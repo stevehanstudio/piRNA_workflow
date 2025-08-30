@@ -13,8 +13,13 @@
 # SAMPLES = [CHIP_SAMPLE, INPUT_SAMPLE]
 
 # Using Panx GLKD dataset first
-CHIP_SAMPLE = "Panx_GLKD_ChIP_input_1st_S1_R1_001"  # Panx GLKD ChIP sample
-INPUT_SAMPLE = "Panx_GLKD_ChIP_input_2nd_S4_R1_001"  # Panx GLKD Input control
+# CHIP_SAMPLE = "Panx_GLKD_ChIP_input_1st_S1_R1_001"  # Panx GLKD ChIP sample
+# INPUT_SAMPLE = "Panx_GLKD_ChIP_input_2nd_S4_R1_001"  # Panx GLKD Input control
+
+# Using White GLKD dataset first
+CHIP_SAMPLE = "White_GLKD_ChIP_input_1st_S7_R1_001"  # White GLKD ChIP sample
+INPUT_SAMPLE = "White_GLKD_ChIP_input_2nd_S10_R1_001"  # White GLKD Input control
+
 SAMPLES = [CHIP_SAMPLE, INPUT_SAMPLE]
 
 BIN_SIZES = [10, 100, 1000]

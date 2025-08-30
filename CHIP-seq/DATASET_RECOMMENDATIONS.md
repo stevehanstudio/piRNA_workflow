@@ -8,6 +8,8 @@ The current dataset (SRR030295/SRR030270) has **very poor quality**:
 - **Old sequencing technology** (likely from early 2000s)
 - **Requires extremely lenient parameters** to retain any reads
 
+> **⚠️ Warning**: These datasets are primarily for testing pipeline functionality. For production analysis, use high-quality datasets as recommended below.
+
 ## Recommended High-Quality Datasets
 
 ### 🎯 **Option 1: Recent ENCODE Datasets (Recommended)**
@@ -208,4 +210,16 @@ echo "Surviving reads: $(wc -l < test_trimmed.fastq | awk '{print $1/4}')"
 4. **Test complete pipeline** with standard parameters
 5. **Update documentation** with new dataset information
 
-This will provide a much better demonstration of the pipeline's capabilities and ensure reproducible, high-quality results. 
+This will provide a much better demonstration of the pipeline's capabilities and ensure reproducible, high-quality results.
+
+## Related Documentation
+
+- **[Main README](README.md)**: Comprehensive pipeline documentation
+- **[Quick Setup Guide](QUICK_SETUP.md)**: Fast setup instructions
+- **[Main Project README](../README.md)**: Overview of the entire project
+
+---
+
+**Last Updated**: December 2024  
+**Status**: Active Development  
+**Priority**: High - Dataset quality significantly impacts pipeline performance 

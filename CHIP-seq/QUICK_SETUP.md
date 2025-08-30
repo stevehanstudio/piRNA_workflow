@@ -14,7 +14,7 @@
 1. **Clone the repository**:
    ```bash
    git clone <repository-url>
-   cd chipseq-workflow
+   cd piRNA_workflow/CHIP-seq
    ```
 
 2. **Create the main environment**:
@@ -46,6 +46,19 @@
 ## Troubleshooting
 
 If you encounter issues:
-1. Ensure mamba is installed: `conda install mamba -n base -c conda-forge`
-2. Try using conda instead: Remove `--conda-frontend mamba` from the command
-3. Check environment files exist in `envs/` directory 
+1. **Ensure mamba is installed**: `conda install mamba -n base -c conda-forge`
+2. **Try using conda instead**: Remove `--conda-frontend mamba` from the command
+3. **Check environment files exist** in `envs/` directory
+4. **Check the main README.md** for comprehensive troubleshooting
+5. **Review the dataset recommendations** if using poor quality data
+
+## Related Documentation
+
+- **[Main README](README.md)**: Comprehensive pipeline documentation
+- **[Dataset Recommendations](DATASET_RECOMMENDATIONS.md)**: Data quality guidelines
+- **[Main Project README](../README.md)**: Overview of the entire project
+
+---
+
+**Last Updated**: December 2024  
+**Status**: Production Ready 

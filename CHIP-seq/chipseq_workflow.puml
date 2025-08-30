@@ -1,0 +1,142 @@
+@startuml ChIPSeq_Pipeline_Workflow
+
+title ChIP-seq Analysis Pipeline Workflow
+
+' Input files
+rectangle "Raw FASTQ Files\n(sample).fastq" as rawfastq #E1F5FE
+rectangle "AllAdaptors.fa" as adapters #E1F5FE
+rectangle "dm6.fa reference" as dm6ref #E1F5FE
+rectangle "42AB_UBIG.fa reference" as vectorref #E1F5FE
+
+' Quality control
+rectangle "fastqc_raw\n(Quality Control)" as fastqcraw #F3E5F5
+rectangle "fastqc_trimmed\n(Quality Control)" as fastqctrimmed #F3E5F5
+
+' Trimming and preprocessing
+rectangle "trim_adapters\n(Cutadapt)" as trimadapters #F3E5F5
+rectangle "trimmomatic\n(Adapter removal)" as trimmomatic #F3E5F5
+rectangle "trim_to_50bp\n(Length trimming)" as trim50bp #F3E5F5
+
+' Main genome mapping pipeline
+rectangle "bowtie_mapping\n(Map to dm6)" as bowtiemap #F3E5F5
+rectangle "samtools_view\n(SAM to BAM)" as samtobam #F3E5F5
+rectangle "samtools_sort_and_index\n(Sort & Index)" as sortindex #F3E5F5
+rectangle "remove_mitochondrial_reads\n(Filter chrM)" as removemito #F3E5F5
+rectangle "samtools_sort_no_mito\n(Sort filtered)" as sortnomito #F3E5F5
+rectangle "samtools_rmdup\n(Remove duplicates)" as rmdup #F3E5F5
+
+' Vector mapping pipeline
+rectangle "bowtie_vector_mapping\n(Map to vectors)" as vectormap #F3E5F5
+rectangle "samtools_view_vector\n(SAM to BAM)" as vectorsamtobam #F3E5F5
+rectangle "samtools_sort_and_index_vector\n(Sort & Index)" as vectorsort #F3E5F5
+
+' Analysis outputs
+rectangle "make_bigwig\n(Generate BigWig)" as makebigwig #FFF3E0
+rectangle "make_enrichment_track\n(ChIP vs Input)" as enrichment #FFF3E0
+rectangle "bam_coverage\n(Coverage analysis)" as coverage #FFF3E0
+rectangle "chop_bedgraph\n(Binned coverage)" as chopbg #FFF3E0
+rectangle "bam_coverage_transposon\n(Transposon analysis)" as transposoncov #FFF3E0
+rectangle "chop_bedgraph_transposon\n(Transposon binning)" as transposonchop #FFF3E0
+
+' Final outputs
+rectangle "BigWig files\n(.bigwig)" as bigwigout #FFEBEE
+rectangle "Enrichment tracks\n(.enrichment.bigwig)" as enrichmentout #FFEBEE
+rectangle "Coverage files\n(.bg4)" as coverageout #FFEBEE
+rectangle "Chopped coverage\n(.chopped.bg4)" as choppedout #FFEBEE
+rectangle "Transposon analysis\n(42AB, 20A regions)" as transposonout #FFEBEE
+
+' Workflow connections
+rawfastq --> fastqcraw
+rawfastq --> trimadapters
+trimadapters --> trimmomatic
+adapters --> trimmomatic
+trimmomatic --> fastqctrimmed
+trimmomatic --> trim50bp
+
+' Main genome pipeline
+trim50bp --> bowtiemap
+bowtiemap --> samtobam
+dm6ref --> samtobam
+samtobam --> sortindex
+sortindex --> removemito
+dm6ref --> removemito
+removemito --> sortnomito
+sortnomito --> rmdup
+
+' Vector pipeline
+trim50bp --> vectormap
+vectormap --> vectorsamtobam
+vectorref --> vectorsamtobam
+vectorsamtobam --> vectorsort
+
+' Analysis branches
+rmdup --> makebigwig
+makebigwig --> bigwigout
+rmdup --> enrichment
+enrichment --> enrichmentout
+vectorsort --> coverage
+coverage --> coverageout
+coverage --> chopbg
+chopbg --> choppedout
+rmdup --> transposoncov
+transposoncov --> transposonchop
+transposonchop --> transposonout
+
+' Grouping
+package "Input Data" {
+  rawfastq
+  adapters
+  dm6ref
+  vectorref
+}
+
+package "Quality Control" {
+  fastqcraw
+  fastqctrimmed
+}
+
+package "Read Processing" {
+  trimadapters
+  trimmomatic
+  trim50bp
+}
+
+package "Genome Mapping Pipeline" {
+  bowtiemap
+  samtobam
+  sortindex
+  removemito
+  sortnomito
+  rmdup
+}
+
+package "Vector Mapping Pipeline" {
+  vectormap
+  vectorsamtobam
+  vectorsort
+}
+
+package "Analysis & Visualization" {
+  makebigwig
+  enrichment
+  coverage
+  chopbg
+  transposoncov
+  transposonchop
+}
+
+package "Final Outputs" {
+  bigwigout
+  enrichmentout
+  coverageout
+  choppedout
+  transposonout
+}
+
+note right of enrichment : ChIP vs Input comparison\nfor differential analysis
+
+note right of transposoncov : Specific analysis for:\n- 42AB (chr2R:2144349-2386719)\n- 20A (chrX:21392175-21431907)
+
+note right of coverage : Multiple bin sizes:\n10, 100, 1000 bp\nStrand-specific analysis
+
+@enduml

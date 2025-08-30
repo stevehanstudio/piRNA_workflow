@@ -2,7 +2,7 @@
 
 A reproducible ChIP-seq analysis pipeline converted from shell commands to Snakemake workflow.
 
-**⚠️ Work in Progress**: This project is actively under development. The pipeline is functional but may undergo further improvements and refinements.
+**✅ Production Ready**: This pipeline is fully functional and has been tested with multiple datasets. It provides a complete ChIP-seq analysis workflow from raw data to publication-ready results.
 
 ## Overview
 
@@ -459,6 +459,12 @@ If you use this pipeline, please cite:
 - **Snakemake**: Köster, J., & Rahmann, S. (2012). Snakemake—a scalable bioinformatics workflow engine. Bioinformatics, 28(19), 2520-2522.
 - **DeepTools**: Ramírez, F., et al. (2016). deepTools2: a next generation web server for deep-sequencing data analysis. Nucleic acids research, 44(W1), W160-W165.
 - **Bowtie**: Langmead, B., et al. (2009). Ultrafast and memory-efficient alignment of short DNA sequences to the human genome. Genome biology, 10(3), R25.
+
+## Related Documentation
+
+- **[Main Project README](../README.md)**: Overview of the entire piRNA workflow project
+- **[Quick Setup Guide](QUICK_SETUP.md)**: Fast setup instructions
+- **[Dataset Recommendations](DATASET_RECOMMENDATIONS.md)**: Data quality guidelines and recommendations
 
 ## Contributing
 
