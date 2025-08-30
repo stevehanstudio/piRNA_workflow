@@ -1,0 +1,13 @@
+name: chipseq_env
+channels:
+   - bioconda
+   - conda-forge
+   - defaults
+dependencies:
+   - fastqc=0.11.9
+   - bowtie=1.2.3
+   - samtools=1.15
+   - bedtools=2.30.0
+   - homer=4.11
+   - r-base=4.2.0
+   - python=3.9

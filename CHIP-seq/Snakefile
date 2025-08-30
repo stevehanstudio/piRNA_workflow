@@ -1,0 +1,794 @@
+# Data ref: https://www.encodeproject.org/experiments/ENCSR128VHN/
+# GSE256757 Dataset: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE256757
+#
+
+# Todo:
+# - Add Bowtie index building for dm6 (bowtie-index/) and 42AB_UBIG.fa (genomes/YichengVectors/)
+# - Add download of 42AB_UBIG.fa from https://github.com/Peng-He-Lab/Luo_2025_piRNA/tree/main/DataFiles
+# - Add download of AllAdaptors.fa from https://github.com/Peng-He-Lab/Luo_2025_piRNA/tree/main/DataFiles
+
+# Commented out original datasets
+# CHIP_SAMPLE = "SRR030295"  # H3K27Ac ChIP sample
+# INPUT_SAMPLE = "SRR030270"  # E0-4 Input control
+# SAMPLES = [CHIP_SAMPLE, INPUT_SAMPLE]
+
+# Using Panx GLKD dataset first
+CHIP_SAMPLE = "Panx_GLKD_ChIP_input_1st_S1_R1_001"  # Panx GLKD ChIP sample
+INPUT_SAMPLE = "Panx_GLKD_ChIP_input_2nd_S4_R1_001"  # Panx GLKD Input control
+SAMPLES = [CHIP_SAMPLE, INPUT_SAMPLE]
+
+BIN_SIZES = [10, 100, 1000]
+TRANSPOSON_BIN_SIZES = [10, 50, 100, 500, 1000]
+
+# SAMPLES = ["SRR10094667"]  # Original single sample
+
+
+rule all:
+    input:
+        expand("results/fastqc_trimmed/{sample}", sample=SAMPLES),
+        expand("results/trimmed_50bp/{sample}.fastq", sample=SAMPLES),
+        expand("results/bowtie/{sample}.sorted_final.bam", sample=SAMPLES),
+        expand("results/bowtie/{sample}.sorted_final.bam.bai", sample=SAMPLES),
+        expand("results/bowtie/{sample}.no_mito_sorted.bam", sample=SAMPLES),
+        expand("results/bowtie/{sample}.rmdup.bam", sample=SAMPLES),
+        expand("results/bowtie/{sample}.rmdup.bam.bai", sample=SAMPLES),
+        expand("results/vector_mapping/{sample}.vectoronly.dup.bam", sample=SAMPLES),
+        expand("results/vector_mapping/{sample}.vectoronly.dup.bam.bai", sample=SAMPLES),
+        expand("results/bowtie/{sample}.bigwig", sample=SAMPLES),
+        # Add enrichment tracks - ChIP vs Input comparison
+        "results/enrichment/Panx_GLKD_ChIP_input_1st_S1_R1_001_vs_Panx_GLKD_ChIP_input_2nd_S4_R1_001.enrichment.bigwig",
+        # Add new coverage processing outputs
+        expand(
+            "results/coverage/{sample}.{binsize}.bg4",
+            sample=SAMPLES,
+            binsize=BIN_SIZES,
+        ),
+        expand(
+            "results/coverage/{sample}.{binsize}.Minus.bg4",
+            sample=SAMPLES,
+            binsize=BIN_SIZES,
+        ),
+        expand(
+            "results/coverage/{sample}.{binsize}.Plus.bg4",
+            sample=SAMPLES,
+            binsize=BIN_SIZES,
+        ),
+        expand(
+            "results/coverage/{sample}.{binsize}.Minus.bg4.chopped.bg4",
+            sample=SAMPLES,
+            binsize=BIN_SIZES,
+        ),
+        expand(
+            "results/coverage/{sample}.{binsize}.Plus.bg4.chopped.bg4",
+            sample=SAMPLES,
+            binsize=BIN_SIZES,
+        ),
+        # Add transposon analysis outputs
+        expand(
+            "results/transposon/{sample}.{binsize}.42AB.bg4",
+            sample=SAMPLES,
+            binsize=TRANSPOSON_BIN_SIZES,
+        ),
+        expand(
+            "results/transposon/{sample}.{binsize}.42AB.Minus.bg4",
+            sample=SAMPLES,
+            binsize=TRANSPOSON_BIN_SIZES,
+        ),
+        expand(
+            "results/transposon/{sample}.{binsize}.42AB.Plus.bg4",
+            sample=SAMPLES,
+            binsize=TRANSPOSON_BIN_SIZES,
+        ),
+        expand(
+            "results/transposon/{sample}.{binsize}.20A.bg4",
+            sample=SAMPLES,
+            binsize=TRANSPOSON_BIN_SIZES,
+        ),
+        expand(
+            "results/transposon/{sample}.{binsize}.20A.Minus.bg4",
+            sample=SAMPLES,
+            binsize=TRANSPOSON_BIN_SIZES,
+        ),
+        expand(
+            "results/transposon/{sample}.{binsize}.20A.Plus.bg4",
+            sample=SAMPLES,
+            binsize=TRANSPOSON_BIN_SIZES,
+        ),
+        expand(
+            "results/transposon/{sample}.{binsize}.42AB.bg4.chopped.bg4",
+            sample=SAMPLES,
+            binsize=TRANSPOSON_BIN_SIZES,
+        ),
+        expand(
+            "results/transposon/{sample}.{binsize}.42AB.Minus.bg4.chopped.bg4",
+            sample=SAMPLES,
+            binsize=TRANSPOSON_BIN_SIZES,
+        ),
+        expand(
+            "results/transposon/{sample}.{binsize}.42AB.Plus.bg4.chopped.bg4",
+            sample=SAMPLES,
+            binsize=TRANSPOSON_BIN_SIZES,
+        ),
+        expand(
+            "results/transposon/{sample}.{binsize}.20A.bg4.chopped.bg4",
+            sample=SAMPLES,
+            binsize=TRANSPOSON_BIN_SIZES,
+        ),
+        expand(
+            "results/transposon/{sample}.{binsize}.20A.Minus.bg4.chopped.bg4",
+            sample=SAMPLES,
+            binsize=TRANSPOSON_BIN_SIZES,
+        ),
+        expand(
+            "results/transposon/{sample}.{binsize}.20A.Plus.bg4.chopped.bg4",
+            sample=SAMPLES,
+            binsize=TRANSPOSON_BIN_SIZES,
+        ),
+
+
+ruleorder: samtools_view > samtools_sort_and_index
+ruleorder: samtools_sort_and_index > remove_mitochondrial_reads
+ruleorder: remove_mitochondrial_reads > samtools_sort_no_mito
+ruleorder: samtools_sort_no_mito > samtools_rmdup
+
+
+rule fastqc_raw:
+    input:
+        fq="{sample}.fastq.gz",
+    output:
+        directory("results/fastqc/{sample}"),
+    params:
+        kmer=6,
+    conda:
+        "envs/fastqc.yaml"
+    shell:
+        """
+        mkdir -p {output}
+        # fastqc {input.fq.gz} -o {output} -k {params.kmer} || exit 1
+        fastqc {input.fq} -o {output} -k {params.kmer} || exit 1
+        echo "FastQC completed for {input.fq}"
+        """
+
+
+rule trim_adapters:
+    input:
+        # fq="{sample}.fastq.gz"
+        fq="{sample}.fastq",
+        # fq="SRR10094667.fastq.gz"
+    output:
+        trimmed="results/trimmed/{sample}.trimmed.fastq",
+    conda:
+        "envs/cutadapt.yaml"
+    shell:
+        """
+        mkdir -p $(dirname {output.trimmed}) || exit 1
+        cutadapt -a CTGTCTCTTATACAC {input.fq} | \
+        cutadapt -a CGTATGCCGTCTTCTGCTTG - | \
+        cutadapt -g TGCCGTCTTCTGCTTG - | \
+        cutadapt -g GGTAACTTTGTGTTT - | \
+        cutadapt -g CTTTGTGTTTGA - | \
+        cutadapt -a CACTCGTCGGCAGCGTTAGATGTGTATAAG - > {output.trimmed} || exit 1
+        echo "Adapter trimming completed for {input.fq}"
+        """
+
+
+# Source of AllAdaptors.fa: https://github.com/Peng-He-Lab/Luo_2025_piRNA/tree/main/DataFiles
+rule trimmomatic:
+    input:
+        trimmed="results/trimmed/{sample}.trimmed.fastq",
+        adapters="AllAdaptors.fa",
+    output:
+        alltrimmed="results/trimmomatic/{sample}.alltrimmed.fastq",
+        log="results/trimmomatic/{sample}.trimmomatic.log",
+    conda:
+        "envs/trimmomatic.yaml"
+    threads: 4
+    shell:
+        """
+        mkdir -p $(dirname {output.alltrimmed}) || exit 1
+        trimmomatic SE  -phred33 -threads {threads} \
+            -trimlog {output.log} \
+            {input.trimmed} {output.alltrimmed} \
+            ILLUMINACLIP:{input.adapters}:2:30:10 \
+            LEADING:20 TRAILING:20 SLIDINGWINDOW:4:5 MINLEN:20 || exit 1
+        echo "Trimmomatic completed for {input.trimmed}"
+        """
+
+
+rule fastqc_trimmed:
+    input:
+        alltrimmed="results/trimmomatic/{sample}.alltrimmed.fastq",
+    output:
+        directory("results/fastqc_trimmed/{sample}"),
+    params:
+        kmer=6,
+    conda:
+        "envs/fastqc.yaml"
+    shell:
+        """
+        mkdir -p {output}
+        fastqc {input.alltrimmed} -o {output} -k {params.kmer} || exit 1
+        echo "FastQC completed for trimmed reads {input.alltrimmed}"
+        """
+
+
+rule trim_to_50bp:
+    input:
+        alltrimmed="results/trimmomatic/{sample}.alltrimmed.fastq",
+    output:
+        trimmed_50bp="results/trimmed_50bp/{sample}.fastq",
+    conda:
+        "envs/python2.yaml"  # Ensure you have a conda environment with Python 2
+    shell:
+        """
+        mkdir -p $(dirname {output.trimmed_50bp}) || exit 1
+        python2 ../Shared/Scripts/trimfastq.py {input.alltrimmed} 50 -stdout 2>/dev/null > {output.trimmed_50bp} || exit 1
+        echo "Trimming to 50bp completed for {input.alltrimmed}"
+        """
+
+
+rule bowtie_mapping:
+    input:
+        trimmed_50bp="results/trimmed_50bp/{sample}.fastq",
+    output:
+        sam="results/bowtie/{sample}.sam",
+    conda:
+        "envs/bowtie.yaml"
+    threads: 8
+    shell:
+        """
+        mkdir -p results/bowtie || exit 1
+        bowtie ../Shared/DataFiles/genome/bowtie-indexes/dm6 -p {threads} -v 2 -k 1 -m 1 -t --sam --best --strata -y --quiet {input.trimmed_50bp} > {output.sam} || exit 1
+        echo "Bowtie mapping completed for {input.trimmed_50bp}"        """
+
+
+# Note: Samtools version 0.1.8 is not available in bioconda channel
+rule samtools_view:
+    input:
+        sam="results/bowtie/{sample}.sam",
+        reference="../Shared/DataFiles/genome/dm6.fa",
+    output:
+        bam="results/bowtie/{sample,[^/.]+}.bam",
+    conda:
+        "envs/samtools-0.1.12.yaml"
+    shell:
+        """
+        samtools view -bT {input.reference} {input.sam} > {output.bam} || exit 1
+        echo "SAM to BAM conversion completed for {input.sam}"
+        """
+
+
+# Note: Does not run with Samtools version 0.1.16
+rule samtools_sort_and_index:
+    input:
+        bam="results/bowtie/{sample}.bam",
+    output:
+        sorted_bam="results/bowtie/{sample}.sorted_final.bam",
+        bai="results/bowtie/{sample}.sorted_final.bam.bai",
+    conda:
+        "envs/samtools-1.16.1.yaml"
+    shell:
+        """
+        echo "Before sorting:"
+        ls -lh results/bowtie/
+        samtools sort -o {output.sorted_bam} {input.bam} || exit 1
+        echo "After sorting:"
+        ls -lh results/bowtie/
+        samtools index {output.sorted_bam} || exit 1
+        echo "Indexing completed for {output.sorted_bam}"
+        """
+
+
+rule remove_mitochondrial_reads:
+    input:
+        sorted_bam="results/bowtie/{sample}.sorted_final.bam",
+    output:
+        no_mito_bam="results/bowtie/{sample}.mito_removed.bam",
+    conda:
+        "envs/samtools-0.1.16.yaml"
+    shell:
+        """
+        samtools view {input.sorted_bam} | egrep -v 'chrM' | samtools view -bT ../Shared/DataFiles/genome/dm6.fa - > {output.no_mito_bam} || exit 1
+        samtools index {output.no_mito_bam} || exit 1
+        echo "Mitochondrial reads removal completed for {input.sorted_bam}"        
+        """
+
+
+# Additional step to sort the no_mito.bam file
+rule samtools_sort_no_mito:
+    input:
+        bam="results/bowtie/{sample}.mito_removed.bam",
+    output:
+        sorted_bam="results/bowtie/{sample}.no_mito_sorted.bam",
+        bai="results/bowtie/{sample}.no_mito_sorted.bam.bai",
+    conda:
+        "envs/samtools-1.16.1.yaml"
+    shell:
+        """
+        samtools sort -o {output.sorted_bam} {input.bam} || exit 1
+        samtools index {output.sorted_bam} || exit 1
+        """
+
+
+# samtools rmdupis deprecated since samtools 0.1.12 -> using samtools markdup
+# (Optional) Remove duplicate reads in case useful
+rule samtools_rmdup:
+    input:
+        sorted_bam="results/bowtie/{sample}.no_mito_sorted.bam",
+    output:
+        dedup_bam="results/bowtie/{sample}.rmdup.bam",
+        dedup_bai="results/bowtie/{sample}.rmdup.bam.bai",
+    conda:
+        "envs/samtools-1.16.1.yaml"
+    shell:
+        """
+        samtools markdup -r -s {input.sorted_bam} {output.dedup_bam} || exit 1
+        samtools index {output.dedup_bam} || exit 1
+        """
+
+
+# Note: Might want to add this to build index if not available
+# import os
+
+# # Define the path to the Bowtie index
+# BOWTIE_INDEX = "genomes/YichengVectors/42AB_UBIG"
+
+# # Rule to build the Bowtie index if it doesn't exist
+# rule build_bowtie_index:
+#     input:
+#         "genomes/YichengVectors/42AB_UBIG.fa"
+#     output:
+#         "genomes/YichengVectors/42AB_UBIG.1.ebwt"  # One of the index files
+#     conda:
+#         "envs/bowtie.yaml"
+#     shell:
+#         """
+#         bowtie-build {input} {os.path.dirname(os.path.abspath({output}))
+#         """
+
+
+# bowtie: unrecognized option '--sam-nh'
+# Map to vectors: Use Bowtie to map reads to the vector index
+rule bowtie_vector_mapping:
+    input:
+        trimmed_50bp="results/trimmed_50bp/{sample}.fastq",
+    output:
+        sam="results/vector_mapping/{sample}.vectoronly.sam",
+    conda:
+        "envs/bowtie.yaml"
+    threads: 8
+    shell:
+        """
+        mkdir -p results/vector_mapping || exit 1
+        bowtie genomes/YichengVectors/42AB_UBIG -p {threads} -v 2 -k 1 -m 1 -t --sam --best -y --strata -q {input.trimmed_50bp} > {output.sam} || exit 1
+        # bowtie genomes/YichengVectors/42AB_UBIG -p {threads} -v 2 -k 1 -m 1 -t --sam-nh --best -y --strata -q {input.trimmed_50bp} > {output.sam} || exit 1
+        """
+
+
+rule samtools_view_vector:
+    input:
+        sam="results/vector_mapping/{sample}.vectoronly.sam",
+        reference="genomes/YichengVectors/42AB_UBIG.fa",
+    output:
+        bam="results/vector_mapping/{sample}.vectoronly.bam",
+    conda:
+        "envs/samtools-1.16.1.yaml"
+        # "envs/samtools-0.1.12.yaml"
+    shell:
+        """
+        echo "Before conversion:"
+        ls -lh results/vector_mapping/
+        echo "First few lines of the SAM file:"
+        head -n 10 {input.sam}
+        echo "Attempting conversion..."
+        samtools view -bT {input.reference} {input.sam} > {output.bam} || exit 1
+        echo "After conversion:"
+        ls -lh results/vector_mapping/
+        """
+
+
+rule samtools_sort_and_index_vector:
+    input:
+        bam="results/vector_mapping/{sample}.vectoronly.bam",
+    output:
+        sorted_bam="results/vector_mapping/{sample}.vectoronly.dup.bam",
+        bai="results/vector_mapping/{sample}.vectoronly.dup.bam.bai",
+    conda:
+        "envs/samtools-1.16.1.yaml"
+        # "envs/samtools-0.1.16.yaml"
+    shell:
+        """
+        samtools sort {input.bam} -o {output.sorted_bam} || exit 1
+        samtools index {output.sorted_bam} || exit 1
+        """
+
+
+# This was from Cursor AI but need to use dm6.chrom.sizes provided by Peng
+# Rule to generate the chrom.sizes file
+# rule generate_chrom_sizes:
+#     input:
+#         "dm6.fa"
+#     output:
+#         "bowtie-indexes/dm6.chrom.sizes"
+#     conda:
+#         "envs/samtools-1.16.1.yaml"
+#     shell:
+#         """
+#         mkdir -p bowtie-indexes
+#         samtools faidx {input}
+#         cut -f1,2 {input}.fai > {output}
+#         """
+
+
+# Note: dm6.chrom.sizes was extracted using grep on the sequence headers and awk to get the lengths
+# grep "^>" dm6.fa | awk '{print $1 "\t" length($0)}' | sed 's/>//g' > dm6.chrom.sizes
+# Source: https://github.com/georgimarinov/GeorgiScripts/blob/master/makewigglefromBAM-NH.py
+rule make_bigwig:
+    input:
+        bam="results/bowtie/{sample}.rmdup.bam",
+        # chrom_sizes="bowtie-indexes/dm6.chrom.sizes"
+        chrom_sizes="../Shared/DataFiles/genome/bowtie-indexes/dm6.chrom.sizes",
+    output:
+        bigwig="results/bowtie/{sample}.bigwig",
+    conda:
+        "envs/python2.yaml"  # Ensure you have a conda environment with Python 2
+    shell:
+        """
+        echo "Debug: Listing contents of the results/bowtie directory before execution:"
+        ls -lh results/bowtie/
+
+        echo "Debug: Checking if the input BAM file exists:"
+        ls -lh {input.bam}
+
+        echo "Debug: Checking if the chrom.sizes file exists:"
+        ls -lh {input.chrom_sizes}
+
+        echo "Running the Python script to generate the Wiggle file..."
+        python ../Shared/Scripts/makewigglefromBAM-NH.py --- {input.bam} {input.chrom_sizes} {output}.bg4 -notitle -uniqueBAM -RPM || exit 1
+
+        echo "Debug: Listing contents of the results/bowtie directory after running the Python script:"
+        ls -lh results/bowtie/
+
+        echo "Debug: Checking if the intermediate .bg4 file was created:"
+        ls -lh {output}.bg4
+
+        echo "Running wigToBigWig to convert the Wiggle file to BigWig format..."
+        wigToBigWig {output}.bg4 {input.chrom_sizes} {output} || exit 1
+
+        echo "Debug: Listing contents of the results/bowtie directory after running wigToBigWig:"
+        ls -lh results/bowtie/
+
+        echo "BigWig file creation completed for {input.bam}"
+
+        # mkdir -p results/bowtie || exit 1
+        # python scripts/makewigglefromBAM-NH.py {input.bam} {input.chrom_sizes} {output}.bg4 --notitle --uniqueBAM --RPM || exit 1
+        # wigToBigWig {output}.bg4 {input.chrom_sizes} {output} || exit 1
+        # echo "BigWig file creation completed for {input.bam}"
+        """
+
+
+# python makewigglefromBAM-NH.py --- 50mer.unique.dup.nochrM.bam genome/bowtie-indexes/dm3.chrom.sizes \
+# dm3.50mer.unique.bg4 -notitle -uniqueBAM -RPM
+# wigToBigWig -clip dm3.50mer.unique.bg4 genome/bowtie-indexes/dm3.chrom.sizes dm3.50mer.unique.bigWig
+
+
+# Make ChIP-vs-Input enrichment track
+rule make_enrichment_track:
+    input:
+        chip_bam="results/bowtie/{chip_sample}.rmdup.bam",
+        input_bam="results/bowtie/{input_sample}.rmdup.bam",
+        blacklist="../Shared/DataFiles/genome/dm6-blacklist.v2.bed.gz",
+    output:
+        enrichment_bigwig="results/enrichment/{chip_sample}_vs_{input_sample}.enrichment.bigwig",
+    conda:
+        "envs/deeptools.yaml"
+    threads: 8
+    shell:
+        """
+        mkdir -p results/enrichment || exit 1
+        
+        # Run bamCompare to create enrichment track
+        bamCompare \
+            -b1 {input.chip_bam} \
+            -b2 {input.input_bam} \
+            -of "bigwig" \
+            -o {output.enrichment_bigwig} \
+            --binSize 10 \
+            -bl {input.blacklist} \
+            -p {threads} || exit 1
+            
+        echo "Enrichment track creation completed for {input.chip_bam} vs {input.input_bam}"
+        """
+
+
+# Rule to generate coverage bedgraph files at different bin sizes
+rule bam_coverage:
+    input:
+        bam="results/vector_mapping/{sample}.vectoronly.dup.bam",
+    output:
+        total="results/coverage/{sample}.{binsize}.bg4",
+        minus="results/coverage/{sample}.{binsize}.Minus.bg4",
+        plus="results/coverage/{sample}.{binsize}.Plus.bg4",
+    conda:
+        "envs/deeptools.yaml"
+    shell:
+        """
+        mkdir -p results/coverage || exit 1
+        
+        # Total coverage
+        bamCoverage \
+            -b {input.bam} \
+            -of bedgraph \
+            -bs {wildcards.binsize} \
+            -o {output.total} || exit 1
+        
+        # Minus strand coverage (reverse reads, SAM flag 16)
+        bamCoverage \
+            -b {input.bam} \
+            -of bedgraph \
+            -bs {wildcards.binsize} \
+            --samFlagInclude 16 \
+            -o {output.minus} || exit 1
+        
+        # Plus strand coverage (forward reads, exclude SAM flag 16)
+        bamCoverage \
+            -b {input.bam} \
+            -of bedgraph \
+            -bs {wildcards.binsize} \
+            --samFlagExclude 16 \
+            -o {output.plus} || exit 1
+        
+        echo "Coverage files generated for {input.bam} at bin size {wildcards.binsize}"
+        """
+
+
+# Rule to create chopped bedgraph files
+rule chop_bedgraph:
+    input:
+        bg4="results/coverage/{sample}.{binsize}.{strand}.bg4",
+    output:
+        chopped="results/coverage/{sample}.{binsize}.{strand}.bg4.chopped.bg4",
+    conda:
+        "envs/bedops.yaml"  # You'll need to create this environment
+    shell:
+        """
+        # Convert bedgraph to 5-column bed format
+        awk -vOFS="\\t" '{{ print $1, $2, $3, ".", $4 }}' {input.bg4} > {input.bg4}.signal.bed || exit 1
+        
+        # Chop into bins and map scores
+        bedops --chop {wildcards.binsize} {input.bg4}.signal.bed | \
+        bedmap --echo --echo-map-score - {input.bg4}.signal.bed | \
+        sed -e 's/|/\\t/g' > {output.chopped} || exit 1
+        
+        # Clean up temporary file
+        rm -f {input.bg4}.signal.bed
+        
+        echo "Chopped bedgraph created for {input.bg4}"
+        """
+
+
+# Transposon analysis - Calculate read counts per equal-sized bin in transposons
+rule bam_coverage_transposon:
+    input:
+        bam="results/bowtie/{sample}.rmdup.bam",
+    output:
+        # 42AB transposon (chr2R:2144349-2386719)
+        total_42AB="results/transposon/{sample}.{binsize}.42AB.bg4",
+        minus_42AB="results/transposon/{sample}.{binsize}.42AB.Minus.bg4",
+        plus_42AB="results/transposon/{sample}.{binsize}.42AB.Plus.bg4",
+        # 20A transposon (chrX:21392175-21431907)
+        total_20A="results/transposon/{sample}.{binsize}.20A.bg4",
+        minus_20A="results/transposon/{sample}.{binsize}.20A.Minus.bg4",
+        plus_20A="results/transposon/{sample}.{binsize}.20A.Plus.bg4",
+    conda:
+        "envs/deeptools.yaml"
+    shell:
+        """
+        mkdir -p results/transposon || exit 1
+        
+        # 42AB transposon analysis (chr2R:2144349:2386719)
+        # Total coverage
+        bamCoverage \
+            -b {input.bam} \
+            -of bedgraph \
+            -bs {wildcards.binsize} \
+            --region chr2R:2144349:2386719 \
+            -o {output.total_42AB} || exit 1
+        
+        # Minus strand coverage (reverse reads, SAM flag 16)
+        bamCoverage \
+            -b {input.bam} \
+            -of bedgraph \
+            -bs {wildcards.binsize} \
+            --region chr2R:2144349:2386719 \
+            --samFlagInclude 16 \
+            -o {output.minus_42AB} || exit 1
+        
+        # Plus strand coverage (forward reads, exclude SAM flag 16)
+        bamCoverage \
+            -b {input.bam} \
+            -of bedgraph \
+            -bs {wildcards.binsize} \
+            --region chr2R:2144349:2386719 \
+            --samFlagExclude 16 \
+            -o {output.plus_42AB} || exit 1
+        
+        # 20A transposon analysis (chrX:21392175:21431907)
+        # Total coverage
+        bamCoverage \
+            -b {input.bam} \
+            -of bedgraph \
+            -bs {wildcards.binsize} \
+            --region chrX:21392175:21431907 \
+            -o {output.total_20A} || exit 1
+        
+        # Minus strand coverage (reverse reads, SAM flag 16)
+        bamCoverage \
+            -b {input.bam} \
+            -of bedgraph \
+            -bs {wildcards.binsize} \
+            --region chrX:21392175:21431907 \
+            --samFlagInclude 16 \
+            -o {output.minus_20A} || exit 1
+        
+        # Plus strand coverage (forward reads, exclude SAM flag 16)
+        bamCoverage \
+            -b {input.bam} \
+            -of bedgraph \
+            -bs {wildcards.binsize} \
+            --region chrX:21392175:21431907 \
+            --samFlagExclude 16 \
+            -o {output.plus_20A} || exit 1
+        
+        echo "Transposon coverage files generated for {input.bam} at bin size {wildcards.binsize}"
+        """
+
+
+# Rule to create chopped bedgraph files for transposons (42AB total)
+rule chop_bedgraph_transposon_42AB_total:
+    input:
+        bg4="results/transposon/{sample}.{binsize}.42AB.bg4",
+    output:
+        chopped="results/transposon/{sample}.{binsize}.42AB.bg4.chopped.bg4",
+    conda:
+        "envs/bedops.yaml"
+    shell:
+        """
+        # Convert bedgraph to 5-column bed format
+        awk -vOFS="\\t" '{{ print $1, $2, $3, ".", $4 }}' {input.bg4} > {input.bg4}.signal.bed || exit 1
+        
+        # Chop into bins and map scores
+        bedops --chop {wildcards.binsize} {input.bg4}.signal.bed | \
+        bedmap --echo --echo-map-score - {input.bg4}.signal.bed | \
+        sed -e 's/|/\\t/g' > {output.chopped} || exit 1
+        
+        # Clean up temporary file
+        rm -f {input.bg4}.signal.bed
+        
+        echo "Chopped transposon bedgraph created for {input.bg4}"
+        """
+
+
+# Rule to create chopped bedgraph files for transposons (20A total)
+rule chop_bedgraph_transposon_20A_total:
+    input:
+        bg4="results/transposon/{sample}.{binsize}.20A.bg4",
+    output:
+        chopped="results/transposon/{sample}.{binsize}.20A.bg4.chopped.bg4",
+    conda:
+        "envs/bedops.yaml"
+    shell:
+        """
+        # Convert bedgraph to 5-column bed format
+        awk -vOFS="\\t" '{{ print $1, $2, $3, ".", $4 }}' {input.bg4} > {input.bg4}.signal.bed || exit 1
+        
+        # Chop into bins and map scores
+        bedops --chop {wildcards.binsize} {input.bg4}.signal.bed | \
+        bedmap --echo --echo-map-score - {input.bg4}.signal.bed | \
+        sed -e 's/|/\\t/g' > {output.chopped} || exit 1
+        
+        # Clean up temporary file
+        rm -f {input.bg4}.signal.bed
+        
+        echo "Chopped transposon bedgraph created for {input.bg4}"
+        """
+
+
+# Rule to create chopped bedgraph files for transposons (42AB Minus)
+rule chop_bedgraph_transposon_42AB_Minus:
+    input:
+        bg4="results/transposon/{sample}.{binsize}.42AB.Minus.bg4",
+    output:
+        chopped="results/transposon/{sample}.{binsize}.42AB.Minus.bg4.chopped.bg4",
+    conda:
+        "envs/bedops.yaml"
+    shell:
+        """
+        # Convert bedgraph to 5-column bed format
+        awk -vOFS="\\t" '{{ print $1, $2, $3, ".", $4 }}' {input.bg4} > {input.bg4}.signal.bed || exit 1
+        
+        # Chop into bins and map scores
+        bedops --chop {wildcards.binsize} {input.bg4}.signal.bed | \
+        bedmap --echo --echo-map-score - {input.bg4}.signal.bed | \
+        sed -e 's/|/\\t/g' > {output.chopped} || exit 1
+        
+        # Clean up temporary file
+        rm -f {input.bg4}.signal.bed
+        
+        echo "Chopped transposon bedgraph created for {input.bg4}"
+        """
+
+
+# Rule to create chopped bedgraph files for transposons (42AB Plus)
+rule chop_bedgraph_transposon_42AB_Plus:
+    input:
+        bg4="results/transposon/{sample}.{binsize}.42AB.Plus.bg4",
+    output:
+        chopped="results/transposon/{sample}.{binsize}.42AB.Plus.bg4.chopped.bg4",
+    conda:
+        "envs/bedops.yaml"
+    shell:
+        """
+        # Convert bedgraph to 5-column bed format
+        awk -vOFS="\\t" '{{ print $1, $2, $3, ".", $4 }}' {input.bg4} > {input.bg4}.signal.bed || exit 1
+        
+        # Chop into bins and map scores
+        bedops --chop {wildcards.binsize} {input.bg4}.signal.bed | \
+        bedmap --echo --echo-map-score - {input.bg4}.signal.bed | \
+        sed -e 's/|/\\t/g' > {output.chopped} || exit 1
+        
+        # Clean up temporary file
+        rm -f {input.bg4}.signal.bed
+        
+        echo "Chopped transposon bedgraph created for {input.bg4}"
+        """
+
+
+# Rule to create chopped bedgraph files for transposons (20A Minus)
+rule chop_bedgraph_transposon_20A_Minus:
+    input:
+        bg4="results/transposon/{sample}.{binsize}.20A.Minus.bg4",
+    output:
+        chopped="results/transposon/{sample}.{binsize}.20A.Minus.bg4.chopped.bg4",
+    conda:
+        "envs/bedops.yaml"
+    shell:
+        """
+        # Convert bedgraph to 5-column bed format
+        awk -vOFS="\\t" '{{ print $1, $2, $3, ".", $4 }}' {input.bg4} > {input.bg4}.signal.bed || exit 1
+        
+        # Chop into bins and map scores
+        bedops --chop {wildcards.binsize} {input.bg4}.signal.bed | \
+        bedmap --echo --echo-map-score - {input.bg4}.signal.bed | \
+        sed -e 's/|/\\t/g' > {output.chopped} || exit 1
+        
+        # Clean up temporary file
+        rm -f {input.bg4}.signal.bed
+        
+        echo "Chopped transposon bedgraph created for {input.bg4}"
+        """
+
+
+# Rule to create chopped bedgraph files for transposons (20A Plus)
+rule chop_bedgraph_transposon_20A_Plus:
+    input:
+        bg4="results/transposon/{sample}.{binsize}.20A.Plus.bg4",
+    output:
+        chopped="results/transposon/{sample}.{binsize}.20A.Plus.bg4.chopped.bg4",
+    conda:
+        "envs/bedops.yaml"
+    shell:
+        """
+        # Convert bedgraph to 5-column bed format
+        awk -vOFS="\\t" '{{ print $1, $2, $3, ".", $4 }}' {input.bg4} > {input.bg4}.signal.bed || exit 1
+        
+        # Chop into bins and map scores
+        bedops --chop {wildcards.binsize} {input.bg4}.signal.bed | \
+        bedmap --echo --echo-map-score - {input.bg4}.signal.bed | \
+        sed -e 's/|/\\t/g' > {output.chopped} || exit 1
+        
+        # Clean up temporary file
+        rm -f {input.bg4}.signal.bed
+        
+        echo "Chopped transposon bedgraph created for {input.bg4}"
+        """

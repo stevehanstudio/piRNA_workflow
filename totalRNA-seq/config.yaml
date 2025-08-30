@@ -1,0 +1,32 @@
+# Configuration file for totalRNA-seq Snakemake workflow
+
+# Input file
+fastq_file: "../CHIP-seq/all.fastq"
+
+# Read trimming parameters
+read_length: 50
+
+# FastQC version (for reference)
+fastqc_version: "0.11.3"
+
+# Adapter sequences for cutadapt (leave empty if not trimming adapters)
+# Example: adapters: "AGATCGGAAGAGC"
+adapters: ""
+
+# Output directory structure
+results_dir: "results"
+fastqc_initial_dir: "results/fastqc_initial"
+fastqc_trimmed_dir: "results/fastqc_trimmed"
+cutadapt_dir: "results/cutadapt"
+trimmed_dir: "results/trimmed"
+mapping_dir: "results/mapping"
+rrna_dir: "results/rrna_removal"
+star_dir: "results/star_alignment"
+vector_dir: "results/vector_mapping"
+
+# Mapping parameters
+threads: 8
+rrna_index: "indexes/rrna/dmel_rRNA_unit"
+genome_dir: "../Shared/DataFiles/genome/star-index"
+vector_index: "../Shared/DataFiles/genome/YichengVectors/42AB_UBIG"
+vector_ref: "../Shared/DataFiles/genome/YichengVectors/42AB_UBIG.fa"

@@ -1,0 +1,5 @@
+{
+    "python.defaultInterpreterPath": "/home/steve/miniconda3/envs/snakemake_env/bin/python",
+    "python.terminal.activateEnvironment": true,
+    "python.condaPath": "/home/steve/miniconda3/bin/conda"
+}

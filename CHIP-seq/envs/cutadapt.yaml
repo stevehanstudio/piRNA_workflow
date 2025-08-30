@@ -1,0 +1,7 @@
+name: cutadapt
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - cutadapt=1.8.3
+  - python=2.7  # needed for older cutadapt versions

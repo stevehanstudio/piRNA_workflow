@@ -1,0 +1,130 @@
+# Snakemake workflow for totalRNA-seq processing
+# This workflow handles reads trimming and quality control
+
+# Configuration
+configfile: "config.yaml"
+
+# Define input files
+FASTQ_FILE = config["fastq_file"]
+READ_LENGTH = config["read_length"]
+FASTQC_VERSION = config["fastqc_version"]
+TRIMFASTQ_SCRIPT = "../Shared/Scripts/trimfastq.py"
+
+# Define output directories
+RESULTS_DIR = "results"
+FASTQC_INITIAL_DIR = f"{RESULTS_DIR}/fastqc_initial"
+FASTQC_TRIMMED_DIR = f"{RESULTS_DIR}/fastqc_trimmed"
+TRIMMED_FASTQ = f"{RESULTS_DIR}/trimmed/allfastq{READ_LENGTH}"
+CUTADAPT_DIR = f"{RESULTS_DIR}/cutadapt"
+MAPPING_DIR = f"{RESULTS_DIR}/mapping"
+RRNA_DIR = f"{RESULTS_DIR}/rrna_removal"
+STAR_DIR = f"{RESULTS_DIR}/star_alignment"
+VECTOR_DIR = f"{RESULTS_DIR}/vector_mapping"
+
+# Rule all - defines the final outputs
+rule all:
+    input:
+        f"{FASTQC_INITIAL_DIR}/all_fastqc.html",
+        f"{FASTQC_TRIMMED_DIR}/allfastq{READ_LENGTH}_fastqc.html",
+        f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam",
+        f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam.bai",
+        f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.bam",
+        f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.bam.bai"
+
+# Initial FastQC quality check
+rule fastqc_initial:
+    input:
+        fastq = FASTQ_FILE
+    output:
+        html = f"{FASTQC_INITIAL_DIR}/all_fastqc.html",
+        zip = f"{FASTQC_INITIAL_DIR}/all_fastqc.zip"
+    conda:
+        "envs/fastqc.yaml"
+    shell:
+        "mkdir -p {FASTQC_INITIAL_DIR} && fastqc {input.fastq} -o {FASTQC_INITIAL_DIR} -k 6"
+
+# Optional: Adapter trimming with cutadapt (if adapters are known)
+rule cutadapt_trim:
+    input:
+        fastq = FASTQ_FILE
+    output:
+        trimmed = f"{CUTADAPT_DIR}/all_cutadapt.fastq"
+    conda:
+        "envs/cutadapt.yaml"
+    params:
+        adapters = config.get("adapters", "")
+    shell:
+        "mkdir -p {CUTADAPT_DIR} && cutadapt -a {params.adapters} -o {output.trimmed} {input.fastq}" if params.adapters else "mkdir -p {CUTADAPT_DIR} && cp {input.fastq} {output.trimmed}"
+
+# Read trimming to specified length using cutadapt
+rule trim_reads:
+    input:
+        fastq = rules.cutadapt_trim.output.trimmed
+    output:
+        trimmed = TRIMMED_FASTQ
+    conda:
+        "envs/cutadapt.yaml"
+    params:
+        length = READ_LENGTH
+    shell:
+        "mkdir -p {RESULTS_DIR}/trimmed && cutadapt -l {params.length} {input.fastq} -o {output.trimmed}"
+
+# Final FastQC quality check on trimmed reads
+rule fastqc_trimmed:
+    input:
+        fastq = rules.trim_reads.output.trimmed
+    output:
+        html = f"{FASTQC_TRIMMED_DIR}/allfastq{READ_LENGTH}_fastqc.html",
+        zip = f"{FASTQC_TRIMMED_DIR}/allfastq{READ_LENGTH}_fastqc.zip"
+    conda:
+        "envs/fastqc.yaml"
+    shell:
+        "mkdir -p {FASTQC_TRIMMED_DIR} && fastqc {input.fastq} -o {FASTQC_TRIMMED_DIR} -k 6"
+
+# Ribosomal RNA removal using bowtie
+rule rrna_removal:
+    input:
+        fastq = rules.trim_reads.output.trimmed
+    output:
+        unmapped = f"{RRNA_DIR}/Unmapped50.fastq",
+        mapped = f"{RRNA_DIR}/allfastq.rRNA.mapped50.map"
+    conda:
+        "envs/bowtie.yaml"
+    params:
+        threads = config.get("threads", 8),
+        rrna_index = config.get("rrna_index", "dmel_rRNA_unit")
+    shell:
+        "mkdir -p {RRNA_DIR} && bowtie {params.rrna_index} -p {params.threads} -v 2 -k 1 --best -t -S -q {input.fastq} --un {output.unmapped} {output.mapped}"
+
+# STAR alignment to transcriptome
+rule star_alignment:
+    input:
+        fastq = rules.rrna_removal.output.unmapped
+    output:
+        bam = f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.bam",
+        sorted_bam = f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam",
+        sorted_bai = f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam.bai"
+    conda:
+        "envs/star.yaml"
+    params:
+        threads = config.get("threads", 8),
+        genome_dir = config.get("genome_dir", "dm6"),
+        prefix = "dm6.50mer"
+    shell:
+        "mkdir -p {STAR_DIR} && STAR --genomeDir {params.genome_dir} --readFilesIn {input.fastq} --runThreadN {params.threads} --genomeLoad NoSharedMemory --outFilterMultimapNmax 1 --alignSJoverhangMin 8 --alignSJDBoverhangMin 1 --outFilterMismatchNmax 999 --outFilterMismatchNoverReadLmax 0.0 --alignIntronMin 20 --alignIntronMax 1000000 --alignMatesGapMax 1000000 --outSAMheaderCommentFile {STAR_DIR}/COfile.txt --outSAMheaderHD @HD VN:1.4 SO:coordinate --outSAMunmapped Within --outFilterType BySJout --outSAMattributes NH HI AS NM MD --outSAMtype BAM SortedByCoordinate --quantMode TranscriptomeSAM GeneCounts --sjdbScore 1 --limitBAMsortRAM 30000000000 --outFileNamePrefix {STAR_DIR}/{params.prefix} --outSAMstrandField intronMotif && samtools sort {output.bam} {STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted && samtools index {output.sorted_bam}"
+
+# Vector mapping using bowtie
+rule vector_mapping:
+    input:
+        fastq = rules.rrna_removal.output.unmapped
+    output:
+        bam = f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.bam",
+        bai = f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.bam.bai"
+    conda:
+        "envs/bowtie.yaml"
+    params:
+        threads = config.get("threads", 8),
+        vector_index = config.get("vector_index", "../Shared/DataFiles/genome/YichengVectors/42AB_UBIG"),
+        vector_ref = config.get("vector_ref", "../Shared/DataFiles/genome/YichengVectors/42AB_UBIG.fa")
+    shell:
+        "mkdir -p {VECTOR_DIR} && bowtie {params.vector_index} -p {params.threads} --chunkmbs 1024 -v 0 -a -m 1 -t -S --best --strata -q {input.fastq} -k 1 --al {VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.fastq | samtools view -F 4 -bT {params.vector_ref} - | samtools sort - {VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup && samtools index {output.bam}"

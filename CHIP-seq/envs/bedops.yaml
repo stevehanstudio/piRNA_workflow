@@ -1,0 +1,8 @@
+name: bedops
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - bedops
+  - gawk
