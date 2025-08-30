@@ -17,6 +17,22 @@ bowtie-indexes_old/
 SRR*/
 FastQCk6/
 
+# Large annotation files
+*.gtf
+*.gff
+*.gff3
+
+# Large log files
+Log.out
+*.log
+*.log.*
+
+# Large genome files
+*.fa
+*.fa.gz
+*.fa.bz2
+*.fa.xz
+
 # Bioinformatics results and intermediate files
 *.bam
 *.sam
