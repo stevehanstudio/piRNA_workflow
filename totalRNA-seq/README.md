@@ -119,7 +119,7 @@ snakemake --use-conda --conda-create-envs-only
 
 ### Python 2.7 Requirement
 
-The `trimfastq.py` script requires Python 2.7. The conda environment `trimfastq.yaml` handles this automatically.
+The `trimfastq.py` script requires Python 2.7 due to legacy dependencies. The conda environment `trimfastq.yaml` handles this automatically. For new projects, consider using modern alternatives like `cutadapt` for read trimming.
 
 ## Original Commands
 
@@ -169,4 +169,24 @@ bowtie UBIG -p 8 --chunkmbs 1024 -v 0 -a -m 1 -t --sam-nh --best --strata -q --s
 
 ## License
 
-[Add your license information here]
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+
+## Support
+
+For issues and questions:
+1. Check the troubleshooting section above
+2. Review the main project README
+3. Open an issue on the repository
+4. Contact the development team
+
+---
+
+**Last Updated**: December 2024  
+**Status**: Active Development

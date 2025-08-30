@@ -8,12 +8,12 @@ This folder contains resources shared between the CHIP-seq and totalRNA-seq work
 - **Source**: Original script from Georgi Marinov (modified 12/06/2012)
 - **Purpose**: Trims FASTQ files to specified lengths with various options
 - **Usage**: Used by both workflows for read length trimming
-- **Dependencies**: Python 2.7 (psyco optional for performance)
+- **Dependencies**: Python 2.7 (legacy script, managed via conda environment)
 
 ### filter_trimfastq.py
 - **Purpose**: Filters output from trimfastq.py to remove progress messages
 - **Usage**: Used by totalRNA-seq workflow to clean up trimfastq.py output
-- **Dependencies**: Python 2.7
+- **Dependencies**: Python 2.7 (legacy script, managed via conda environment)
 
 ### makewigglefromBAM-NH.py
 - **Purpose**: Converts BAM files to wiggle format for visualization
@@ -79,6 +79,25 @@ Both workflows reference these shared resources using relative paths:
 
 ## Notes
 
-- The trimfastq.py script requires Python 2.7 due to legacy dependencies
+- The trimfastq.py script requires Python 2.7 due to legacy dependencies (managed via conda environment)
 - Both workflows maintain their own Snakefiles and configurations
 - Shared resources are read-only from the workflow perspective
+- Python 2.7 scripts are automatically managed by Snakemake conda environments
+
+## Modern Alternatives
+
+For new projects, consider replacing legacy Python 2.7 scripts with:
+- **cutadapt**: Modern adapter trimming and length filtering
+- **seqtk**: Fast sequence toolkit for read manipulation
+- **bioawk**: Bioinformatics-aware awk for sequence processing
+
+## Related Documentation
+
+- **[Main Project README](../README.md)**: Overview of the entire piRNA workflow project
+- **[CHIP-seq README](../CHIP-seq/README.md)**: ChIP-seq pipeline documentation
+- **[TotalRNA-seq README](../totalRNA-seq/README.md)**: RNA-seq processing documentation
+
+---
+
+**Last Updated**: December 2024  
+**Status**: Production Ready
