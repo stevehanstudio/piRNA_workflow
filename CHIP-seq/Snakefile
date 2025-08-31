@@ -1,0 +1,464 @@
+# ChIP-seq Analysis Pipeline (Snakemake)
+# Based on Peng-He-Lab/Luo_2025_piRNA repository
+# This workflow processes ChIP-seq data from raw FASTQ to BigWig visualization
+
+# Shared file paths - centralized configuration
+# These variables centralize all shared file paths for easy maintenance
+# If you need to change the location of shared files, update these variables only
+SHARED_SCRIPTS = "../Shared/Scripts"
+SHARED_DATA = "../Shared/DataFiles"
+SHARED_GENOME = f"{SHARED_DATA}/genome"
+
+# Scripts (updated paths for reorganized structure)
+TRIMFASTQ_SCRIPT = f"{SHARED_SCRIPTS}/python/trimfastq.py"
+MAKEWIGGLE_SCRIPT = f"{SHARED_SCRIPTS}/python/makewigglefromBAM-NH.py"
+
+# Genome files
+DM6_REFERENCE = f"{SHARED_GENOME}/dm6.fa"
+DM6_BLACKLIST = f"{SHARED_GENOME}/dm6-blacklist.v2.bed.gz"
+DM6_CHROM_SIZES = f"{SHARED_GENOME}/bowtie-indexes/dm6.chrom.sizes"
+DM6_BOWTIE_INDEX = f"{SHARED_GENOME}/bowtie-indexes/dm6"
+
+# Vector files
+VECTOR_42AB_INDEX = f"{SHARED_GENOME}/YichengVectors/42AB_UBIG"
+VECTOR_42AB_REF = f"{SHARED_GENOME}/YichengVectors/42AB_UBIG.fa"
+VECTOR_20A_INDEX = f"{SHARED_GENOME}/YichengVectors/20A"
+VECTOR_20A_REF = f"{SHARED_GENOME}/YichengVectors/20A.fa"
+
+# Adapter files
+ADAPTERS_FILE = f"{SHARED_DATA}/AllAdaptors.fa"
+
+# Sample configuration
+CHIP_SAMPLE = "White_GLKD_ChIP_input_1st_S7_R1_001"  # ChIP sample
+INPUT_SAMPLE = "White_GLKD_ChIP_input_2nd_S10_R1_001"  # Input control
+SAMPLES = [CHIP_SAMPLE, INPUT_SAMPLE]
+
+# Analysis parameters
+BIN_SIZES = [10, 100, 1000]
+TRANSPOSON_BIN_SIZES = [10, 50, 100, 500, 1000]
+
+# Main rule - defines all outputs
+rule all:
+    input:
+        # Quality control outputs
+        expand("results/fastqc_trimmed/{sample}", sample=SAMPLES),
+        expand("results/trimmed_50bp/{sample}.fastq", sample=SAMPLES),
+        
+        # Genome mapping outputs
+        expand("results/bowtie/{sample}.sorted_final.bam", sample=SAMPLES),
+        expand("results/bowtie/{sample}.sorted_final.bam.bai", sample=SAMPLES),
+        expand("results/bowtie/{sample}.no_mito_sorted.bam", sample=SAMPLES),
+        expand("results/bowtie/{sample}.rmdup.bam", sample=SAMPLES),
+        expand("results/bowtie/{sample}.rmdup.bam.bai", sample=SAMPLES),
+        
+        # Vector mapping outputs
+        expand("results/vector_mapping/{sample}.vectoronly.dup.bam", sample=SAMPLES),
+        expand("results/vector_mapping/{sample}.vectoronly.dup.bam.bai", sample=SAMPLES),
+        
+        # Signal outputs
+        expand("results/bowtie/{sample}.bigwig", sample=SAMPLES),
+        
+        # Enrichment analysis
+        "results/enrichment/Panx_GLKD_ChIP_input_1st_S1_R1_001_vs_Panx_GLKD_ChIP_input_2nd_S4_R1_001.enrichment.bigwig",
+        
+        # Coverage analysis
+        expand(
+            "results/coverage/{sample}.{binsize}.bg4",
+            sample=SAMPLES,
+            binsize=BIN_SIZES,
+        ),
+        expand(
+            "results/coverage/{sample}.{binsize}.Minus.bg4",
+            sample=SAMPLES,
+            binsize=BIN_SIZES,
+        ),
+        expand(
+            "results/coverage/{sample}.{binsize}.Plus.bg4",
+            sample=SAMPLES,
+            binsize=BIN_SIZES,
+        ),
+        expand(
+            "results/coverage/{sample}.{binsize}.Minus.bg4.chopped.bg4",
+            sample=SAMPLES,
+            binsize=BIN_SIZES,
+        ),
+        expand(
+            "results/coverage/{sample}.{binsize}.Plus.bg4.chopped.bg4",
+            sample=SAMPLES,
+            binsize=BIN_SIZES,
+        ),
+        
+        # Transposon analysis
+        expand(
+            "results/transposon/{sample}.{binsize}.42AB.bg4",
+            sample=SAMPLES,
+            binsize=TRANSPOSON_BIN_SIZES,
+        ),
+        expand(
+            "results/transposon/{sample}.{binsize}.42AB.Minus.bg4",
+            sample=SAMPLES,
+            binsize=TRANSPOSON_BIN_SIZES,
+        ),
+        expand(
+            "results/transposon/{sample}.{binsize}.42AB.Plus.bg4",
+            sample=SAMPLES,
+            binsize=TRANSPOSON_BIN_SIZES,
+        ),
+        expand(
+            "results/transposon/{sample}.{binsize}.20A.bg4",
+            sample=SAMPLES,
+            binsize=TRANSPOSON_BIN_SIZES,
+        ),
+        expand(
+            "results/transposon/{sample}.{binsize}.20A.Minus.bg4",
+            sample=SAMPLES,
+            binsize=TRANSPOSON_BIN_SIZES,
+        ),
+        expand(
+            "results/transposon/{sample}.{binsize}.20A.Plus.bg4",
+            sample=SAMPLES,
+            binsize=TRANSPOSON_BIN_SIZES,
+        )
+
+# Index building rules - these generate indexes from source files
+rule build_dm6_bowtie_index:
+    input:
+        dm6_fa = DM6_REFERENCE
+    output:
+        index_files = expand(f"{DM6_BOWTIE_INDEX}.{{ext}}", ext=["1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt"])
+    conda:
+        "envs/bowtie.yaml"
+    shell:
+        """
+        mkdir -p $(dirname {DM6_BOWTIE_INDEX})
+        bowtie-build {input.dm6_fa} {DM6_BOWTIE_INDEX}
+        """
+
+rule build_vector_42AB_index:
+    input:
+        vector_fa = VECTOR_42AB_REF
+    output:
+        index_files = expand(f"{VECTOR_42AB_INDEX}.{{ext}}", ext=["1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt"])
+    conda:
+        "envs/bowtie.yaml"
+    shell:
+        """
+        mkdir -p $(dirname {VECTOR_42AB_INDEX})
+        bowtie-build {input.vector_fa} {VECTOR_42AB_INDEX}
+        """
+
+rule build_vector_20A_index:
+    input:
+        vector_fa = VECTOR_20A_REF
+    output:
+        index_files = expand(f"{VECTOR_20A_INDEX}.{{ext}}", ext=["1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt"])
+    conda:
+        "envs/bowtie.yaml"
+    shell:
+        """
+        mkdir -p $(dirname {VECTOR_20A_INDEX})
+        bowtie-build {input.vector_fa} {VECTOR_20A_INDEX}
+        """
+
+rule generate_chrom_sizes:
+    input:
+        dm6_fa = DM6_REFERENCE
+    output:
+        chrom_sizes = DM6_CHROM_SIZES
+    conda:
+        "envs/samtools-1.16.1.yaml"
+    shell:
+        """
+        mkdir -p $(dirname {output.chrom_sizes})
+        samtools faidx {input.dm6_fa}
+        cut -f1,2 {input.dm6_fa}.fai > {output.chrom_sizes}
+        """
+
+# Quality control rules
+rule fastqc_raw:
+    input:
+        fastq = "{sample}.fastq"
+    output:
+        html = "results/fastqc_raw/{sample}_fastqc.html",
+        zip = "results/fastqc_raw/{sample}_fastqc.zip"
+    conda:
+        "envs/fastqc.yaml"
+    shell:
+        """
+        mkdir -p results/fastqc_raw
+        fastqc {input.fastq} -o results/fastqc_raw
+        """
+
+rule trim_adapters:
+    input:
+        fastq = "{sample}.fastq",
+        adapters = ADAPTERS_FILE
+    output:
+        trimmed = "results/trimmed/{sample}.trimmed.fastq"
+    conda:
+        "envs/cutadapt.yaml"
+    shell:
+        """
+        mkdir -p results/trimmed
+        cutadapt -a file:{input.adapters} -o {output.trimmed} {input.fastq}
+        """
+
+rule trimmomatic:
+    input:
+        fastq = "results/trimmed/{sample}.trimmed.fastq"
+    output:
+        trimmed = "results/trimmomatic/{sample}.alltrimmed.fastq"
+    conda:
+        "envs/trimmomatic.yaml"
+    shell:
+        """
+        mkdir -p results/trimmomatic
+        trimmomatic SE {input.fastq} {output.trimmed} \
+            ILLUMINACLIP:{ADAPTERS_FILE}:2:30:10 \
+            LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:50
+        """
+
+rule fastqc_trimmed:
+    input:
+        fastq = "results/trimmomatic/{sample}.alltrimmed.fastq"
+    output:
+        html = "results/fastqc_trimmed/{sample}_fastqc.html",
+        zip = "results/fastqc_trimmed/{sample}_fastqc.zip"
+    conda:
+        "envs/fastqc.yaml"
+    shell:
+        """
+        mkdir -p results/fastqc_trimmed
+        fastqc {input.fastq} -o results/fastqc_trimmed
+        """
+
+rule trim_to_50bp:
+    input:
+        alltrimmed = "results/trimmomatic/{sample}.alltrimmed.fastq"
+    output:
+        trimmed_50bp = "results/trimmed_50bp/{sample}.fastq"
+    conda:
+        "envs/python2.yaml"
+    shell:
+        """
+        mkdir -p $(dirname {output.trimmed_50bp})
+        python2 {TRIMFASTQ_SCRIPT} {input.alltrimmed} 50 -stdout 2>/dev/null > {output.trimmed_50bp}
+        """
+
+# Genome mapping rules
+rule bowtie_mapping:
+    input:
+        trimmed_50bp = "results/trimmed_50bp/{sample}.fastq",
+        index_files = expand(f"{DM6_BOWTIE_INDEX}.{{ext}}", ext=["1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt"])
+    output:
+        sam = "results/bowtie/{sample}.sam"
+    conda:
+        "envs/bowtie.yaml"
+    threads: 8
+    shell:
+        """
+        mkdir -p results/bowtie
+        bowtie {DM6_BOWTIE_INDEX} -p {threads} -v 2 -k 1 -m 1 -t --sam --best --strata -y --quiet {input.trimmed_50bp} > {output.sam}
+        """
+
+rule samtools_view:
+    input:
+        sam = "results/bowtie/{sample}.sam",
+        reference = DM6_REFERENCE
+    output:
+        bam = "results/bowtie/{sample}.bam"
+    conda:
+        "envs/samtools-0.1.12.yaml"
+    shell:
+        """
+        samtools view -bT {input.reference} {input.sam} > {output.bam}
+        """
+
+rule samtools_sort_and_index:
+    input:
+        bam = "results/bowtie/{sample}.bam"
+    output:
+        sorted_bam = "results/bowtie/{sample}.sorted_final.bam",
+        bai = "results/bowtie/{sample}.sorted_final.bam.bai"
+    conda:
+        "envs/samtools-1.16.1.yaml"
+    shell:
+        """
+        samtools sort -o {output.sorted_bam} {input.bam}
+        samtools index {output.sorted_bam}
+        """
+
+rule remove_mitochondrial_reads:
+    input:
+        sorted_bam = "results/bowtie/{sample}.sorted_final.bam"
+    output:
+        no_mito_bam = "results/bowtie/{sample}.mito_removed.bam"
+    conda:
+        "envs/samtools-0.1.16.yaml"
+    shell:
+        """
+        samtools view {input.sorted_bam} | egrep -v 'chrM' | samtools view -bT {DM6_REFERENCE} - > {output.no_mito_bam}
+        samtools index {output.no_mito_bam}
+        """
+
+rule samtools_sort_no_mito:
+    input:
+        bam = "results/bowtie/{sample}.mito_removed.bam"
+    output:
+        sorted_bam = "results/bowtie/{sample}.no_mito_sorted.bam",
+        bai = "results/bowtie/{sample}.no_mito_sorted.bam.bai"
+    conda:
+        "envs/samtools-1.16.1.yaml"
+    shell:
+        """
+        samtools sort -o {output.sorted_bam} {input.bam}
+        samtools index {output.sorted_bam}
+        """
+
+rule samtools_rmdup:
+    input:
+        bam = "results/bowtie/{sample}.no_mito_sorted.bam"
+    output:
+        rmdup_bam = "results/bowtie/{sample}.rmdup.bam",
+        bai = "results/bowtie/{sample}.rmdup.bam.bai"
+    conda:
+        "envs/samtools-1.16.1.yaml"
+    shell:
+        """
+        samtools markdup {input.bam} {output.rmdup_bam}
+        samtools index {output.rmdup_bam}
+        """
+
+# Vector mapping rules
+rule bowtie_vector_mapping:
+    input:
+        trimmed_50bp = "results/trimmed_50bp/{sample}.fastq",
+        index_files = expand(f"{VECTOR_42AB_INDEX}.{{ext}}", ext=["1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt"])
+    output:
+        sam = "results/vector_mapping/{sample}.vectoronly.sam"
+    conda:
+        "envs/bowtie.yaml"
+    threads: 8
+    shell:
+        """
+        mkdir -p results/vector_mapping
+        bowtie {VECTOR_42AB_INDEX} -p {threads} --chunkmbs 1024 -v 0 -a -m 1 -t --sam --best --strata -q {input.trimmed_50bp} > {output.sam}
+        """
+
+rule samtools_view_vector:
+    input:
+        sam = "results/vector_mapping/{sample}.vectoronly.sam",
+        reference = VECTOR_42AB_REF
+    output:
+        bam = "results/vector_mapping/{sample}.vectoronly.bam"
+    conda:
+        "envs/samtools-0.1.12.yaml"
+    shell:
+        """
+        samtools view -F 4 -bT {input.reference} {input.sam} > {output.bam}
+        """
+
+rule samtools_sort_and_index_vector:
+    input:
+        bam = "results/vector_mapping/{sample}.vectoronly.bam"
+    output:
+        sorted_bam = "results/vector_mapping/{sample}.vectoronly.dup.bam",
+        bai = "results/vector_mapping/{sample}.vectoronly.dup.bam.bai"
+    conda:
+        "envs/samtools-1.16.1.yaml"
+    shell:
+        """
+        samtools sort -o {output.sorted_bam} {input.bam}
+        samtools index {output.sorted_bam}
+        """
+
+# Signal generation rules
+rule make_bigwig:
+    input:
+        bam = "results/bowtie/{sample}.rmdup.bam",
+        chrom_sizes = DM6_CHROM_SIZES
+    output:
+        bigwig = "results/bowtie/{sample}.bigwig"
+    conda:
+        "envs/python2.yaml"
+    shell:
+        """
+        python {MAKEWIGGLE_SCRIPT} --- {input.bam} {input.chrom_sizes} {output}.bg4 -notitle -uniqueBAM -RPM
+        wigToBigWig {output}.bg4 {input.chrom_sizes} {output}
+        """
+
+rule make_enrichment_track:
+    input:
+        chip_bam = f"results/bowtie/{CHIP_SAMPLE}.rmdup.bam",
+        input_bam = f"results/bowtie/{INPUT_SAMPLE}.rmdup.bam",
+        blacklist = DM6_BLACKLIST
+    output:
+        enrichment_bigwig = "results/enrichment/Panx_GLKD_ChIP_input_1st_S1_R1_001_vs_Panx_GLKD_ChIP_input_2nd_S4_R1_001.enrichment.bigwig"
+    conda:
+        "envs/deeptools.yaml"
+    threads: 8
+    shell:
+        """
+        mkdir -p results/enrichment
+        bamCompare -b1 {input.chip_bam} -b2 {input.input_bam} -of bigwig -o {output.enrichment_bigwig} --binSize 10 -bl {input.blacklist} -p {threads}
+        """
+
+# Coverage analysis rules
+rule bam_coverage:
+    input:
+        bam = "results/vector_mapping/{sample}.vectoronly.dup.bam"
+    output:
+        total = "results/coverage/{sample}.{binsize}.bg4",
+        minus = "results/coverage/{sample}.{binsize}.Minus.bg4",
+        plus = "results/coverage/{sample}.{binsize}.Plus.bg4"
+    conda:
+        "envs/deeptools.yaml"
+    shell:
+        """
+        mkdir -p results/coverage
+        bamCoverage -b {input.bam} -o {output.total} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize 143726002
+        bamCoverage -b {input.bam} -o {output.minus} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize 143726002 --filterRNAstrand forward
+        bamCoverage -b {input.bam} -o {output.plus} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize 143726002 --filterRNAstrand reverse
+        """
+
+rule chop_bedgraph:
+    input:
+        bg4 = "results/coverage/{sample}.{binsize}.{strand}.bg4"
+    output:
+        chopped = "results/coverage/{sample}.{binsize}.{strand}.bg4.chopped.bg4"
+    conda:
+        "envs/bedops.yaml"
+    shell:
+        """
+        bedops --chop {input.bg4} > {output.chopped}
+        """
+
+# Transposon analysis rules
+rule bam_coverage_transposon:
+    input:
+        bam = "results/bowtie/{sample}.rmdup.bam"
+    output:
+        total = "results/transposon/{sample}.{binsize}.42AB.bg4",
+        minus = "results/transposon/{sample}.{binsize}.42AB.Minus.bg4",
+        plus = "results/transposon/{sample}.{binsize}.42AB.Plus.bg4"
+    conda:
+        "envs/deeptools.yaml"
+    shell:
+        """
+        mkdir -p results/transposon
+        bamCoverage -b {input.bam} -o {output.total} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize 143726002
+        bamCoverage -b {input.bam} -o {output.minus} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize 143726002 --filterRNAstrand forward
+        bamCoverage -b {input.bam} -o {output.plus} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize 143726002 --filterRNAstrand reverse
+        """
+
+rule chop_bedgraph_transposon:
+    input:
+        bg4 = "results/transposon/{sample}.{binsize}.42AB.{strand}.bg4"
+    output:
+        chopped = "results/transposon/{sample}.{binsize}.42AB.{strand}.bg4.chopped.bg4"
+    conda:
+        "envs/bedops.yaml"
+    shell:
+        """
+        bedops --chop {input.bg4} > {output.chopped}
+        """

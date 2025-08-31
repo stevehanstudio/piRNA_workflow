@@ -18,41 +18,21 @@ This pipeline processes ChIP-seq data from raw FASTQ files to BigWig visualizati
 
 ## Workflow Overview
 
-```
-Raw FASTQ Files
-       ↓
-   FastQC (QC)
-       ↓
-Adapter Trimming (cutadapt)
-       ↓
-Quality Trimming (Trimmomatic)
-       ↓
-Length Trimming (50bp)
-       ↓
-Genome Mapping (Bowtie)
-       ↓
-Vector Mapping (Bowtie)
-       ↓
-SAM → BAM Conversion
-       ↓
-Mitochondrial Removal
-       ↓
-Duplicate Removal
-       ↓
-BigWig Generation
-       ↓
-Enrichment Analysis (ChIP vs Input)
-       ↓
-Coverage Analysis (multiple bin sizes)
-       ↓
-Transposon Analysis
-```
+![ChIP-seq Workflow](../Shared/DataFiles/workflow_images/chipseq_workflow.png)
+
+*The ChIP-seq workflow processes raw FASTQ files through quality control, adapter trimming, read mapping (both genome and vector), and generates BigWig tracks, enrichment analysis, and coverage analysis at multiple resolutions.*
 
 ### Key Dependencies
 - **Quality Control**: Must pass before mapping
 - **Mapping**: Requires both genome and vector indexes
 - **Coverage**: Depends on successful mapping
 - **Enrichment**: Requires both ChIP and Input samples
+
+### Workflow Diagram
+The workflow diagram above is generated from the PlantUML source file located at `../Shared/Scripts/plantuml/chipseq_workflow.puml`. To regenerate the image or modify the workflow visualization, edit the PUML file and run:
+```bash
+plantuml -tpng chipseq_workflow.puml -o ../Shared/DataFiles/workflow_images/
+```
 
 ## Quick Start
 

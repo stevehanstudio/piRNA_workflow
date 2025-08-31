@@ -12,7 +12,7 @@ SHARED_DATA = "../Shared/DataFiles"
 SHARED_GENOME = f"{SHARED_DATA}/genome"
 
 # Scripts
-TRIMFASTQ_SCRIPT = f"{SHARED_SCRIPTS}/trimfastq.py"
+TRIMFASTQ_SCRIPT = f"{SHARED_SCRIPTS}/python/trimfastq.py"
 
 # Vector files
 VECTOR_42AB_INDEX = f"{SHARED_GENOME}/YichengVectors/42AB_UBIG"
