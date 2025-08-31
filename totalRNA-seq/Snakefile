@@ -4,11 +4,24 @@
 # Configuration
 configfile: "config.yaml"
 
+# Shared file paths - centralized configuration
+# These variables centralize all shared file paths for easy maintenance
+# If you need to change the location of shared files, update these variables only
+SHARED_SCRIPTS = "../Shared/Scripts"
+SHARED_DATA = "../Shared/DataFiles"
+SHARED_GENOME = f"{SHARED_DATA}/genome"
+
+# Scripts
+TRIMFASTQ_SCRIPT = f"{SHARED_SCRIPTS}/trimfastq.py"
+
+# Vector files
+VECTOR_42AB_INDEX = f"{SHARED_GENOME}/YichengVectors/42AB_UBIG"
+VECTOR_42AB_REF = f"{SHARED_GENOME}/YichengVectors/42AB_UBIG.fa"
+
 # Define input files
 FASTQ_FILE = config["fastq_file"]
 READ_LENGTH = config["read_length"]
 FASTQC_VERSION = config["fastqc_version"]
-TRIMFASTQ_SCRIPT = "../Shared/Scripts/trimfastq.py"
 
 # Define output directories
 RESULTS_DIR = "results"
@@ -124,7 +137,7 @@ rule vector_mapping:
         "envs/bowtie.yaml"
     params:
         threads = config.get("threads", 8),
-        vector_index = config.get("vector_index", "../Shared/DataFiles/genome/YichengVectors/42AB_UBIG"),
-        vector_ref = config.get("vector_ref", "../Shared/DataFiles/genome/YichengVectors/42AB_UBIG.fa")
+        vector_index = config.get("vector_index", VECTOR_42AB_INDEX),
+        vector_ref = config.get("vector_ref", VECTOR_42AB_REF)
     shell:
         "mkdir -p {VECTOR_DIR} && bowtie {params.vector_index} -p {params.threads} --chunkmbs 1024 -v 0 -a -m 1 -t -S --best --strata -q {input.fastq} -k 1 --al {VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.fastq | samtools view -F 4 -bT {params.vector_ref} - | samtools sort - {VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup && samtools index {output.bam}"
