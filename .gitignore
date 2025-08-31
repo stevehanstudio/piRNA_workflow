@@ -1,0 +1,133 @@
+# Bioinformatics Workflow .gitignore
+# This file ignores generated files, indexes, and large data files
+# that should not be stored in version control
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Conda and environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.snakemake/
+
+# Snakemake
+.snakemake/
+results/
+results_*/
+*.log
+*.log.*
+
+# Large data files
+*.fastq
+*.fastq.gz
+*.fq
+*.fq.gz
+*.fa
+*.fa.gz
+*.fa.bz2
+*.fa.xz
+*.gtf
+*.gff
+*.gff3
+*.bed
+*.bed.gz
+*.bed.bgz
+*.bam
+*.sam
+*.bai
+*.cram
+*.crai
+
+# Index files (should be generated, not stored in git)
+*.ebwt
+*.bt2
+*.bt2l
+*.crai
+*.csi
+*.tbi
+*.fai
+*.dict
+*.idx
+*.amb
+*.ann
+*.bwt
+*.pac
+*.sa
+*.bci
+
+# Bioinformatics results and intermediate files
+*.bigwig
+*.bg4
+*.bedgraph
+*.wig
+*.tdf
+*.bw
+*.vcf
+*.vcf.gz
+*.bcf
+*.gvcf
+
+# Generated index directories
+bowtie-indexes/
+star-indexes/
+bwa-indexes/
+hisat2-indexes/
+salmon-indexes/
+kallisto-indexes/
+indexes/
+STAR/
+star/
+
+# Specific workflow directories
+genomes/
+bowtie-indexes_old/
+FastQCk6/
+SRR*/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup

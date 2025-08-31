@@ -1,3 +1,7 @@
+# Bioinformatics Workflow .gitignore
+# This file ignores generated files, indexes, and large data files
+# that should not be stored in version control
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -13,6 +17,29 @@ __pycache__/
 genomes/
 bowtie-indexes/
 bowtie-indexes_old/
+
+# Index files (should be generated, not stored in git)
+*.ebwt
+*.bt2
+*.bt2l
+*.crai
+*.csi
+*.tbi
+*.fai
+*.dict
+*.idx
+*.amb
+*.ann
+*.bwt
+*.pac
+*.sa
+*.bai
+*.bci
+*.csi
+*.tbi
+STAR/
+star/
+indexes/
 
 SRR*/
 FastQCk6/
@@ -50,10 +77,41 @@ Log.out
 *.tbi
 *.csi
 
+# Additional bioinformatics file types
+*.vcf
+*.vcf.gz
+*.bcf
+*.gvcf
+*.fasta
+*.fastq
+*.fq
+*.fa
+*.fa.gz
+*.gtf
+*.gff
+*.gff3
+*.bed.gz
+*.bed.bgz
+*.bw
+*.bigwig
+*.wig
+*.tdf
+*.bam.bai
+*.cram
+*.cram.crai
+
 # Intermediate results
 results/
 results_old/
 .snakemake/
+
+# Generated index directories
+bowtie-indexes/
+star-indexes/
+bwa-indexes/
+hisat2-indexes/
+salmon-indexes/
+kallisto-indexes/
 
 # C extensions
 *.so

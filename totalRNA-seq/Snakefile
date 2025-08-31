@@ -18,6 +18,10 @@ TRIMFASTQ_SCRIPT = f"{SHARED_SCRIPTS}/trimfastq.py"
 VECTOR_42AB_INDEX = f"{SHARED_GENOME}/YichengVectors/42AB_UBIG"
 VECTOR_42AB_REF = f"{SHARED_GENOME}/YichengVectors/42AB_UBIG.fa"
 
+# Additional shared files
+DM6_REFERENCE = f"{SHARED_GENOME}/dm6.fa"
+RRNA_REFERENCE = f"{SHARED_GENOME}/rrna/dmel_rRNA_unit.fa"
+
 # Define input files
 FASTQ_FILE = config["fastq_file"]
 READ_LENGTH = config["read_length"]
@@ -33,6 +37,32 @@ MAPPING_DIR = f"{RESULTS_DIR}/mapping"
 RRNA_DIR = f"{RESULTS_DIR}/rrna_removal"
 STAR_DIR = f"{RESULTS_DIR}/star_alignment"
 VECTOR_DIR = f"{RESULTS_DIR}/vector_mapping"
+
+# Index building rules - these generate indexes from source files
+rule build_vector_42AB_index:
+    input:
+        vector_fa = VECTOR_42AB_REF
+    output:
+        index_files = expand(f"{VECTOR_42AB_INDEX}.{{ext}}", ext=["1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt"])
+    conda:
+        "envs/bowtie.yaml"
+    shell:
+        """
+        mkdir -p $(dirname {VECTOR_42AB_INDEX})
+        bowtie-build {input.vector_fa} {VECTOR_42AB_INDEX}
+        """
+
+rule build_rrna_index:
+    input:
+        rrna_fa = RRNA_REFERENCE
+    output:
+        index_files = expand("dmel_rRNA_unit.{{ext}}", ext=["1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt"])
+    conda:
+        "envs/bowtie.yaml"
+    shell:
+        """
+        bowtie-build {input.rrna_fa} dmel_rRNA_unit
+        """
 
 # Rule all - defines the final outputs
 rule all:
@@ -129,7 +159,8 @@ rule star_alignment:
 # Vector mapping using bowtie
 rule vector_mapping:
     input:
-        fastq = rules.rrna_removal.output.unmapped
+        fastq = rules.rrna_removal.output.unmapped,
+        vector_index_files = expand(f"{VECTOR_42AB_INDEX}.{{ext}}", ext=["1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt"])
     output:
         bam = f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.bam",
         bai = f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.bam.bai"
@@ -137,7 +168,7 @@ rule vector_mapping:
         "envs/bowtie.yaml"
     params:
         threads = config.get("threads", 8),
-        vector_index = config.get("vector_index", VECTOR_42AB_INDEX),
-        vector_ref = config.get("vector_ref", VECTOR_42AB_REF)
+        vector_index = VECTOR_42AB_INDEX,
+        vector_ref = VECTOR_42AB_REF
     shell:
         "mkdir -p {VECTOR_DIR} && bowtie {params.vector_index} -p {params.threads} --chunkmbs 1024 -v 0 -a -m 1 -t -S --best --strata -q {input.fastq} -k 1 --al {VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.fastq | samtools view -F 4 -bT {params.vector_ref} - | samtools sort - {VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup && samtools index {output.bam}"
