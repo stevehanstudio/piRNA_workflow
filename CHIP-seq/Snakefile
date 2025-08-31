@@ -26,7 +26,7 @@ VECTOR_20A_INDEX = f"{SHARED_GENOME}/YichengVectors/20A"
 VECTOR_20A_REF = f"{SHARED_GENOME}/YichengVectors/20A.fa"
 
 # Adapter files
-ADAPTERS_FILE = f"{SHARED_DATA}/AllAdaptors.fa"
+ADAPTERS_FILE = f"{SHARED_GENOME}/AllAdaptors.fa"
 
 # Sample configuration
 CHIP_SAMPLE = "White_GLKD_ChIP_input_1st_S7_R1_001"  # ChIP sample

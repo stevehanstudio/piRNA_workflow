@@ -15,7 +15,6 @@ bowtie-indexes/
 bowtie-indexes_old/
 
 SRR*/
-FastQCk6/
 
 # Large annotation files
 *.gtf
@@ -23,7 +22,6 @@ FastQCk6/
 *.gff3
 
 # Large log files
-Log.out
 *.log
 *.log.*
 
@@ -108,7 +106,6 @@ cover/
 *.pot
 
 # Django stuff:
-*.log
 local_settings.py
 db.sqlite3
 db.sqlite3-journal

@@ -4,7 +4,7 @@
 
 This document explains our approach to handling bioinformatics index files in the piRNA workflow project.
 
-## Why Indexes Shouldn't Be in Git
+## Why Indexes is not stored in this repository
 
 ### **1. File Size Issues**
 - **Bowtie indexes** (`.ebwt` files): 2-10GB each
@@ -211,9 +211,3 @@ Consider using Snakemake's `--cache` feature for sharing indexes between users.
 
 ### **3. Index Versioning**
 Track index versions and rebuild when source files change.
-
----
-
-**Last Updated**: December 2024  
-**Status**: Implemented  
-**Impact**: High - Improves repository management and user experience

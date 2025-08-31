@@ -107,7 +107,6 @@ star/
 # Specific workflow directories
 genomes/
 bowtie-indexes_old/
-FastQCk6/
 SRR*/
 
 # IDE and editor files

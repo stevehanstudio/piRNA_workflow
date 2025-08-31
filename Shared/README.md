@@ -96,8 +96,3 @@ For new projects, consider replacing legacy Python 2.7 scripts with:
 - **[Main Project README](../README.md)**: Overview of the entire piRNA workflow project
 - **[CHIP-seq README](../CHIP-seq/README.md)**: ChIP-seq pipeline documentation
 - **[TotalRNA-seq README](../totalRNA-seq/README.md)**: RNA-seq processing documentation
-
----
-
-**Last Updated**: December 2024  
-**Status**: Production Ready

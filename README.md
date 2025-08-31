@@ -1,126 +1,227 @@
-# Shared Scripts
+# piRNA Workflow Project
 
-This directory contains scripts organized by type for the piRNA workflow project.
+A bioinformatics workflow system for piRNA and ChIP-seq analysis, featuring reproducible Snakemake pipelines and shared resources. This project is a **work in progress** that builds upon and extends the original methodologies from the Peng-He-Lab.
 
-## Directory Structure
+## 🚀 Project Overview
+
+This repository contains a bioinformatics workflow system that is **converting all workflows** from the [Peng-He-Lab/Luo_2025_piRNA repository](https://github.com/Peng-He-Lab/Luo_2025_piRNA) from shell scripts to Snakemake:
+
+- **CHIP-seq Pipeline**: ✅ Converted - ChIP-seq analysis from raw FASTQ to BigWig visualization
+- **TotalRNA-seq Pipeline**: ✅ Converted - Total RNA-seq processing with rRNA removal and alignment
+- **piRNA-seq Pipeline**: 🚧 Converting - Specialized piRNA analysis pipeline
+- **Fusion Reads Pipeline**: 📋 Planned - Detection and analysis of fusion reads
+- **RIP-seq Pipeline**: 📋 Planned - RNA immunoprecipitation sequencing
+- **Shared Resources**: Common scripts, genomes, and data files used by all workflows
+
+## 🔄 Relationship to Original Work
+
+This project is a **modernization and extension** of the original work by [Luo et al. 2025](https://www.sciencedirect.com/science/article/pii/S1097276523007979?dgcid=coauthor) and the [Peng-He-Lab/Luo_2025_piRNA repository](https://github.com/Peng-He-Lab/Luo_2025_piRNA).
+
+### **What We've Modernized**
+- **Shell Scripts → Snakemake**: Converted original shell-based pipelines to reproducible Snakemake workflows
+- **Manual Dependencies → Conda**: Automated environment management with conda/mamba
+- **Hardcoded Paths → Variables**: Centralized path management for better maintainability
+- **Single-threaded → Parallel**: Added parallel processing capabilities
+- **Documentation**: Comprehensive READMEs and setup guides
+
+### **What We've Extended**
+- **Additional QC Steps**: Enhanced quality control and reporting
+- **Flexible Configuration**: Easy customization for different datasets
+- **Performance Optimization**: Resource-aware execution and monitoring
+- **Modern Tools**: Updated to current software versions and best practices
+
+### **Conversion Plan**
+- **Phase 1**: ✅ CHIP-seq and TotalRNA-seq (Completed)
+- **Phase 2**: 🚧 piRNA-seq (In Progress)
+- **Phase 3**: 📋 Fusion Reads and RIP-seq (Planned)
+- **Goal**: Complete conversion of all 5 original workflows to Snakemake
+
+## 📁 Project Structure
 
 ```
-Scripts/
-├── python/          # Python scripts for data processing
-├── shell/           # Bash/shell scripts for setup and maintenance
-├── plantuml/        # PlantUML diagrams for workflow documentation
-└── README.md        # This file
+piRNA_workflow/
+├── CHIP-seq/                 # ✅ ChIP-seq analysis pipeline (Converted)
+│   ├── Snakefile            # Main workflow definition
+│   ├── envs/                # Conda environment definitions
+│   ├── results/             # Analysis outputs
+│   └── README.md            # Detailed ChIP-seq documentation
+├── totalRNA-seq/            # ✅ Total RNA-seq processing pipeline (Converted)
+│   ├── Snakefile            # Main workflow definition
+│   ├── envs/                # Conda environment definitions
+│   ├── results/             # Analysis outputs
+│   └── README.md            # Detailed RNA-seq documentation
+├── piRNA-seq/               # 🚧 piRNA-seq pipeline (Converting)
+│   ├── Snakefile            # Main workflow definition (in progress)
+│   ├── envs/                # Conda environment definitions
+│   ├── results/             # Analysis outputs
+│   └── README.md            # Detailed piRNA-seq documentation
+├── fusion-reads/            # 📋 Fusion reads pipeline (Planned)
+│   ├── Snakefile            # Main workflow definition (planned)
+│   ├── envs/                # Conda environment definitions
+│   ├── results/             # Analysis outputs
+│   └── README.md            # Detailed fusion reads documentation
+├── RIP-seq/                 # 📋 RIP-seq pipeline (Planned)
+│   ├── Snakefile            # Main workflow definition (planned)
+│   ├── envs/                # Conda environment definitions
+│   ├── results/             # Analysis outputs
+│   └── README.md            # Detailed RIP-seq documentation
+├── Shared/                   # Common resources
+│   ├── Scripts/             # Shared Python, shell, and PlantUML scripts
+│   ├── DataFiles/           # Common genome files and datasets
+│   └── README.md            # Shared resources documentation
+└── README.md                 # This file
 ```
 
-## Script Categories
+## 🎯 Key Features
 
-### **Python Scripts** (`python/`)
-- **Data processing** scripts used by workflows
-- **Legacy Python 2.7** scripts (managed via conda)
-- **Modern Python 3** scripts for new functionality
-- **Automatically managed** by Snakemake workflows
+### **Reproducibility**
+- **Snakemake workflows** for reproducible analysis
+- **Conda environments** for dependency management
+- **Version-controlled** configurations and parameters
 
-### **Shell Scripts** (`shell/`)
-- **Setup scripts** for initial configuration
-- **Maintenance scripts** for updates and maintenance
-- **Index building** scripts for bioinformatics tools
-- **File download** and preparation scripts
+### **Scalability**
+- **Parallel processing** with configurable core usage
+- **Modular design** for easy customization
+- **Resource-aware** execution
 
-### **PlantUML Diagrams** (`plantuml/`)
-- **Workflow documentation** in visual format
-- **Project structure** diagrams
-- **Data flow** representations
-- **Component relationship** diagrams
+### **Quality Control**
+- **Multi-step QC** with FastQC integration
+- **Adapter trimming** and quality filtering
+- **Comprehensive reporting** at each step
 
-## Quick Start
+### **Analysis Capabilities**
+- **ChIP-seq**: Peak detection, enrichment analysis, BigWig generation
+- **RNA-seq**: rRNA removal, transcriptome alignment, vector mapping
+- **Coverage analysis** at multiple resolutions
+- **Transposon-specific** analysis
 
-### **Python Scripts**
-```bash
-# Scripts are automatically used by workflows
-# No manual execution required
-cd python/
-ls -la  # View available scripts
-```
+### **Modernization**
+- **Conversion from shell scripts** to Snakemake workflows
+- **Updated software versions** and best practices
+- **Enhanced reproducibility** and scalability
 
-### **Shell Scripts**
-```bash
-# Setup scripts for initial configuration
-cd shell/
-chmod +x *.sh  # Make executable
-./create_star_index.sh  # Create STAR index
-./create_rrna_index.sh  # Create rRNA index
-```
+## 🚀 Quick Start
 
-### **PlantUML Diagrams**
-```bash
-# View workflow diagrams
-cd plantuml/
-plantuml chipseq_workflow.puml  # Generate PNG
-# Or use online viewer: http://www.plantuml.com/plantuml/uml/
-```
+### Prerequisites
 
-## Script Management
+1. **Install Miniconda**:
+   ```bash
+   wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+   bash Miniconda3-latest-Linux-x86_64.sh
+   ```
 
-### **Adding New Scripts**
-1. **Python scripts** → `python/` folder
-2. **Shell scripts** → `shell/` folder
-3. **PlantUML diagrams** → `plantuml/` folder
-4. **Update README** in appropriate folder
-5. **Test functionality** before committing
+2. **Install mamba** (recommended):
+   ```bash
+   conda install mamba -n base -c conda-forge
+   ```
 
-### **Script Dependencies**
-- **Python scripts**: Managed by conda environments
-- **Shell scripts**: Require bioinformatics tools (Bowtie, STAR, etc.)
-- **PlantUML**: Requires PlantUML installation for generation
+### Basic Usage
 
-### **Version Control**
-- **All scripts** are version controlled
-- **Generated outputs** are ignored by .gitignore
-- **Index files** are built automatically, not stored
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd piRNA_workflow
+   ```
 
-## Integration with Workflows
+2. **Run ChIP-seq pipeline**:
+   ```bash
+   cd CHIP-seq
+   snakemake --use-conda --conda-frontend mamba --cores 8
+   ```
 
-### **Snakemake Integration**
-- **Python scripts** are called by Snakefile rules
-- **Paths updated** to use new folder structure
-- **Automatic execution** during workflow runs
+3. **Run TotalRNA-seq pipeline**:
+   ```bash
+   cd totalRNA-seq
+   snakemake --use-conda --conda-frontend mamba --cores 8
+   ```
 
-### **Path References**
-```python
-# Updated paths in Snakefiles
-SHARED_SCRIPTS = "../Shared/Scripts"
-TRIMFASTQ_SCRIPT = f"{SHARED_SCRIPTS}/python/trimfastq.py"
-```
+## 📊 Workflow Status
 
-## Maintenance
+Based on the [Peng-He-Lab/Luo_2025_piRNA repository](https://github.com/Peng-He-Lab/Luo_2025_piRNA), we are converting all 5 original workflows from shell scripts to Snakemake:
 
-### **Regular Tasks**
-- **Update documentation** when scripts change
-- **Test functionality** after modifications
-- **Validate outputs** for correctness
-- **Check dependencies** for updates
+### ✅ **Completed Workflows**
+- **ChIP-seq Pipeline**: ✅ **Converted to Snakemake**
+  - Quality Control: FastQC, adapter trimming, quality filtering
+  - Read Mapping: Bowtie alignment to reference genome
+  - Signal Generation: BigWig tracks and enrichment analysis
+  - Coverage Analysis: Multiple bin sizes and resolutions
+  - Transposon Analysis: Specialized transposon element analysis
 
-### **Quality Assurance**
-- **Code review** for new scripts
-- **Testing** in different environments
-- **Documentation** updates
-- **Error handling** improvements
+- **TotalRNA-seq Pipeline**: ✅ **Converted to Snakemake**
+  - Quality Control: Multi-step FastQC analysis
+  - Read Processing: Adapter and length trimming
+  - rRNA Removal: Bowtie-based ribosomal RNA filtering
+  - Alignment: STAR transcriptome mapping
+  - Vector Mapping: Vector sequence analysis
 
-## Future Improvements
+### 🚧 **Workflows in Progress**
+- **piRNA-seq Pipeline**: 🚧 **Converting to Snakemake**
+  - Specialized piRNA analysis pipeline
+  - Adapter trimming and quality control
+  - piRNA-specific mapping and analysis
 
-### **Script Modernization**
-- **Python 3 conversion** for legacy scripts
-- **Enhanced error handling** and logging
-- **Unit testing** framework
-- **Parameter validation**
+### 📋 **Planned Workflows**
+- **Fusion Reads Pipeline**: 📋 **Planned for Snakemake conversion**
+  - Detection and analysis of fusion reads
+  - Based on `fusion-reads-workflow-wz-v2.sh`
+  - Integration with other workflows
 
-### **Automation**
-- **CI/CD integration** for script testing
-- **Automated documentation** generation
-- **Dependency management** automation
-- **Performance monitoring**
+- **RIP-seq Pipeline**: 📋 **Planned for Snakemake conversion**
+  - RNA immunoprecipitation sequencing
+  - Uses adapter trimming from piRNA-seq
+  - Followed by Total RNA-seq pipeline
 
----
+### 🔄 **Workflow Integration**
+- **Shared Components**: All workflows will use common resources and scripts
+- **Consistent Interface**: Uniform Snakemake rule structure across all pipelines
+- **Modular Design**: Easy to run individual workflows or combined analyses
 
-**Last Updated**: December 2024  
-**Status**: Active - Organized and documented
+## 🔧 Configuration
+
+### Environment Management
+- **Automatic environment creation** with `--use-conda`
+- **Tool-specific environments** for optimal performance
+- **mamba support** for faster dependency resolution
+
+### Sample Configuration
+- **Flexible sample naming** in Snakefiles
+- **Configurable parameters** for analysis steps
+- **Easy customization** for different datasets
+
+## 📚 Documentation
+
+- **[CHIP-seq README](CHIP-seq/README.md)**: Comprehensive ChIP-seq pipeline documentation
+- **[TotalRNA-seq README](totalRNA-seq/README.md)**: RNA-seq processing documentation
+- **[Shared Resources README](Shared/README.md)**: Common resources and scripts
+- **[Quick Setup Guide](CHIP-seq/QUICK_SETUP.md)**: Fast setup instructions
+- **[Dataset Recommendations](CHIP-seq/DATASET_RECOMMENDATIONS.md)**: Data quality guidelines
+
+## 🐛 Troubleshooting
+
+### Common Issues
+1. **Environment Creation**: Use `--conda-frontend mamba` for complex environments
+2. **Memory Issues**: Reduce cores with `--cores 4`
+3. **File Not Found**: Check file paths in Snakefiles
+4. **Python Version**: Each tool uses its own environment
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🙏 Acknowledgments
+
+- **[Peng-He-Lab/Luo_2025_piRNA](https://github.com/Peng-He-Lab/Luo_2025_piRNA)**: Original pipeline development and methodology
+- **Luo et al. 2025**: Original research and methodology development
+- **Snakemake community**: Workflow engine and best practices
+- **Bioconda contributors**: Software packaging and distribution
+- **Open-source bioinformatics community**: Tools and resources
+
+## 📖 Citation
+
+If you use this workflow in your research, please cite:
+
+### Original Research
+- **Luo et al. 2025**: [Paper Title](https://www.sciencedirect.com/science/article/pii/S1097276523007979?dgcid=coauthor) - Original methodology and findings
+
+### Original Repository
+- **Peng-He-Lab/Luo_2025_piRNA**: [https://github.com/Peng-He-Lab/Luo_2025_piRNA](https://github.com/Peng-He-Lab/Luo_2025_piRNA) - Source of original scripts and methodology
