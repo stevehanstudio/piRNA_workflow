@@ -77,10 +77,10 @@ snakemake --use-conda --conda-frontend mamba --cores 24
 
 1. **Reference Genome**: `dm6.fa`
 2. **Bowtie Index**: `bowtie-indexes/dm6/` (built from dm6.fa)
-3. **Chromosome Sizes**: `genomes/bowtie-indexes/dm6.chrom.sizes`
+3. **Chromosome Sizes**: `../Shared/DataFiles/genome/bowtie-indexes/dm6.chrom.sizes`
 4. **Blacklist**: `dm6-blacklist.v2.bed.gz`
 5. **Adapter File**: `AllAdaptors.fa`
-6. **Vector Reference**: `genomes/YichengVectors/42AB_UBIG.fa`
+6. **Vector Reference**: `../Shared/DataFiles/genome/YichengVectors/42AB_UBIG.fa`
 7. **Input FASTQ Files**: `SRR030295.fastq`, `SRR030270.fastq`
 
 ### File Sources
@@ -107,15 +107,15 @@ wget https://raw.githubusercontent.com/Peng-He-Lab/Luo_2025_piRNA/main/DataFiles
 
 # Create chromosome sizes file
 samtools faidx dm6.fa
-cut -f1,2 dm6.fa.fai > genomes/bowtie-indexes/dm6.chrom.sizes
+cut -f1,2 dm6.fa.fai > ../Shared/DataFiles/genome/bowtie-indexes/dm6.chrom.sizes
 
 # Build Bowtie index
 mkdir -p bowtie-indexes/dm6
 bowtie-build dm6.fa bowtie-indexes/dm6/dm6
 
 # Create vector index directory
-mkdir -p genomes/YichengVectors
-bowtie-build genomes/YichengVectors/42AB_UBIG.fa genomes/YichengVectors/42AB_UBIG
+mkdir -p ../Shared/DataFiles/genome/YichengVectors
+bowtie-build ../Shared/DataFiles/genome/YichengVectors/42AB_UBIG.fa ../Shared/DataFiles/genome/YichengVectors/42AB_UBIG
 ```
 
 **Note**: You may need to download your own FASTQ files or use the provided SRR030295.fastq and SRR030270.fastq files.
@@ -319,10 +319,10 @@ snakemake --version
 6. **Transposon Analysis Issues**
    ```bash
    # Check if vector files exist
-   ls -la genomes/YichengVectors/
+   ls -la ../Shared/DataFiles/genome/YichengVectors/
    
    # Verify vector indexes are built
-   ls -la genomes/YichengVectors/*.ebwt
+   ls -la ../Shared/DataFiles/genome/YichengVectors/*.ebwt
    ```
 
 7. **Memory Issues with Large Files**

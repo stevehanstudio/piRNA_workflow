@@ -89,7 +89,7 @@ chrom_sizes="genome/bowtie-indexes/dm6.chrom.sizes"
 
 #### **Corrected Path:**
 ```python
-chrom_sizes="genomes/bowtie-indexes/dm6.chrom.sizes"
+chrom_sizes="../Shared/DataFiles/genome/bowtie-indexes/dm6.chrom.sizes"
 ```
 
 #### **Rationale:**

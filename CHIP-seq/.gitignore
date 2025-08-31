@@ -10,7 +10,6 @@ __pycache__/
 *.fastq
 *.gz
 *.zip
-genomes/
 bowtie-indexes/
 bowtie-indexes_old/
 
