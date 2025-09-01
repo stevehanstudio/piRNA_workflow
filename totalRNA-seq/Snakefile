@@ -104,6 +104,42 @@ rule build_star_index:
              --genomeSAindexNbases 12
         """
 
+rule build_rsem_index:
+    input:
+        genome_fa = DM6_REFERENCE,
+        gtf = HARMONIZED_GTF
+    output:
+        rsem_index = f"{SHARED_GENOME}/rsem.grp"
+    conda:
+        "envs/rsem.yaml"
+    shell:
+        """
+        rsem-prepare-reference --gtf {input.gtf} {input.genome_fa} {SHARED_GENOME}/rsem
+        """
+
+rule rsem_quantification:
+    input:
+        bam = f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam",
+        rsem_index = rules.build_rsem_index.output.rsem_index
+    output:
+        rsem = f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.rsem"
+    conda:
+        "envs/rsem.yaml"
+    shell:
+        """
+        rsem-calculate-expression --bam \
+                                  --estimate-rspd \
+                                  --calc-ci \
+                                  --seed 12345 \
+                                  -p 8 \
+                                  --no-bam-output \
+                                  --ci-memory 30000 \
+                                  --temporary-folder {STAR_DIR}/temp \
+                                  {input.bam} \
+                                  {SHARED_GENOME}/rsem \
+                                  {output.rsem}
+        """
+
 # Rule all - defines the final outputs
 rule all:
     input:
@@ -115,6 +151,7 @@ rule all:
         f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.bam.bai",
         f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bg.bigWig",
         f"{STAR_DIR}/dm6.50merAligned.sortedByCoord.coverage",
+        # rules.build_rsem_index.output.rsem_index,
         f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.rsem",
         f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.10.bg4"
 
@@ -238,7 +275,7 @@ rule generate_bedgraph:
         bam = f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam"
     output:
         bg = f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bg",
-        bgc = f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bgc"
+        #bgc = f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bgc"
     conda:
         "envs/star.yaml"
     shell:
@@ -254,7 +291,8 @@ rule generate_bedgraph:
 rule generate_coverage_profiles:
     input:
         gtf = HARMONIZED_GTF,
-        bedgraph = f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bgc"
+        bedgraph = f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bg"
+        # bedgraph = f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bgc"
     output:
         coverage = f"{STAR_DIR}/dm6.50merAligned.sortedByCoord.coverage"
     conda:
@@ -279,28 +317,6 @@ rule generate_bigwig:
     shell:
         """
         wigToBigWig -clip {input.bedgraph} {input.chrom_sizes} {output.bigwig}
-        """
-
-rule rsem_quantification:
-    input:
-        bam = f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam"
-    output:
-        rsem = f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.rsem"
-    conda:
-        "envs/rsem.yaml"
-    shell:
-        """
-        rsem-calculate-expression --bam \
-                                  --estimate-rspd \
-                                  --calc-ci \
-                                  --seed 12345 \
-                                  -p 8 \
-                                  --no-bam-output \
-                                  --ci-memory 30000 \
-                                  --temporary-folder {STAR_DIR}/temp \
-                                  {input.bam} \
-                                  {SHARED_GENOME}/rsem \
-                                  {output.rsem}
         """
 
 rule bam_coverage:
