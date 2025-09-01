@@ -1,0 +1,21 @@
+name: deeptools
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.8
+  - deeptools=3.5.4
+  - numpy
+  - scipy
+  - matplotlib
+  - pybigwig
+  - pysam
+  - bx-python
+  - py2bit
+  - pybedtools
+  - pandas
+  - h5py
+  - numba
+  - joblib
+  - psutil 

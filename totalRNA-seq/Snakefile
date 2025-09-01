@@ -258,7 +258,7 @@ rule generate_coverage_profiles:
     output:
         coverage = f"{STAR_DIR}/dm6.50merAligned.sortedByCoord.coverage"
     conda:
-        "envs/python.yaml"  # Ensure this environment has Python and the required script
+        "envs/python2.yaml"  # Ensure this environment has Python and the required script
     shell:
         """
         python {SHARED_SCRIPTS}/python/gene_coverage_wig_gtf.py \

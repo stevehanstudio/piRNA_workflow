@@ -1,0 +1,8 @@
+name: rsem
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - rsem
+  - star        # RSEM uses STAR for transcriptome alignment
+  - samtools    # required for BAM handling
