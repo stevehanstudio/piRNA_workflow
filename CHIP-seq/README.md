@@ -4,6 +4,14 @@ A reproducible ChIP-seq analysis pipeline converted from shell commands to Snake
 
 **✅ Production Ready**: This pipeline is fully functional and has been tested with multiple datasets. It provides a complete ChIP-seq analysis workflow from raw data to publication-ready results.
 
+## 🆕 Recent Improvements
+
+- **✅ Parameterized Paths**: No more symlinks needed - use `INPUT_DATA_DIR` variable to specify input file location
+- **✅ Flexible Results Directory**: Customize output directory name with `RESULTS_DIR` variable (e.g., `results_White_GLKD`)
+- **✅ Enhanced Error Handling**: Fixed FastQC output naming issues and improved Snakemake syntax
+- **✅ Simplified Usage**: Convenient alias setup (`alias sm='snakemake --use-conda --cores 8'`)
+- **✅ Better Documentation**: Updated troubleshooting guide and configuration examples
+
 ## Overview
 
 This pipeline processes ChIP-seq data from raw FASTQ files to BigWig visualization tracks and enrichment analysis. It includes quality control, adapter trimming, read mapping, duplicate removal, and ChIP-vs-Input enrichment analysis.
@@ -29,9 +37,18 @@ This pipeline processes ChIP-seq data from raw FASTQ files to BigWig visualizati
 - **Enrichment**: Requires both ChIP and Input samples
 
 ### Workflow Diagram
-The workflow diagram above is generated from the PlantUML source file located at `../Shared/Scripts/plantuml/chipseq_workflow.puml`. To regenerate the image or modify the workflow visualization, edit the PUML file and run:
+The workflow diagram above shows the complete ChIP-seq analysis pipeline with **specific output file names and types**. The diagram is generated from the PlantUML source file located at `../Shared/Scripts/plantuml/chipseq_workflow.puml`. 
+
+**Key Features of the Updated Diagram:**
+- ✅ **Specific File Names**: Shows actual output file naming conventions (e.g., `{sample}.alltrimmed_fastqc.html`)
+- ✅ **File Types**: Displays all major file types (.fastq, .bam, .bigwig, .bg4, .html)
+- ✅ **Branching Paths**: Illustrates parallel genome and vector mapping workflows
+- ✅ **Output Summary**: Includes a note with key final output files
+
+To regenerate the image or modify the workflow visualization, edit the PUML file and run:
 ```bash
-plantuml -tpng chipseq_workflow.puml -o ../Shared/DataFiles/workflow_images/
+cd ../Shared/Scripts/plantuml
+plantuml -tpng chipseq_workflow.puml -o ../../DataFiles/workflow_images/
 ```
 
 ## Quick Start
@@ -64,11 +81,17 @@ cd chipseq-workflow
 # Activate the environment
 conda activate snakemake_env
 
+# Set up convenient alias
+alias sm='snakemake --use-conda --cores 8'
+
 # Run the complete pipeline
-snakemake --use-conda --conda-frontend mamba --cores 8
+sm
 
 # Or run with specific number of cores
-snakemake --use-conda --conda-frontend mamba --cores 24
+snakemake --use-conda --cores 24
+
+# Dry run to check what will be executed
+sm -n
 ```
 
 ## Data Requirements
@@ -81,7 +104,7 @@ snakemake --use-conda --conda-frontend mamba --cores 24
 4. **Blacklist**: `dm6-blacklist.v2.bed.gz`
 5. **Adapter File**: `AllAdaptors.fa`
 6. **Vector Reference**: `../Shared/DataFiles/genome/YichengVectors/42AB_UBIG.fa`
-7. **Input FASTQ Files**: `SRR030295.fastq`, `SRR030270.fastq`
+7. **Input FASTQ Files**: Located in `INPUT_DATA_DIR` (configurable path)
 
 ### File Sources
 
@@ -147,19 +170,19 @@ The pipeline generates FastQC reports for quality assessment:
 
 ```bash
 # View FastQC reports (if running locally)
-google-chrome results/fastqc_trimmed/SRR030295_fastqc.html
-google-chrome results/fastqc_trimmed/SRR030270_fastqc.html
+google-chrome {RESULTS_DIR}/fastqc_trimmed/{CHIP_SAMPLE}.alltrimmed_fastqc.html
+google-chrome {RESULTS_DIR}/fastqc_trimmed/{INPUT_SAMPLE}.alltrimmed_fastqc.html
 
 # If running on remote server via SSH:
 # Option 1: Port forwarding
 ssh -L 8080:localhost:8080 username@server
-cd results/fastqc_trimmed/
+cd {RESULTS_DIR}/fastqc_trimmed/
 python3 -m http.server 8080
-# Then open http://localhost:8080/SRR030295_fastqc.html in local browser
+# Then open http://localhost:8080/{CHIP_SAMPLE}.alltrimmed_fastqc.html in local browser
 
 # Option 2: Copy files to local machine
-scp username@server:/path/to/chipseq-workflow/results/fastqc_trimmed/*.html ./
-google-chrome SRR030295_fastqc.html
+scp username@server:/path/to/chipseq-workflow/{RESULTS_DIR}/fastqc_trimmed/*.html ./
+google-chrome {CHIP_SAMPLE}.alltrimmed_fastqc.html
 ```
 
 ### Quality Metrics to Monitor
@@ -181,24 +204,24 @@ google-chrome SRR030295_fastqc.html
 
 ### Main Outputs
 ```
-results/
+{RESULTS_DIR}/                     # Configurable output directory name
 ├── bowtie/
-│   ├── SRR030295.bigwig          # ChIP signal track
-│   ├── SRR030270.bigwig          # Input signal track
-│   └── *.bam                      # Processed alignment files
+│   ├── {CHIP_SAMPLE}.bigwig      # ChIP signal track
+│   ├── {INPUT_SAMPLE}.bigwig     # Input signal track
+│   └── *.bam                     # Processed alignment files
 ├── enrichment/
-│   └── SRR030295_vs_SRR030270.enrichment.bigwig  # Enrichment track
-├── fastqc_trimmed/                # Quality control reports
-├── vector_mapping/                # Vector mapping results
-├── coverage/                      # Coverage analysis at different bin sizes
-│   ├── *.10.bg4                  # 10bp bin coverage
-│   ├── *.100.bg4                 # 100bp bin coverage
-│   ├── *.1000.bg4                # 1000bp bin coverage
-│   └── *.chopped.bg4             # Chopped coverage files
-└── transposon/                    # Transposon-specific analysis
-    ├── *.42AB.bg4                # 42AB transposon coverage
-    ├── *.20A.bg4                 # 20A transposon coverage
-    └── *.chopped.bg4             # Chopped transposon files
+│   └── {CHIP_SAMPLE}_vs_{INPUT_SAMPLE}.enrichment.bigwig  # Enrichment track
+├── fastqc_trimmed/               # Quality control reports
+│   └── *.alltrimmed_fastqc.html  # FastQC reports (note: .alltrimmed naming)
+├── vector_mapping/               # Vector mapping results
+├── coverage/                     # Coverage analysis at different bin sizes
+│   ├── *.10.bg4                 # 10bp bin coverage
+│   ├── *.100.bg4                # 100bp bin coverage
+│   ├── *.1000.bg4               # 1000bp bin coverage
+│   └── *.chopped.bg4            # Chopped coverage files (optional)
+└── transposon/                   # Transposon-specific analysis
+    ├── *.42AB.bg4               # 42AB transposon coverage
+    └── *.chopped.bg4            # Chopped transposon files (optional)
 ```
 
 ### File Descriptions
@@ -214,13 +237,25 @@ results/
 
 ### Sample Configuration
 
-Edit `Snakefile` to configure your samples:
+The pipeline now supports flexible configuration with centralized variables. Edit `Snakefile` to configure your analysis:
 
 ```python
-CHIP_SAMPLE = "SRR030295"    # Your ChIP sample
-INPUT_SAMPLE = "SRR030270"    # Your Input control
+# Input data files - specify where your FASTQ files are located
+INPUT_DATA_DIR = f"{SHARED_DATA}/datasets/chip-seq/chip_inputs"
+
+# Results directory configuration - customize your output directory
+RESULTS_DIR = "results_White_GLKD"  # Can be any name you prefer
+
+# Sample configuration
+CHIP_SAMPLE = "White_GLKD_ChIP_input_1st_S7_R1_001"    # Your ChIP sample
+INPUT_SAMPLE = "White_GLKD_ChIP_input_2nd_S10_R1_001"  # Your Input control
 SAMPLES = [CHIP_SAMPLE, INPUT_SAMPLE]
 ```
+
+**New Configuration Features:**
+- **`INPUT_DATA_DIR`**: Centralized input file location (no symlinks needed)
+- **`RESULTS_DIR`**: Customizable output directory name 
+- **Path Variables**: All file paths are now parameterized for easy maintenance
 
 ### Analysis Parameters
 
@@ -251,38 +286,61 @@ The pipeline uses conda environments defined in `envs/`:
 
 ### Basic Run
 ```bash
-snakemake --use-conda --conda-frontend mamba --cores 24
+# Set up alias for convenience
+alias sm='snakemake --use-conda --cores 8'
+sm
 ```
 
 ### Force Re-run All Steps
 ```bash
-snakemake --use-conda --conda-frontend mamba --cores 24 --forceall
+sm --forceall
 ```
 
 ### Run Specific Rule
 ```bash
-snakemake --use-conda --conda-frontend mamba --cores 24 make_enrichment_track
+sm make_enrichment_track
 ```
 
 ### Dry Run (Check What Will Be Run)
 ```bash
-snakemake --use-conda --conda-frontend mamba --cores 24 --dry-run
+sm -n
+# or
+sm --dry-run
 ```
 
 ### Clean Up
 ```bash
-snakemake --use-conda --conda-frontend mamba --cores 24 --cleanup-metadata
+sm --cleanup-metadata
+```
+
+### Advanced Usage
+```bash
+# Use more cores for faster processing
+snakemake --use-conda --cores 24
+
+# Use mamba for faster environment creation
+snakemake --use-conda --conda-frontend mamba --cores 8
+
+# Run with higher latency wait for network filesystems
+sm --latency-wait 60
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Snakemake Environment Creation Fails**
+1. **Snakemake Environment Setup**
    ```bash
-   # Snakemake will create environments automatically with --use-conda
-   # Try using mamba for complex environments:
-   snakemake --use-conda --conda-frontend mamba --cores 4
+   # First create and activate the snakemake environment
+   conda create -n snakemake_env snakemake
+   conda activate snakemake_env
+   
+   # Then run the pipeline (Snakemake will create tool environments automatically)
+   snakemake --use-conda --cores 4
+   
+   # Use alias for convenience
+   alias sm='snakemake --use-conda --cores 8'
+   sm
    ```
 
 2. **Memory Issues**
@@ -328,10 +386,21 @@ snakemake --version
 7. **Memory Issues with Large Files**
    ```bash
    # Use fewer cores for memory-intensive operations
-snakemake --use-conda --conda-frontend mamba --cores 2 make_coverage
+   snakemake --use-conda --conda-frontend mamba --cores 2 make_coverage
    
    # Check available memory
    free -h
+   ```
+
+8. **FastQC Output Naming Issues**
+   ```bash
+   # FastQC creates files with .alltrimmed_fastqc.html suffix
+   # If you see MissingOutputException for fastqc files, check that rule outputs match:
+   # Expected: {sample}.alltrimmed_fastqc.html
+   # Not: {sample}_fastqc.html
+   
+   # Verify FastQC outputs exist
+   ls -la {RESULTS_DIR}/fastqc_trimmed/
    ```
 
 ### Debug Mode
@@ -380,8 +449,10 @@ snakemake --use-conda --conda-frontend mamba --cores 24 make_bigwig --verbose
 ## Biological Context
 
 ### Sample Types
-- **SRR030295**: H3K27Ac ChIP sample (active enhancer marker)
-- **SRR030270**: E0-4 Input control (embryonic stage 0-4 hours)
+- **Current Example**: White GLKD ChIP-seq experiment
+  - **ChIP Sample**: White_GLKD_ChIP_input_1st_S7_R1_001
+  - **Input Control**: White_GLKD_ChIP_input_2nd_S10_R1_001
+- **Historical Example**: H3K27Ac ChIP-seq (SRR030295/SRR030270)
 
 ### Analysis Purpose
 - **H3K27Ac**: Marks active enhancers and promoters
@@ -401,9 +472,9 @@ The pipeline generates BigWig files for visualization in genome browsers:
 
 ```bash
 # Load in IGV or UCSC Genome Browser
-results/bowtie/SRR030295.bigwig    # ChIP signal
-results/bowtie/SRR030270.bigwig    # Input signal
-results/enrichment/SRR030295_vs_SRR030270.enrichment.bigwig  # Enrichment
+{RESULTS_DIR}/bowtie/{CHIP_SAMPLE}.bigwig    # ChIP signal
+{RESULTS_DIR}/bowtie/{INPUT_SAMPLE}.bigwig   # Input signal
+{RESULTS_DIR}/enrichment/{CHIP_SAMPLE}_vs_{INPUT_SAMPLE}.enrichment.bigwig  # Enrichment
 ```
 
 ### Enrichment Analysis
