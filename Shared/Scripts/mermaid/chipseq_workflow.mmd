@@ -1,0 +1,83 @@
+graph TD
+    %% Input data
+    raw_fastq[Raw FASTQ Files] --> fastqc_raw[FastQC Raw Quality Control]
+    fastqc_raw --> raw_qc_reports("Raw QC Reports (html/zip)")
+    
+    %% Quality control and trimming
+    raw_fastq --> cutadapt[Cutadapt Adapter Trimming]
+    cutadapt --> adapter_trimmed("Adapter-trimmed (fastq)")
+    adapter_trimmed --> trimmomatic[Trimmomatic Quality Trimming]
+    trimmomatic --> quality_trimmed("Quality-trimmed (fastq)")
+    quality_trimmed --> fastqc_trimmed[FastQC Trimmed Quality Control]
+    fastqc_trimmed --> trimmed_qc_reports("Trimmed QC Reports (html/zip)")
+    quality_trimmed --> trim_50bp[Trim to 50bp]
+    trim_50bp --> fastq_50bp("50bp-trimmed (fastq)")
+    
+    %% Index building (parallel processes)
+    dm6_genome[dm6 Reference Genome] --> build_dm6_index[Build Bowtie dm6 Index]
+    build_dm6_index --> dm6_index("dm6 Bowtie Index (ebwt)")
+    vector_42ab[42AB Vector Reference] --> build_42ab_index[Build 42AB Vector Index]
+    build_42ab_index --> vector_42ab_index("42AB Vector Index (ebwt)")
+    vector_20a[20A Vector Reference] --> build_20a_index[Build 20A Vector Index]
+    build_20a_index --> vector_20a_index("20A Vector Index (ebwt)")
+    dm6_genome --> generate_chrom_sizes[Generate Chromosome Sizes]
+    generate_chrom_sizes --> chrom_sizes_file("dm6.chrom.sizes (txt)")
+    
+    %% Genome mapping workflow
+    fastq_50bp --> bowtie_genome[Bowtie Genome Mapping]
+    dm6_index --> bowtie_genome
+    bowtie_genome --> genome_sam("Genome Alignment (sam)")
+    genome_sam --> sam_to_bam[Convert SAM to BAM]
+    sam_to_bam --> genome_bam("Genome Alignment (bam)")
+    genome_bam --> sort_index_bam[Sort and Index BAM]
+    sort_index_bam --> sorted_bam("Sorted BAM + Index (bam/bai)")
+    sorted_bam --> remove_mito[Remove Mitochondrial Reads]
+    remove_mito --> mito_removed_bam("Mito-removed (bam)")
+    mito_removed_bam --> sort_no_mito[Sort No-Mito BAM]
+    sort_no_mito --> no_mito_sorted("No-Mito Sorted (bam/bai)")
+    no_mito_sorted --> remove_duplicates[Remove Duplicates]
+    remove_duplicates --> dedup_bam("Deduplicated (bam/bai)")
+    
+    %% Vector mapping workflow
+    fastq_50bp --> bowtie_vector[Bowtie Vector Mapping]
+    vector_42ab_index --> bowtie_vector
+    bowtie_vector --> vector_sam("Vector Alignment (sam)")
+    vector_sam --> vector_sam_to_bam[Convert Vector SAM to BAM]
+    vector_sam_to_bam --> vector_bam("Vector Alignment (bam)")
+    vector_bam --> sort_vector_bam[Sort and Index Vector BAM]
+    sort_vector_bam --> vector_sorted_bam("Vector Sorted (bam/bai)")
+    
+    %% Signal generation
+    dedup_bam --> make_bigwig[Generate BigWig Signals]
+    chrom_sizes_file --> make_bigwig
+    make_bigwig --> bigwig_signals("BigWig Signal Tracks (bigwig)")
+    
+    %% Enrichment analysis
+    dedup_bam --> chip_vs_input[ChIP vs Input Comparison]
+    chip_vs_input --> enrichment_track("Enrichment Track (bigwig)")
+    
+    %% Coverage analysis
+    vector_sorted_bam --> coverage_analysis[Generate Coverage Tracks]
+    coverage_analysis --> coverage_tracks("Coverage Tracks (bg4)")
+    coverage_analysis --> strand_coverage("Strand-specific Coverage (bg4)")
+    coverage_tracks --> chop_bedgraph[Chop BedGraph]
+    strand_coverage --> chop_bedgraph
+    chop_bedgraph --> chopped_coverage("Chopped Coverage (bg4)")
+    
+    %% Transposon analysis
+    dedup_bam --> transposon_coverage[Generate Transposon Coverage]
+    transposon_coverage --> transposon_tracks("Transposon Coverage (bg4)")
+    transposon_coverage --> strand_transposon("Strand-specific Transposon (bg4)")
+    transposon_tracks --> chop_transposon[Chop Transposon BedGraph]
+    strand_transposon --> chop_transposon
+    chop_transposon --> chopped_transposon("Chopped Transposon (bg4)")
+    
+    %% Styling
+    classDef inputFiles fill:white,stroke:#333,stroke-width:2px,color:#000
+    classDef processing fill:white,stroke:#666,stroke-width:1px,color:#000
+    classDef output fill:transparent,stroke:#999,stroke-width:1px,stroke-dasharray: 3 3,color:#000
+    classDef index fill:white,stroke:#333,stroke-width:1px,color:#000
+    
+    class raw_fastq,dm6_genome,vector_42ab,vector_20a inputFiles
+    class fastqc_raw,cutadapt,trimmomatic,fastqc_trimmed,trim_50bp,build_dm6_index,build_42ab_index,build_20a_index,generate_chrom_sizes,bowtie_genome,sam_to_bam,sort_index_bam,remove_mito,sort_no_mito,remove_duplicates,bowtie_vector,vector_sam_to_bam,sort_vector_bam,make_bigwig,chip_vs_input,coverage_analysis,chop_bedgraph,transposon_coverage,chop_transposon processing
+    class raw_qc_reports,adapter_trimmed,quality_trimmed,trimmed_qc_reports,fastq_50bp,dm6_index,vector_42ab_index,vector_20a_index,chrom_sizes_file,genome_sam,genome_bam,sorted_bam,mito_removed_bam,no_mito_sorted,dedup_bam,vector_sam,vector_bam,vector_sorted_bam,bigwig_signals,enrichment_track,coverage_tracks,strand_coverage,chopped_coverage,transposon_tracks,strand_transposon,chopped_transposon output
