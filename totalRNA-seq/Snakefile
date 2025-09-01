@@ -22,7 +22,7 @@ VECTOR_42AB_REF = f"{SHARED_GENOME}/YichengVectors/42AB_UBIG.fa"
 DM6_REFERENCE = f"{SHARED_GENOME}/dm6.fa"
 RRNA_REFERENCE = f"{SHARED_GENOME}/rrna/dmel_rRNA_unit.fa"
 
-# GTF files - original and chromosome-harmonized  
+# GTF files - original and chromosome-harmonized
 ORIGINAL_GTF = f"{SHARED_GENOME}/annotations/dm6.gtf"
 HARMONIZED_GTF = f"{SHARED_GENOME}/annotations/dm6_chr_harmonized.gtf"
 
@@ -237,7 +237,8 @@ rule generate_bedgraph:
     input:
         bam = f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam"
     output:
-        bedgraph = f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bgc"
+        bg = f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bg",
+        bgc = f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bgc"
     conda:
         "envs/star.yaml"
     shell:
