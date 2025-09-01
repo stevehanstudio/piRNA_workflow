@@ -106,6 +106,7 @@ star/
 
 # Specific workflow directories
 genomes/
+Shared/DataFiles/genome/
 bowtie-indexes_old/
 SRR*/
 

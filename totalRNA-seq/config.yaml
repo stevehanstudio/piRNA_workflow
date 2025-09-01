@@ -1,7 +1,7 @@
 # Configuration file for totalRNA-seq Snakemake workflow
 
-# Input file
-fastq_file: "../CHIP-seq/all.fastq"
+# Input file - use totalRNA-seq specific dataset
+fastq_file: "../Shared/DataFiles/datasets/totalrna-seq/all.50mers.fastq"
 
 # Read trimming parameters
 read_length: 50
@@ -26,7 +26,8 @@ vector_dir: "results/vector_mapping"
 
 # Mapping parameters
 threads: 8
-rrna_index: "indexes/rrna/dmel_rRNA_unit"
-genome_dir: "../Shared/DataFiles/genome/star-index"
+rrna_index: "../Shared/DataFiles/genome/rrna/dmel_rRNA_unit"
+# Note: genome_dir is now automatically managed by the Snakefile
+# GTF file chromosome naming is automatically harmonized in the pipeline
 vector_index: "../Shared/DataFiles/genome/YichengVectors/42AB_UBIG"
 vector_ref: "../Shared/DataFiles/genome/YichengVectors/42AB_UBIG.fa"

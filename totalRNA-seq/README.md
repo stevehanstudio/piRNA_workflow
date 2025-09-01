@@ -13,6 +13,25 @@ The pipeline performs the following steps:
 6. **Transcriptome Alignment**: Maps unmapped reads to transcriptome using STAR
 7. **Vector Mapping**: Maps unmapped reads to vector sequences using bowtie
 
+## 🆕 Recent Improvements
+
+This pipeline has been recently modernized with several key enhancements:
+
+### **✅ Chromosome Harmonization**
+- **Problem**: Automatic detection and fixing of chromosome naming mismatches between FASTA (UCSC format: chr1, chr2, chrX) and GTF (Ensembl format: 1, 2, X) files
+- **Solution**: Added `harmonize_chromosome_names` rule that converts Ensembl to UCSC format
+- **Benefit**: Eliminates STAR alignment failures due to chromosome naming conflicts
+
+### **✅ Shared Resource Architecture**
+- **Migration**: Moved from local `indexes/` folder to centralized `../Shared/DataFiles/` structure
+- **Benefits**: Consistent resource sharing across workflows, eliminates duplication
+- **Direct paths**: No symbolic links, uses direct paths to shared folders [[memory:7692900]]
+
+### **✅ Modern Tool Compatibility**
+- **Updated samtools syntax**: Fixed deprecated `samtools sort` commands for modern versions
+- **STAR index automation**: Automatic building of STAR genome indexes with harmonized annotations
+- **Better error handling**: Improved pipeline robustness and error reporting
+
 ## Prerequisites
 
 - [Conda](https://docs.conda.io/en/latest/) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html)

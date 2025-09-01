@@ -22,6 +22,10 @@ VECTOR_42AB_REF = f"{SHARED_GENOME}/YichengVectors/42AB_UBIG.fa"
 DM6_REFERENCE = f"{SHARED_GENOME}/dm6.fa"
 RRNA_REFERENCE = f"{SHARED_GENOME}/rrna/dmel_rRNA_unit.fa"
 
+# GTF files - original and chromosome-harmonized  
+ORIGINAL_GTF = f"{SHARED_GENOME}/annotations/dm6.gtf"
+HARMONIZED_GTF = f"{SHARED_GENOME}/annotations/dm6_chr_harmonized.gtf"
+
 # Define input files
 FASTQ_FILE = config["fastq_file"]
 READ_LENGTH = config["read_length"]
@@ -56,31 +60,72 @@ rule build_rrna_index:
     input:
         rrna_fa = RRNA_REFERENCE
     output:
-        index_files = expand("dmel_rRNA_unit.{{ext}}", ext=["1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt"])
+        index_files = expand(f"{SHARED_GENOME}/rrna/dmel_rRNA_unit.{{ext}}", ext=["1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt"])
     conda:
         "envs/bowtie.yaml"
     shell:
         """
-        bowtie-build {input.rrna_fa} dmel_rRNA_unit
+        mkdir -p {SHARED_GENOME}/rrna
+        bowtie-build {input.rrna_fa} {SHARED_GENOME}/rrna/dmel_rRNA_unit
+        """
+
+# Chromosome name harmonization - fix Ensembl vs UCSC naming convention mismatch
+rule harmonize_chromosome_names:
+    input:
+        original_gtf = ORIGINAL_GTF
+    output:
+        harmonized_gtf = HARMONIZED_GTF
+    shell:
+        """
+        mkdir -p $(dirname {output.harmonized_gtf})
+        # Add 'chr' prefix to chromosome names to match UCSC convention used in dm6.fa
+        sed 's/^2L/chr2L/; s/^2R/chr2R/; s/^3L/chr3L/; s/^3R/chr3R/; s/^4/chr4/; s/^X/chrX/; s/^Y/chrY/; s/^mitochondrion_genome/chrM/' {input.original_gtf} > {output.harmonized_gtf}
+        """
+
+# Build STAR genome index with harmonized GTF annotations
+rule build_star_index:
+    input:
+        genome_fa = DM6_REFERENCE,
+        gtf = HARMONIZED_GTF
+    output:
+        index_files = expand(f"{SHARED_GENOME}/star-index/{{file}}", file=["genomeParameters.txt", "Genome", "SA", "SAindex"])
+    conda:
+        "envs/star.yaml"
+    params:
+        index_dir = f"{SHARED_GENOME}/star-index"
+    shell:
+        """
+        mkdir -p {params.index_dir}
+        STAR --runMode genomeGenerate \
+             --genomeDir {params.index_dir} \
+             --genomeFastaFiles {input.genome_fa} \
+             --sjdbGTFfile {input.gtf} \
+             --runThreadN 8 \
+             --genomeSAindexNbases 12
         """
 
 # Rule all - defines the final outputs
 rule all:
     input:
-        f"{FASTQC_INITIAL_DIR}/all_fastqc.html",
+        f"{FASTQC_INITIAL_DIR}/all.50mers_fastqc.html",
         f"{FASTQC_TRIMMED_DIR}/allfastq{READ_LENGTH}_fastqc.html",
         f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam",
         f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam.bai",
         f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.bam",
-        f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.bam.bai"
+        f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.bam.bai",
+        f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bg.bigWig",
+        f"{STAR_DIR}/dm6.50merAligned.sortedByCoord.coverage",
+        f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.rsem",
+        f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.10.bg4"
+
 
 # Initial FastQC quality check
 rule fastqc_initial:
     input:
         fastq = FASTQ_FILE
     output:
-        html = f"{FASTQC_INITIAL_DIR}/all_fastqc.html",
-        zip = f"{FASTQC_INITIAL_DIR}/all_fastqc.zip"
+        html = f"{FASTQC_INITIAL_DIR}/all.50mers_fastqc.html",
+        zip = f"{FASTQC_INITIAL_DIR}/all.50mers_fastqc.zip"
     conda:
         "envs/fastqc.yaml"
     shell:
@@ -142,7 +187,8 @@ rule rrna_removal:
 # STAR alignment to transcriptome
 rule star_alignment:
     input:
-        fastq = rules.rrna_removal.output.unmapped
+        fastq = rules.rrna_removal.output.unmapped,
+        star_index = rules.build_star_index.output.index_files
     output:
         bam = f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.bam",
         sorted_bam = f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam",
@@ -151,10 +197,10 @@ rule star_alignment:
         "envs/star.yaml"
     params:
         threads = config.get("threads", 8),
-        genome_dir = config.get("genome_dir", "dm6"),
+        genome_dir = f"{SHARED_GENOME}/star-index",
         prefix = "dm6.50mer"
     shell:
-        "mkdir -p {STAR_DIR} && STAR --genomeDir {params.genome_dir} --readFilesIn {input.fastq} --runThreadN {params.threads} --genomeLoad NoSharedMemory --outFilterMultimapNmax 1 --alignSJoverhangMin 8 --alignSJDBoverhangMin 1 --outFilterMismatchNmax 999 --outFilterMismatchNoverReadLmax 0.0 --alignIntronMin 20 --alignIntronMax 1000000 --alignMatesGapMax 1000000 --outSAMheaderCommentFile {STAR_DIR}/COfile.txt --outSAMheaderHD @HD VN:1.4 SO:coordinate --outSAMunmapped Within --outFilterType BySJout --outSAMattributes NH HI AS NM MD --outSAMtype BAM SortedByCoordinate --quantMode TranscriptomeSAM GeneCounts --sjdbScore 1 --limitBAMsortRAM 30000000000 --outFileNamePrefix {STAR_DIR}/{params.prefix} --outSAMstrandField intronMotif && samtools sort {output.bam} {STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted && samtools index {output.sorted_bam}"
+        "mkdir -p {STAR_DIR} && STAR --genomeDir {params.genome_dir} --readFilesIn {input.fastq} --runThreadN {params.threads} --genomeLoad NoSharedMemory --outFilterMultimapNmax 1 --alignSJoverhangMin 8 --alignSJDBoverhangMin 1 --outFilterMismatchNmax 999 --outFilterMismatchNoverReadLmax 0.0 --alignIntronMin 20 --alignIntronMax 1000000 --alignMatesGapMax 1000000 --outSAMheaderCommentFile {STAR_DIR}/COfile.txt --outSAMheaderHD @HD VN:1.4 SO:coordinate --outSAMunmapped Within --outFilterType BySJout --outSAMattributes NH HI AS NM MD --outSAMtype BAM SortedByCoordinate --quantMode TranscriptomeSAM GeneCounts --sjdbScore 1 --limitBAMsortRAM 30000000000 --outFileNamePrefix {STAR_DIR}/{params.prefix} --outSAMstrandField intronMotif && samtools sort -o {output.sorted_bam} {output.bam} && samtools index {output.sorted_bam}"
 
 # Vector mapping using bowtie
 rule vector_mapping:
@@ -171,4 +217,102 @@ rule vector_mapping:
         vector_index = VECTOR_42AB_INDEX,
         vector_ref = VECTOR_42AB_REF
     shell:
-        "mkdir -p {VECTOR_DIR} && bowtie {params.vector_index} -p {params.threads} --chunkmbs 1024 -v 0 -a -m 1 -t -S --best --strata -q {input.fastq} -k 1 --al {VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.fastq | samtools view -F 4 -bT {params.vector_ref} - | samtools sort - {VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup && samtools index {output.bam}"
+        "mkdir -p {VECTOR_DIR} && bowtie {params.vector_index} -p {params.threads} --chunkmbs 1024 -v 0 -a -m 1 -t -S --best --strata -q {input.fastq} -k 1 --al {VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.fastq | samtools view -F 4 -bT {params.vector_ref} - | samtools sort -o {output.bam} - && samtools index {output.bam}"
+
+rule feature_counts:
+    input:
+        bam = f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam",
+        gtf = HARMONIZED_GTF
+    output:
+        counts = f"{STAR_DIR}/dm6.50merAligned.counts.txt"
+    conda:
+        "envs/subread.yaml"  # or "envs/htseq.yaml"
+    shell:
+        """
+        mkdir -p {STAR_DIR}
+        featureCounts -T 8 -a {input.gtf} -o {output.counts} {input.bam}
+        """
+
+rule generate_bedgraph:
+    input:
+        bam = f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam"
+    output:
+        bedgraph = f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bgc"
+    conda:
+        "envs/star.yaml"
+    shell:
+        """
+        STAR --runMode inputAlignmentsFromBAM \
+             --inputBAMfile {input.bam} \
+             --outWigType bedGraph \
+             --outWigStrand Unstranded \
+             --outFileNamePrefix {STAR_DIR}/dm6.50merAligned.sortedByCoord \
+             --outWigReferencesPrefix chr
+        """
+
+rule generate_coverage_profiles:
+    input:
+        gtf = HARMONIZED_GTF,
+        bedgraph = f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bgc"
+    output:
+        coverage = f"{STAR_DIR}/dm6.50merAligned.sortedByCoord.coverage"
+    conda:
+        "envs/python.yaml"  # Ensure this environment has Python and the required script
+    shell:
+        """
+        python {SHARED_SCRIPTS}/python/gene_coverage_wig_gtf.py \
+            {input.gtf} \
+            {input.bedgraph} \
+            1000 \
+            {output.coverage}
+        """
+
+rule generate_bigwig:
+    input:
+        bedgraph = f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bg",
+        chrom_sizes = f"{SHARED_GENOME}/bowtie-indexes/dm6.chrom.sizes"
+    output:
+        bigwig = f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bg.bigWig"
+    conda:
+        "envs/ucsc.yaml"  # Ensure this environment has wigToBigWig
+    shell:
+        """
+        wigToBigWig -clip {input.bedgraph} {input.chrom_sizes} {output.bigwig}
+        """
+
+rule rsem_quantification:
+    input:
+        bam = f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam"
+    output:
+        rsem = f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.rsem"
+    conda:
+        "envs/rsem.yaml"
+    shell:
+        """
+        rsem-calculate-expression --bam \
+                                  --estimate-rspd \
+                                  --calc-ci \
+                                  --seed 12345 \
+                                  -p 8 \
+                                  --no-bam-output \
+                                  --ci-memory 30000 \
+                                  --temporary-folder {STAR_DIR}/temp \
+                                  {input.bam} \
+                                  {SHARED_GENOME}/rsem \
+                                  {output.rsem}
+        """
+
+rule bam_coverage:
+    input:
+        bam = f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.bam"
+    output:
+        bg4 = f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.10.bg4"
+    conda:
+        "envs/deeptools.yaml"  # Ensure this environment has bamCoverage
+    shell:
+        """
+        bamCoverage -b {input.bam} \
+                    -of bedgraph \
+                    -bs 10 \
+                    -o {output.bg4}
+        """

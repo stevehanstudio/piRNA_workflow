@@ -13,6 +13,34 @@ This repository contains a bioinformatics workflow system that is **converting a
 - **RIP-seq Pipeline**: 📋 Planned - RNA immunoprecipitation sequencing
 - **Shared Resources**: Common scripts, genomes, and data files used by all workflows
 
+## 🎯 Quick Start
+
+Use the unified workflow manager with **numeric shortcuts** and **smart defaults**:
+
+```bash
+# Quick start - run workflows with numeric shortcuts
+./run_workflow.sh 1    # Run ChIP-seq workflow
+./run_workflow.sh 4    # Run totalRNA-seq workflow
+
+# Interactive selection (no arguments)
+./run_workflow.sh      # Prompts: "Please select a workflow (1 or 4):"
+
+# Traditional text options still work
+./run_workflow.sh chip-seq run
+./run_workflow.sh totalrna-seq status
+
+# Setup conda environments
+./run_workflow.sh totalrna-seq setup
+```
+
+**New Features:**
+- ✅ **Numeric shortcuts**: `1` = ChIP-seq, `4` = totalRNA-seq
+- ✅ **Default command**: `run` is automatic (no need to specify)
+- ✅ **Interactive mode**: Script prompts when no workflow specified
+- ✅ **Smart validation**: Better error handling and environment checks
+
+For detailed usage, see [WORKFLOW_MANAGER.md](WORKFLOW_MANAGER.md).
+
 ## 🔄 Relationship to Original Work
 
 This project is a **modernization and extension** of the original work by [Luo et al. 2025](https://www.sciencedirect.com/science/article/pii/S1097276523007979?dgcid=coauthor) and the [Peng-He-Lab/Luo_2025_piRNA repository](https://github.com/Peng-He-Lab/Luo_2025_piRNA).
