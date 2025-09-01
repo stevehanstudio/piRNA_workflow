@@ -1,0 +1,31 @@
+@startuml chipseq_workflow
+start
+:Raw FASTQ files;
+:FastQC Quality Control;
+:Adapter Trimming;
+:Trimmomatic;
+:FastQC on Trimmed;
+:Trim to 50bp;
+split
+  :Genome Mapping Path;
+  :Bowtie Mapping to dm6;
+  :SAM to BAM;
+  :Sort & Index BAM;
+  :Remove Mitochondrial;
+  :Sort No-Mito BAM;
+  :Remove Duplicates;
+  :BigWig Generation;
+  :Enrichment Track;
+  :Transposon Coverage;
+  :Chop Transposon Bedgraph;
+split again
+  :Vector Mapping Path;
+  :Bowtie Vector Mapping;
+  :SAM to BAM Vector;
+  :Sort & Index Vector;
+  :Coverage Analysis;
+  :Chop Bedgraph;
+split end
+:Final Outputs;
+stop
+@enduml

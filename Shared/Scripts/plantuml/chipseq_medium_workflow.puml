@@ -1,0 +1,86 @@
+@startuml chipseq_workflow
+start
+
+partition "{sample}.fastq" {
+:Raw FASTQ files;
+}
+
+partition "{sample}_fastqc.html" {
+:FastQC Quality Control;
+}
+
+partition "{sample}.trimmed.fastq" {
+:Adapter Trimming;
+}
+
+partition "{sample}.alltrimmed.fastq" {
+:Trimmomatic;
+}
+
+partition "{sample}.alltrimmed_fastqc.html" {
+:FastQC on Trimmed;
+}
+
+partition "{sample}.fastq (50bp)" {
+:Trim to 50bp;
+}
+
+split
+  partition "Genome Path" {
+    partition "{sample}.sam" {
+    :Bowtie Mapping to dm6;
+    }
+    partition "{sample}.bam" {
+    :SAM to BAM;
+    }
+    partition "{sample}.sorted_final.bam/.bai" {
+    :Sort & Index BAM;
+    }
+    partition "{sample}.mito_removed.bam" {
+    :Remove Mitochondrial;
+    }
+    partition "{sample}.no_mito_sorted.bam/.bai" {
+    :Sort No-Mito BAM;
+    }
+    partition "{sample}.rmdup.bam/.bai" {
+    :Remove Duplicates;
+    }
+    partition "{sample}.bigwig" {
+    :BigWig Generation;
+    }
+    partition "{chip}_vs_{input}.enrichment.bigwig" {
+    :Enrichment Track;
+    }
+    partition "{sample}.{binsize}.42AB.bg4" {
+    :Transposon Coverage;
+    }
+    partition "{sample}.{binsize}.42AB.chopped.bg4" {
+    :Chop Transposon Bedgraph;
+    }
+  }
+
+split again
+  partition "Vector Path" {
+    partition "{sample}.vectoronly.sam" {
+    :Bowtie Vector Mapping;
+    }
+    partition "{sample}.vectoronly.bam" {
+    :SAM to BAM Vector;
+    }
+    partition "{sample}.vectoronly.dup.bam/.bai" {
+    :Sort & Index Vector;
+    }
+    partition "{sample}.{binsize}.bg4" {
+    :Coverage Analysis;
+    }
+    partition "{sample}.{binsize}.chopped.bg4" {
+    :Chop Bedgraph;
+    }
+  }
+
+split end
+
+:Final Outputs;
+
+stop
+@enduml

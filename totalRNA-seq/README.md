@@ -186,7 +186,3 @@ For issues and questions:
 3. Open an issue on the repository
 4. Contact the development team
 
----
-
-**Last Updated**: December 2024  
-**Status**: Active Development

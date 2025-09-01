@@ -126,7 +126,11 @@ piRNA_workflow/
 2. **Run ChIP-seq pipeline**:
    ```bash
    cd CHIP-seq
-   snakemake --use-conda --conda-frontend mamba --cores 8
+   # Activate snakemake environment first
+   conda activate snakemake_env
+   # Run with alias for convenience
+   alias sm='snakemake --use-conda --cores 8'
+   sm
    ```
 
 3. **Run TotalRNA-seq pipeline**:
@@ -140,12 +144,13 @@ piRNA_workflow/
 Based on the [Peng-He-Lab/Luo_2025_piRNA repository](https://github.com/Peng-He-Lab/Luo_2025_piRNA), we are converting all 5 original workflows from shell scripts to Snakemake:
 
 ### ✅ **Completed Workflows**
-- **ChIP-seq Pipeline**: ✅ **Converted to Snakemake**
+- **ChIP-seq Pipeline**: ✅ **Converted to Snakemake** ⭐ **Production Ready**
   - Quality Control: FastQC, adapter trimming, quality filtering
-  - Read Mapping: Bowtie alignment to reference genome
+  - Read Mapping: Bowtie alignment to reference genome  
   - Signal Generation: BigWig tracks and enrichment analysis
   - Coverage Analysis: Multiple bin sizes and resolutions
   - Transposon Analysis: Specialized transposon element analysis
+  - **Enhanced Features**: Parameterized paths, flexible sample naming, robust error handling
 
 - **TotalRNA-seq Pipeline**: ✅ **Converted to Snakemake**
   - Quality Control: Multi-step FastQC analysis
