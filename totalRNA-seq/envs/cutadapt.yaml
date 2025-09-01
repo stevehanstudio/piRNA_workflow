@@ -4,6 +4,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - cutadapt
-  - python=3.8
+  - python=3.9
+  - cutadapt=4.4
+  - xopen>=1.6.0,<2.0.0
 
