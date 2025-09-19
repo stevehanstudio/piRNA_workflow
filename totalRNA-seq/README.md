@@ -2,6 +2,13 @@
 
 This repository contains a Snakemake workflow for processing totalRNA-seq data, converting the original shell commands into a reproducible and scalable pipeline.
 
+> **🚀 Quick Start**: Use the unified workflow manager from the project root:
+> ```bash
+> ./run_workflow.sh 4 check-inputs    # Validate requirements
+> ./run_workflow.sh 4                 # Run with interactive guidance
+> ```
+> For details, see [WORKFLOW_MANAGER.md](../WORKFLOW_MANAGER.md).
+
 ## Overview
 
 The pipeline performs the following steps:

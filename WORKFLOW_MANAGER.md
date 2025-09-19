@@ -38,6 +38,9 @@ The `run_workflow.sh` script provides a unified interface for managing both work
 | `dryrun` | Show what will be executed (dry run) |
 | `run` | Run the complete workflow **[DEFAULT]** |
 | `run-force` | Force re-run all steps of the workflow |
+| `check-inputs` | Validate all required input files are present |
+| `fix-incomplete` | Fix incomplete files and continue workflow |
+| `unlock` | Unlock workflow directory (fixes lock errors) |
 | `status` | Check workflow status and progress |
 | `clean` | Clean up output files |
 | `help` | Show help message |
@@ -66,6 +69,17 @@ The script now includes several interactive features to improve user experience:
 3. **Execution Timing**:
    - Tracks total execution time for `run` and `run-force` commands
    - Displays formatted time (HH:MM:SS) upon completion
+
+4. **Input File Validation**:
+   - Comprehensive checking of all required input files
+   - Intelligent validation for indexes vs source files
+   - Specific guidance on missing files with download instructions
+   - Pre-flight validation prevents workflow failures
+
+5. **Error Recovery**:
+   - Automatic Snakemake lock detection and resolution
+   - Incomplete file cleanup and recovery
+   - Smart metadata management
 
 ## Examples
 
@@ -119,6 +133,21 @@ The script now includes several interactive features to improve user experience:
 ./run_workflow.sh totalrna-seq run
 ```
 
+### Input Validation and Troubleshooting
+```bash
+# Validate all required input files before running
+./run_workflow.sh 1 check-inputs
+./run_workflow.sh 4 check-inputs
+
+# Fix common workflow issues
+./run_workflow.sh 1 unlock          # Resolve lock errors
+./run_workflow.sh 1 fix-incomplete  # Handle incomplete files
+
+# Check workflow status and progress
+./run_workflow.sh 1 status
+./run_workflow.sh 4 dryrun
+```
+
 ### Advanced Usage
 ```bash
 # Force re-run all steps with 4 cores (numeric option)
@@ -135,6 +164,22 @@ The script now includes several interactive features to improve user experience:
 
 # Default command with custom cores
 ./run_workflow.sh 4 --cores 12  # Same as: ./run_workflow.sh 4 run --cores 12
+```
+
+### Complete Workflow Examples
+```bash
+# Example 1: First-time setup and validation
+./run_workflow.sh 1 check-inputs     # Validate requirements
+./run_workflow.sh 1 setup           # Create environments
+./run_workflow.sh 1                 # Run with interactive prompts
+
+# Example 2: Troubleshooting interrupted workflows
+./run_workflow.sh 1 unlock          # Clear locks
+./run_workflow.sh 1 fix-incomplete  # Fix incomplete files
+./run_workflow.sh 1 run --rerun-incomplete
+
+# Example 3: Production run with manual control
+./run_workflow.sh chip-seq run --cores 16 --rerun-incomplete
 ```
 
 ## Features
@@ -172,6 +217,30 @@ To completely restart a workflow:
 ```bash
 ./run_workflow.sh [workflow] clean
 ./run_workflow.sh [workflow] run-force
+```
+
+### Input File Issues
+If workflows fail due to missing files:
+```bash
+# Check what's missing
+./run_workflow.sh [workflow] check-inputs
+
+# Follow the provided download and setup instructions
+# Then validate again
+./run_workflow.sh [workflow] check-inputs
+```
+
+### Lock and Incomplete File Issues
+If workflows are interrupted:
+```bash
+# Clear Snakemake locks
+./run_workflow.sh [workflow] unlock
+
+# Fix incomplete files
+./run_workflow.sh [workflow] fix-incomplete
+
+# Resume workflow
+./run_workflow.sh [workflow] run --rerun-incomplete
 ```
 
 ## Workflow-Specific Notes

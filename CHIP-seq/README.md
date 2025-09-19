@@ -4,6 +4,13 @@ A reproducible ChIP-seq analysis pipeline converted from shell commands to Snake
 
 **✅ Production Ready**: This pipeline is fully functional and has been tested with multiple datasets. It provides a complete ChIP-seq analysis workflow from raw data to publication-ready results.
 
+> **🚀 Quick Start**: Use the unified workflow manager from the project root:
+> ```bash
+> ./run_workflow.sh 1 check-inputs    # Validate requirements
+> ./run_workflow.sh 1                 # Run with interactive guidance
+> ```
+> For details, see [WORKFLOW_MANAGER.md](../WORKFLOW_MANAGER.md).
+
 ## 🆕 Recent Improvements
 
 - **✅ Parameterized Paths**: No more symlinks needed - use `INPUT_DATA_DIR` variable to specify input file location

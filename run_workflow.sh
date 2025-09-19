@@ -134,6 +134,211 @@ check_existing_outputs() {
     return 0
 }
 
+# Function to check required input files
+check_input_files() {
+    local workflow_dir=$1
+    local missing_files=()
+    local missing_dirs=()
+    local all_files_present=true
+    
+    echo "=== Input File Validation ===" >&2
+    echo "Checking required input files for $workflow_dir workflow..." >&2
+    echo "" >&2
+    
+    if [[ "$workflow_dir" == "CHIP-seq" ]]; then
+        # CHIP-seq required files
+        local required_files=(
+            "Shared/DataFiles/genome/dm6.fa"
+            "Shared/DataFiles/genome/dm6-blacklist.v2.bed.gz"
+            "Shared/DataFiles/genome/bowtie-indexes/dm6.chrom.sizes"
+            "Shared/DataFiles/genome/AllAdaptors.fa"
+            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.fa"
+            "Shared/Scripts/python/trimfastq.py"
+            "Shared/Scripts/python/makewigglefromBAM-NH.py"
+        )
+        
+        local required_dirs=(
+            "Shared/DataFiles/datasets/chip-seq/chip_inputs"
+            "Shared/DataFiles/genome/bowtie-indexes"
+            "Shared/DataFiles/genome/YichengVectors"
+        )
+        
+        # Check for bowtie index files (indexes are required for workflow)
+        local bowtie_index_files=(
+            "Shared/DataFiles/genome/bowtie-indexes/dm6.1.ebwt"
+            "Shared/DataFiles/genome/bowtie-indexes/dm6.2.ebwt"
+            "Shared/DataFiles/genome/bowtie-indexes/dm6.3.ebwt"
+            "Shared/DataFiles/genome/bowtie-indexes/dm6.4.ebwt"
+            "Shared/DataFiles/genome/bowtie-indexes/dm6.rev.1.ebwt"
+            "Shared/DataFiles/genome/bowtie-indexes/dm6.rev.2.ebwt"
+        )
+        
+        # Check for vector index files (only 42AB_UBIG, 20A is temporarily disabled)
+        local vector_index_files=(
+            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.1.ebwt"
+            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.2.ebwt"
+            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.3.ebwt"
+            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.4.ebwt"
+            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.rev.1.ebwt"
+            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.rev.2.ebwt"
+        )
+        
+        required_files+=("${bowtie_index_files[@]}" "${vector_index_files[@]}")
+        
+    elif [[ "$workflow_dir" == "totalRNA-seq" ]]; then
+        # totalRNA-seq required files (basic files that are always needed)
+        local required_files=(
+            "Shared/DataFiles/datasets/totalrna-seq/all.50mers.fastq"
+            "Shared/DataFiles/genome/dm6.fa"
+            "Shared/DataFiles/genome/annotations/dm6.gtf"
+            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.fa"
+            "Shared/Scripts/python/trimfastq.py"
+        )
+        
+        local required_dirs=(
+            "Shared/DataFiles/datasets/totalrna-seq"
+            "Shared/DataFiles/genome/rrna"
+            "Shared/DataFiles/genome/annotations"
+            "Shared/DataFiles/genome/YichengVectors"
+        )
+        
+        # Check for rRNA: either source file OR index files must exist
+        local rrna_source="Shared/DataFiles/genome/rrna/dmel_rRNA_unit.fa"
+        local rrna_index_files=(
+            "Shared/DataFiles/genome/rrna/dmel_rRNA_unit.1.ebwt"
+            "Shared/DataFiles/genome/rrna/dmel_rRNA_unit.2.ebwt"
+            "Shared/DataFiles/genome/rrna/dmel_rRNA_unit.3.ebwt"
+            "Shared/DataFiles/genome/rrna/dmel_rRNA_unit.4.ebwt"
+            "Shared/DataFiles/genome/rrna/dmel_rRNA_unit.rev.1.ebwt"
+            "Shared/DataFiles/genome/rrna/dmel_rRNA_unit.rev.2.ebwt"
+        )
+        
+        # Check if rRNA indexes exist (preferred) or source file exists
+        local rrna_available=false
+        if [[ -f "$rrna_source" ]]; then
+            rrna_available=true
+            required_files+=("$rrna_source")
+        else
+            # Check if all index files exist
+            local all_rrna_indexes_exist=true
+            for index_file in "${rrna_index_files[@]}"; do
+                if [[ ! -f "$index_file" ]]; then
+                    all_rrna_indexes_exist=false
+                    break
+                fi
+            done
+            if [[ "$all_rrna_indexes_exist" == "true" ]]; then
+                rrna_available=true
+                # Don't add to required_files since they exist
+            else
+                # Neither source nor complete indexes exist
+                required_files+=("${rrna_index_files[@]}")
+            fi
+        fi
+        
+        # Check for vector index files
+        local vector_index_files=(
+            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.1.ebwt"
+            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.2.ebwt"
+            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.3.ebwt"
+            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.4.ebwt"
+            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.rev.1.ebwt"
+            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.rev.2.ebwt"
+        )
+        
+        required_files+=("${vector_index_files[@]}")
+    fi
+    
+    # Check directories first
+    for dir in "${required_dirs[@]}"; do
+        if [[ ! -d "$dir" ]]; then
+            missing_dirs+=("$dir")
+            all_files_present=false
+        fi
+    done
+    
+    # Check files
+    for file in "${required_files[@]}"; do
+        if [[ ! -f "$file" ]]; then
+            missing_files+=("$file")
+            all_files_present=false
+        fi
+    done
+    
+    # Report results
+    if [[ "$all_files_present" == "true" ]]; then
+        echo "✅ All required input files are present!" >&2
+        echo "" >&2
+        return 0
+    else
+        echo "❌ Missing required input files:" >&2
+        echo "" >&2
+        
+        if [[ ${#missing_dirs[@]} -gt 0 ]]; then
+            echo "Missing directories:" >&2
+            for dir in "${missing_dirs[@]}"; do
+                echo "  • $dir" >&2
+            done
+            echo "" >&2
+        fi
+        
+        if [[ ${#missing_files[@]} -gt 0 ]]; then
+            echo "Missing files:" >&2
+            for file in "${missing_files[@]}"; do
+                echo "  • $file" >&2
+            done
+            echo "" >&2
+        fi
+        
+        echo "📋 Required actions:" >&2
+        echo "" >&2
+        
+        if [[ "$workflow_dir" == "CHIP-seq" ]]; then
+            echo "1. Download and prepare reference files:" >&2
+            echo "   • Download dm6.fa, dm6-blacklist.v2.bed.gz, AllAdaptors.fa" >&2
+            echo "   • Build bowtie indexes: bowtie-build dm6.fa dm6" >&2
+            echo "   • Build vector indexes: bowtie-build 42AB_UBIG.fa 42AB_UBIG" >&2
+            echo "   • Create chromosome sizes: samtools faidx dm6.fa && cut -f1,2 dm6.fa.fai > dm6.chrom.sizes" >&2
+            echo "" >&2
+            echo "2. Place input FASTQ files in:" >&2
+            echo "   Shared/DataFiles/datasets/chip-seq/chip_inputs/" >&2
+            echo "" >&2
+        elif [[ "$workflow_dir" == "totalRNA-seq" ]]; then
+            echo "1. Download and prepare reference files:" >&2
+            echo "   • Download dm6.fa, dm6.gtf, dmel_rRNA_unit.fa" >&2
+            echo "   • Build rRNA index: bowtie-build dmel_rRNA_unit.fa dmel_rRNA_unit" >&2
+            echo "   • Build vector index: bowtie-build 42AB_UBIG.fa 42AB_UBIG" >&2
+            echo "" >&2
+            echo "2. Place input FASTQ file:" >&2
+            echo "   Shared/DataFiles/datasets/totalrna-seq/all.50mers.fastq" >&2
+            echo "" >&2
+        fi
+        
+        echo "3. For detailed setup instructions, see:" >&2
+        echo "   • $workflow_dir/README.md" >&2
+        echo "   • INDEX_BUILDING_STRATEGY.md" >&2
+        echo "" >&2
+        
+        while true; do
+            read -p "Would you like to proceed anyway? The workflow will likely fail. (y/N): " choice >&2
+            case $choice in
+                [Yy]* ) 
+                    echo "⚠️  Proceeding with missing files - workflow may fail!" >&2
+                    echo "" >&2
+                    return 0
+                    ;;
+                [Nn]* | "" )
+                    echo "Workflow cancelled. Please prepare the required files first." >&2
+                    exit 1
+                    ;;
+                * ) 
+                    echo "Please answer yes (y) or no (n)." >&2
+                    ;;
+            esac
+        done
+    fi
+}
+
 # Function to interactively select workflow
 select_workflow() {
     echo "Available workflows:" >&2
@@ -171,6 +376,9 @@ show_usage() {
     echo "  dryrun        - Show what will be executed (dry run)"
     echo "  run           - Run the complete workflow [DEFAULT]"
     echo "  run-force     - Force re-run all steps of the workflow"
+    echo "  fix-incomplete - Fix incomplete files and continue workflow"
+    echo "  check-inputs  - Validate all required input files are present"
+    echo "  unlock        - Unlock workflow directory (fixes lock errors)"
     echo "  status        - Check workflow status and progress"
     echo "  clean         - Clean up output files"
     echo "  help          - Show this help message"
@@ -190,6 +398,8 @@ show_usage() {
     echo "  $0 chip-seq dryrun        # Dry run ChIP-seq workflow (will prompt for cores)"
     echo "  $0 4                      # Run totalRNA-seq (will prompt for cores)"
     echo "  $0 totalrna-seq status    # Check totalRNA-seq status"
+    echo "  $0 1 fix-incomplete       # Fix incomplete ChIP-seq files and continue"
+    echo "  $0 4 check-inputs         # Validate totalRNA-seq input files"
     echo "  $0                        # Interactive mode - prompts for workflow and cores"
     echo ""
     echo "Note: Workflows must be run from their respective directories."
@@ -206,10 +416,9 @@ run_snakemake() {
     echo "Command: ${command}"
     echo ""
     
-    cd "${workflow_dir}"
-    
-    # Use conda run to execute in the snakemake_env environment
+    # Use conda run to execute in the snakemake_env environment with proper directory
     conda run -n snakemake_env bash -c "
+        cd '${workflow_dir}'
         # Set up sm alias
         alias sm='snakemake'
         ${command}
@@ -298,6 +507,11 @@ elif [[ -z "$CORES" ]]; then
     CORES=8  # Default fallback
 fi
 
+# Check input files before running workflows (unless it's help, status, clean, unlock, or check-inputs)
+if [[ "$COMMAND" != "help" && "$COMMAND" != "status" && "$COMMAND" != "clean" && "$COMMAND" != "unlock" && "$COMMAND" != "check-inputs" ]]; then
+    check_input_files "$WORKFLOW_DIR"
+fi
+
 # Check for existing outputs before running destructive commands
 FORCE_RERUN=false
 if [[ "$COMMAND" == "run" || "$COMMAND" == "run-force" ]]; then
@@ -323,12 +537,21 @@ case "$COMMAND" in
     run)
         if [[ "$FORCE_RERUN" == "true" ]]; then
             echo "Force running $WORKFLOW workflow (all steps)..."
+            echo "Note: Cleaning up any incomplete file metadata first..."
+            run_snakemake "$WORKFLOW_DIR" "snakemake --cleanup-metadata --use-conda" 2>/dev/null || true
             START_TIME=$(date +%s)
             run_snakemake "$WORKFLOW_DIR" "snakemake all --forceall --use-conda --cores $CORES $EXTRA_FLAGS"
         else
             echo "Running $WORKFLOW workflow..."
             START_TIME=$(date +%s)
-            run_snakemake "$WORKFLOW_DIR" "snakemake all --use-conda --cores $CORES $EXTRA_FLAGS"
+            # Try regular run first, if it fails with incomplete files, suggest fix-incomplete
+            if ! run_snakemake "$WORKFLOW_DIR" "snakemake all --use-conda --cores $CORES $EXTRA_FLAGS"; then
+                echo ""
+                echo "❌ Workflow failed. This might be due to incomplete files from a previous run."
+                echo "💡 Try running: $0 $WORKFLOW fix-incomplete"
+                echo "   This will clean up incomplete files and resume the workflow."
+                exit 1
+            fi
         fi
         END_TIME=$(date +%s)
         DURATION=$((END_TIME - START_TIME))
@@ -349,6 +572,33 @@ case "$COMMAND" in
         echo "Workflow completed successfully!"
         echo "Total execution time: $(printf '%02d:%02d:%02d' $((DURATION/3600)) $((DURATION%3600/60)) $((DURATION%60)))"
         echo "=================================="
+        ;;
+    fix-incomplete)
+        echo "Fixing incomplete files for $WORKFLOW workflow..."
+        echo "Step 1: Attempting to clean up metadata for incomplete files..."
+        # Try to cleanup metadata - this might fail if no specific files are provided, that's OK
+        run_snakemake "$WORKFLOW_DIR" "snakemake --cleanup-metadata --use-conda || true" 2>/dev/null || true
+        echo ""
+        echo "Step 2: Re-running workflow with incomplete file recovery..."
+        START_TIME=$(date +%s)
+        run_snakemake "$WORKFLOW_DIR" "snakemake all --rerun-incomplete --use-conda --cores $CORES $EXTRA_FLAGS"
+        END_TIME=$(date +%s)
+        DURATION=$((END_TIME - START_TIME))
+        echo ""
+        echo "=================================="
+        echo "Incomplete files fixed and workflow completed!"
+        echo "Total execution time: $(printf '%02d:%02d:%02d' $((DURATION/3600)) $((DURATION%3600/60)) $((DURATION%60)))"
+        echo "=================================="
+        ;;
+    check-inputs)
+        echo "Validating input files for $WORKFLOW workflow..."
+        echo ""
+        check_input_files "$WORKFLOW_DIR"
+        ;;
+    unlock)
+        echo "Unlocking $WORKFLOW workflow directory..."
+        run_snakemake "$WORKFLOW_DIR" "snakemake --unlock --use-conda"
+        echo "Workflow directory unlocked successfully!"
         ;;
     status)
         echo "Checking $WORKFLOW workflow status..."

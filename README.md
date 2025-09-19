@@ -15,12 +15,12 @@ This repository contains a bioinformatics workflow system that is **converting a
 
 ## 🎯 Quick Start
 
-Use the unified workflow manager with **numeric shortcuts** and **smart defaults**:
+Use the unified workflow manager with **intelligent automation** and **interactive guidance**:
 
 ```bash
 # Quick start - run workflows with numeric shortcuts
-./run_workflow.sh 1    # Run ChIP-seq workflow
-./run_workflow.sh 4    # Run totalRNA-seq workflow
+./run_workflow.sh 1    # Run ChIP-seq workflow (interactive mode)
+./run_workflow.sh 4    # Run totalRNA-seq workflow (interactive mode)
 
 # Interactive selection (no arguments)
 ./run_workflow.sh      # Prompts: "Please select a workflow (1 or 4):"
@@ -29,15 +29,23 @@ Use the unified workflow manager with **numeric shortcuts** and **smart defaults
 ./run_workflow.sh chip-seq run
 ./run_workflow.sh totalrna-seq status
 
-# Setup conda environments
-./run_workflow.sh totalrna-seq setup
+# Validate inputs before running
+./run_workflow.sh 1 check-inputs    # Check all required files
+./run_workflow.sh 4 check-inputs    # Validate totalRNA-seq files
+
+# Troubleshooting commands
+./run_workflow.sh 1 unlock          # Fix lock errors
+./run_workflow.sh 1 fix-incomplete  # Handle incomplete files
 ```
 
-**New Features:**
-- ✅ **Numeric shortcuts**: `1` = ChIP-seq, `4` = totalRNA-seq
-- ✅ **Default command**: `run` is automatic (no need to specify)
-- ✅ **Interactive mode**: Script prompts when no workflow specified
-- ✅ **Smart validation**: Better error handling and environment checks
+**🆕 Enhanced Features:**
+- ✅ **Smart Resource Detection**: Auto-detects CPU cores, load, and memory
+- ✅ **Input Validation**: Checks all required files before running
+- ✅ **Overwrite Protection**: Prompts before overwriting existing results
+- ✅ **Execution Timing**: Shows total runtime upon completion
+- ✅ **Auto-Force Rerun**: Automatically uses `--forceall` when overwriting
+- ✅ **Interactive Core Selection**: Suggests optimal core count based on system load
+- ✅ **Comprehensive Error Handling**: Unlock, incomplete files, missing inputs
 
 For detailed usage, see [WORKFLOW_MANAGER.md](WORKFLOW_MANAGER.md).
 
@@ -151,20 +159,30 @@ piRNA_workflow/
    cd piRNA_workflow
    ```
 
-2. **Run ChIP-seq pipeline**:
+2. **Create the snakemake environment** (one-time setup):
    ```bash
-   cd CHIP-seq
-   # Activate snakemake environment first
+   conda create -n snakemake_env -c bioconda -c conda-forge snakemake
    conda activate snakemake_env
-   # Run with alias for convenience
-   alias sm='snakemake --use-conda --cores 8'
-   sm
    ```
 
-3. **Run TotalRNA-seq pipeline**:
+3. **Run workflows using the unified manager**:
    ```bash
-   cd totalRNA-seq
-   snakemake --use-conda --conda-frontend mamba --cores 8
+   # Interactive mode - guided setup
+   ./run_workflow.sh
+   
+   # Quick runs with automatic resource detection
+   ./run_workflow.sh 1    # ChIP-seq (prompts for cores)
+   ./run_workflow.sh 4    # totalRNA-seq (prompts for cores)
+   
+   # Manual control
+   ./run_workflow.sh 1 run --cores 8
+   ./run_workflow.sh totalrna-seq dryrun
+   ```
+
+4. **Validate inputs before running**:
+   ```bash
+   ./run_workflow.sh 1 check-inputs     # Verify ChIP-seq requirements
+   ./run_workflow.sh 4 check-inputs     # Verify totalRNA-seq requirements
    ```
 
 ## 📊 Workflow Status
@@ -229,13 +247,85 @@ Based on the [Peng-He-Lab/Luo_2025_piRNA repository](https://github.com/Peng-He-
 - **[Quick Setup Guide](CHIP-seq/QUICK_SETUP.md)**: Fast setup instructions
 - **[Dataset Recommendations](CHIP-seq/DATASET_RECOMMENDATIONS.md)**: Data quality guidelines
 
+## 🛠️ Workflow Manager Features
+
+The `run_workflow.sh` script provides a comprehensive workflow management system:
+
+### **🔍 Input Validation**
+```bash
+./run_workflow.sh 1 check-inputs    # Validate all required files
+./run_workflow.sh 4 check-inputs    # Check totalRNA-seq requirements
+```
+- Checks for reference genomes, indexes, and input datasets
+- Provides specific guidance on missing files
+- Offers download commands and setup instructions
+
+### **🧠 Smart Resource Detection**
+```bash
+./run_workflow.sh 1    # Auto-detects system resources
+# Output:
+# === System Resources ===
+# Total CPU cores: 16
+# Current load average: 2.1
+# Available memory: 32GB
+# Number of cores to use [12]: 
+```
+- Analyzes CPU cores, load average, and memory
+- Suggests optimal core count based on system load
+- Allows manual override or acceptance of suggestion
+
+### **🛡️ Safety Features**
+```bash
+./run_workflow.sh 1 run    # Checks for existing results
+# Warning: Existing results directories found:
+# Do you want to proceed and potentially overwrite existing results? (y/N):
+```
+- Detects existing output directories
+- Prompts before overwriting valuable results
+- Automatically applies `--forceall` when confirmed
+
+### **🔧 Troubleshooting Commands**
+```bash
+./run_workflow.sh 1 unlock          # Fix Snakemake lock errors
+./run_workflow.sh 1 fix-incomplete  # Handle incomplete files
+./run_workflow.sh 1 status          # Check workflow progress
+./run_workflow.sh 1 clean           # Remove output files
+```
+
+### **⏱️ Execution Monitoring**
+- Displays total execution time upon completion
+- Shows formatted time (HH:MM:SS)
+- Tracks resource usage during runs
+
 ## 🐛 Troubleshooting
 
-### Common Issues
-1. **Environment Creation**: Use `--conda-frontend mamba` for complex environments
-2. **Memory Issues**: Reduce cores with `--cores 4`
-3. **File Not Found**: Check file paths in Snakefiles
-4. **Python Version**: Each tool uses its own environment
+### **Workflow Manager Issues**
+```bash
+# Lock errors (previous run interrupted)
+./run_workflow.sh 1 unlock
+
+# Incomplete files (run was interrupted)
+./run_workflow.sh 1 fix-incomplete
+
+# Missing input files
+./run_workflow.sh 1 check-inputs
+
+# Check what would run without executing
+./run_workflow.sh 1 dryrun
+```
+
+### **Common Snakemake Issues**
+1. **Environment Creation**: Use `--conda-frontend mamba` for faster dependency resolution
+2. **Memory Issues**: Reduce cores with `--cores 4` or let the script suggest optimal cores
+3. **File Not Found**: Use `check-inputs` command to verify all required files
+4. **Permission Issues**: Ensure write access to output directories
+5. **Incomplete Files**: Use `fix-incomplete` command to clean metadata
+
+### **Performance Optimization**
+- Let the script auto-detect optimal core count based on system load
+- Use `dryrun` to preview computational requirements
+- Monitor system resources during execution
+- Use `status` to check progress of long-running workflows
 
 ## 📄 License
 

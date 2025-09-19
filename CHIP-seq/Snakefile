@@ -32,7 +32,7 @@ ADAPTERS_FILE = f"{SHARED_GENOME}/AllAdaptors.fa"
 INPUT_DATA_DIR = f"{SHARED_DATA}/datasets/chip-seq/chip_inputs"
 
 # Results directory configuration
-RESULTS_DIR = "results_White_GLKD"
+RESULTS_DIR = "results"
 
 # Sample configuration
 CHIP_SAMPLE = "White_GLKD_ChIP_input_1st_S7_R1_001"  # ChIP sample
