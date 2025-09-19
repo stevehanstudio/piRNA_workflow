@@ -147,9 +147,9 @@ snakemake --use-conda --conda-clean-envs
 snakemake --use-conda --conda-create-envs-only
 ```
 
-### Python 2.7 Requirement
+### Python Environment
 
-The `trimfastq.py` script requires Python 2.7 due to legacy dependencies. The conda environment `trimfastq.yaml` handles this automatically. For new projects, consider using modern alternatives like `cutadapt` for read trimming.
+The `trimfastq.py` script has been modernized to use Python 3.9+. The conda environment `python.yaml` handles all dependencies automatically. The script maintains full compatibility with the original Python 2.7 version.
 
 ## Original Commands
 

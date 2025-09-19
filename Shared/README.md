@@ -79,14 +79,14 @@ Both workflows reference these shared resources using relative paths:
 
 ## Notes
 
-- The trimfastq.py script requires Python 2.7 due to legacy dependencies (managed via conda environment)
+- The trimfastq.py script uses Python 3.9+ (managed via conda environment)
 - Both workflows maintain their own Snakefiles and configurations
 - Shared resources are read-only from the workflow perspective
-- Python 2.7 scripts are automatically managed by Snakemake conda environments
+- Python scripts are automatically managed by Snakemake conda environments
 
 ## Modern Alternatives
 
-For new projects, consider replacing legacy Python 2.7 scripts with:
+For new projects, consider modern alternatives such as:
 - **cutadapt**: Modern adapter trimming and length filtering
 - **seqtk**: Fast sequence toolkit for read manipulation
 - **bioawk**: Bioinformatics-aware awk for sequence processing

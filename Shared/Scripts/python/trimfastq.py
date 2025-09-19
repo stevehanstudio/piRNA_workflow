@@ -1,7 +1,8 @@
+#!/usr/bin/env python3
 ##################################
 #                                #
-# Last modified 12/06/2012       # 
-#                                #
+# Last modified 2024/09/19       # 
+# Converted to Python 3          #
 # Georgi Marinov                 #
 #                                # 
 ##################################
@@ -9,11 +10,7 @@
 import sys
 import os
 
-try:
-	import psyco
-	psyco.full()
-except:
-	pass
+# Note: psyco is not available in Python 3 and not needed with modern Python performance
 
 def main(argv):
 
@@ -251,4 +248,3 @@ def main(argv):
 
 if __name__ == '__main__':
     main(sys.argv)
-

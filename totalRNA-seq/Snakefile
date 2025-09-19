@@ -12,7 +12,7 @@ SHARED_DATA = "../Shared/DataFiles"
 SHARED_GENOME = f"{SHARED_DATA}/genome"
 
 # Scripts
-TRIMFASTQ_SCRIPT = f"{SHARED_SCRIPTS}/python/trimfastq_py3.py"
+TRIMFASTQ_SCRIPT = f"{SHARED_SCRIPTS}/python/trimfastq.py"
 
 # Vector files
 VECTOR_42AB_INDEX = f"{SHARED_GENOME}/YichengVectors/42AB_UBIG"
@@ -296,7 +296,7 @@ rule generate_coverage_profiles:
     output:
         coverage = f"{STAR_DIR}/dm6.50merAligned.sortedByCoord.coverage"
     conda:
-        "envs/python3.yaml"  # Ensure this environment has Python and the required script
+        "envs/python.yaml"  # Ensure this environment has Python and the required script
     shell:
         """
         python {SHARED_SCRIPTS}/python/gene_coverage_wig_gtf.py \

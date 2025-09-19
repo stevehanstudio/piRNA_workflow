@@ -240,7 +240,7 @@ rule trim_to_50bp:
     output:
         trimmed_50bp = RESULTS_DIR + "/trimmed_50bp/{sample}.fastq"
     conda:
-        "envs/python3.yaml"
+        "envs/python.yaml"
     shell:
         """
         mkdir -p $(dirname {output.trimmed_50bp})
@@ -382,7 +382,7 @@ rule make_bigwig:
     output:
         bigwig = RESULTS_DIR + "/bowtie/{sample}.bigwig"
     conda:
-        "envs/python3.yaml"
+        "envs/python.yaml"
     shell:
         """
         python {MAKEWIGGLE_SCRIPT} --- {input.bam} {input.chrom_sizes} {output}.bg4 -notitle -uniqueBAM -RPM

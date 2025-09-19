@@ -153,8 +153,8 @@ check_input_files() {
             "Shared/DataFiles/genome/bowtie-indexes/dm6.chrom.sizes"
             "Shared/DataFiles/genome/AllAdaptors.fa"
             "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.fa"
-            "Shared/Scripts/python/trimfastq_py3.py"
-            "Shared/Scripts/python/makewigglefromBAM-NH_py3.py"
+            "Shared/Scripts/python/trimfastq.py"
+            "Shared/Scripts/python/makewigglefromBAM-NH.py"
         )
         
         local required_dirs=(
@@ -192,7 +192,7 @@ check_input_files() {
             "Shared/DataFiles/genome/dm6.fa"
             "Shared/DataFiles/genome/annotations/dm6.gtf"
             "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.fa"
-            "Shared/Scripts/python/trimfastq_py3.py"
+            "Shared/Scripts/python/trimfastq.py"
         )
         
         local required_dirs=(
