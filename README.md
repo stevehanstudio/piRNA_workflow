@@ -78,12 +78,14 @@ This project is a **modernization and extension** of the original work by [Luo e
 piRNA_workflow/
 ├── CHIP-seq/                 # ✅ ChIP-seq analysis pipeline (Converted)
 │   ├── Snakefile            # Main workflow definition
-│   ├── envs/                # Conda environment definitions
+│   ├── config.yaml          # Configuration file
+│   ├── envs/                # Conda environment definitions (13 files)
 │   ├── results/             # Analysis outputs
 │   └── README.md            # Detailed ChIP-seq documentation
 ├── totalRNA-seq/            # ✅ Total RNA-seq processing pipeline (Converted)
 │   ├── Snakefile            # Main workflow definition
-│   ├── envs/                # Conda environment definitions
+│   ├── config.yaml          # Configuration file
+│   ├── envs/                # Conda environment definitions (9 files)
 │   ├── results/             # Analysis outputs
 │   └── README.md            # Detailed RNA-seq documentation
 ├── piRNA-seq/               # 🚧 piRNA-seq pipeline (Converting)
@@ -133,6 +135,8 @@ piRNA_workflow/
 
 ### **Modernization**
 - **Conversion from shell scripts** to Snakemake workflows
+- **Standardized config.yaml** files for easy parameter management
+- **Individual conda environments** for reliable dependency management
 - **Updated software versions** and best practices
 - **Enhanced reproducibility** and scalability
 

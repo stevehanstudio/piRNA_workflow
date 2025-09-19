@@ -66,14 +66,18 @@ snakemake --use-conda --conda-create-envs-only
 Edit `config.yaml` to customize your workflow:
 
 ```yaml
-# Input file
-fastq_file: "all.fastq"
+# Input file - use totalRNA-seq specific dataset
+fastq_file: "../Shared/DataFiles/datasets/totalrna-seq/all.50mers.fastq"
 
 # Read trimming parameters
 read_length: 50
 
 # Adapter sequences (leave empty if not trimming adapters)
-adapters: "AGATCGGAAGAGC"
+adapters: ""  # Leave empty if no adapter trimming needed
+
+# Mapping parameters
+rrna_index: "../Shared/DataFiles/genome/rrna/dmel_rRNA_unit"
+vector_index: "../Shared/DataFiles/genome/YichengVectors/42AB_UBIG"
 ```
 
 ## Usage

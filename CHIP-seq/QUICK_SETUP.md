@@ -25,7 +25,14 @@
 
 3. **Download required data files** (see README.md for details)
 
-4. **Run the workflow** (Snakemake will create tool environments automatically):
+4. **Run the workflow using the unified manager**:
+   ```bash
+   cd .. # Go to project root
+   ./run_workflow.sh 1 check-inputs  # Validate requirements
+   ./run_workflow.sh 1               # Run with interactive guidance
+   ```
+
+   **Or run directly in CHIP-seq directory**:
    ```bash
    snakemake --use-conda --cores 4
    ```

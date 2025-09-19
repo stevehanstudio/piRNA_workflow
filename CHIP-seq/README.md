@@ -244,25 +244,33 @@ google-chrome {CHIP_SAMPLE}.alltrimmed_fastqc.html
 
 ### Sample Configuration
 
-The pipeline now supports flexible configuration with centralized variables. Edit `Snakefile` to configure your analysis:
+The pipeline uses a modern `config.yaml` file for easy configuration. Edit `config.yaml` to customize your analysis:
 
-```python
-# Input data files - specify where your FASTQ files are located
-INPUT_DATA_DIR = f"{SHARED_DATA}/datasets/chip-seq/chip_inputs"
-
-# Results directory configuration - customize your output directory
-RESULTS_DIR = "results_White_GLKD"  # Can be any name you prefer
-
+```yaml
 # Sample configuration
-CHIP_SAMPLE = "White_GLKD_ChIP_input_1st_S7_R1_001"    # Your ChIP sample
-INPUT_SAMPLE = "White_GLKD_ChIP_input_2nd_S10_R1_001"  # Your Input control
-SAMPLES = [CHIP_SAMPLE, INPUT_SAMPLE]
+samples:
+  chip: "White_GLKD_ChIP_input_1st_S7_R1_001"    # ChIP sample
+  input: "White_GLKD_ChIP_input_2nd_S10_R1_001"  # Input control sample
+
+# Input data
+input_data:
+  data_dir: "../Shared/DataFiles/datasets/chip-seq/chip_inputs"
+
+# Output directories
+output:
+  results_dir: "results"
+
+# Analysis parameters
+analysis:
+  bin_sizes: [10, 100, 1000]
+  transposon_bin_sizes: [10, 50, 100, 500, 1000]
 ```
 
-**New Configuration Features:**
-- **`INPUT_DATA_DIR`**: Centralized input file location (no symlinks needed)
-- **`RESULTS_DIR`**: Customizable output directory name 
-- **Path Variables**: All file paths are now parameterized for easy maintenance
+**Configuration Features:**
+- **`config.yaml`**: Modern YAML-based configuration (no need to edit Snakefile)
+- **Sample Management**: Easy to change samples without touching code
+- **Path Configuration**: Centralized file path management
+- **Analysis Parameters**: Configurable bin sizes and analysis settings
 
 ### Analysis Parameters
 
