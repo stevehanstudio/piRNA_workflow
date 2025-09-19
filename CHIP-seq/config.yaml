@@ -43,8 +43,8 @@ references:
 
 # Scripts
 scripts:
-  trimfastq: "../Shared/Scripts/python/trimfastq.py"
-  makewiggle: "../Shared/Scripts/python/makewigglefromBAM-NH.py"
+  trimfastq: "../Shared/Scripts/python/trimfastq_py3.py"
+  makewiggle: "../Shared/Scripts/python/makewigglefromBAM-NH_py3.py"
 
 # Processing parameters
 processing:

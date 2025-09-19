@@ -240,11 +240,11 @@ rule trim_to_50bp:
     output:
         trimmed_50bp = RESULTS_DIR + "/trimmed_50bp/{sample}.fastq"
     conda:
-        "envs/python2.yaml"
+        "envs/python3.yaml"
     shell:
         """
         mkdir -p $(dirname {output.trimmed_50bp})
-        python2 {TRIMFASTQ_SCRIPT} {input.alltrimmed} 50 -stdout 2>/dev/null > {output.trimmed_50bp}
+        python {TRIMFASTQ_SCRIPT} {input.alltrimmed} 50 -stdout 2>/dev/null > {output.trimmed_50bp}
         """
 
 # Genome mapping rules
@@ -382,7 +382,7 @@ rule make_bigwig:
     output:
         bigwig = RESULTS_DIR + "/bowtie/{sample}.bigwig"
     conda:
-        "envs/python2.yaml"
+        "envs/python3.yaml"
     shell:
         """
         python {MAKEWIGGLE_SCRIPT} --- {input.bam} {input.chrom_sizes} {output}.bg4 -notitle -uniqueBAM -RPM

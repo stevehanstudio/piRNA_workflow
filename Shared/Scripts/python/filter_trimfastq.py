@@ -1,8 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Filter script to remove progress messages from trimfastq.py output
 and keep only valid FASTQ content.
-Compatible with Python 2.7
+Compatible with Python 3+
 """
 
 import sys

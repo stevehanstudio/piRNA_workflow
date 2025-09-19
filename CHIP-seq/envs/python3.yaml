@@ -1,0 +1,10 @@
+name: python3
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - pip
+  - pysam
+  - ucsc-wigtobigwig
