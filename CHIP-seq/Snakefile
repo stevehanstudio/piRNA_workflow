@@ -2,46 +2,40 @@
 # Based on Peng-He-Lab/Luo_2025_piRNA repository
 # This workflow processes ChIP-seq data from raw FASTQ to BigWig visualization
 
-# Shared file paths - centralized configuration
-# These variables centralize all shared file paths for easy maintenance
-# If you need to change the location of shared files, update these variables only
-SHARED_SCRIPTS = "../Shared/Scripts"
-SHARED_DATA = "../Shared/DataFiles"
-SHARED_GENOME = f"{SHARED_DATA}/genome"
+# Load configuration
+configfile: "config.yaml"
 
-# Scripts (updated paths for reorganized structure)
-TRIMFASTQ_SCRIPT = f"{SHARED_SCRIPTS}/python/trimfastq.py"
-MAKEWIGGLE_SCRIPT = f"{SHARED_SCRIPTS}/python/makewigglefromBAM-NH.py"
-
-# Genome files
-DM6_REFERENCE = f"{SHARED_GENOME}/dm6.fa"
-DM6_BLACKLIST = f"{SHARED_GENOME}/dm6-blacklist.v2.bed.gz"
-DM6_CHROM_SIZES = f"{SHARED_GENOME}/bowtie-indexes/dm6.chrom.sizes"
-DM6_BOWTIE_INDEX = f"{SHARED_GENOME}/bowtie-indexes/dm6"
-
-# Vector files
-VECTOR_42AB_INDEX = f"{SHARED_GENOME}/YichengVectors/42AB_UBIG"
-VECTOR_42AB_REF = f"{SHARED_GENOME}/YichengVectors/42AB_UBIG.fa"
-VECTOR_20A_INDEX = f"{SHARED_GENOME}/YichengVectors/20A"
-VECTOR_20A_REF = f"{SHARED_GENOME}/YichengVectors/20A.fa"
-
-# Adapter files
-ADAPTERS_FILE = f"{SHARED_GENOME}/AllAdaptors.fa"
-
-# Input data files
-INPUT_DATA_DIR = f"{SHARED_DATA}/datasets/chip-seq/chip_inputs"
-
-# Results directory configuration
-RESULTS_DIR = "results"
-
-# Sample configuration
-CHIP_SAMPLE = "White_GLKD_ChIP_input_1st_S7_R1_001"  # ChIP sample
-INPUT_SAMPLE = "White_GLKD_ChIP_input_2nd_S10_R1_001"  # Input control
+# Extract configuration values
+CHIP_SAMPLE = config["samples"]["chip"]
+INPUT_SAMPLE = config["samples"]["input"]
 SAMPLES = [CHIP_SAMPLE, INPUT_SAMPLE]
 
+# Paths
+RESULTS_DIR = config["output"]["results_dir"]
+INPUT_DATA_DIR = config["input_data"]["data_dir"]
+
+# Scripts
+TRIMFASTQ_SCRIPT = config["scripts"]["trimfastq"]
+MAKEWIGGLE_SCRIPT = config["scripts"]["makewiggle"]
+
+# Reference files
+DM6_REFERENCE = config["references"]["dm6_fasta"]
+DM6_BLACKLIST = config["references"]["dm6_blacklist"]
+DM6_CHROM_SIZES = config["references"]["dm6_chrom_sizes"]
+DM6_BOWTIE_INDEX = config["references"]["dm6_bowtie_index"]
+
+# Vector files
+VECTOR_42AB_INDEX = config["references"]["vector_42ab_index"]
+VECTOR_42AB_REF = config["references"]["vector_42ab_fasta"]
+VECTOR_20A_INDEX = config["references"]["vector_20a_index"]
+VECTOR_20A_REF = config["references"]["vector_20a_fasta"]
+
+# Adapter files
+ADAPTERS_FILE = config["references"]["adapters_file"]
+
 # Analysis parameters
-BIN_SIZES = [10, 100, 1000]
-TRANSPOSON_BIN_SIZES = [10, 50, 100, 500, 1000]
+BIN_SIZES = config["analysis"]["bin_sizes"]
+TRANSPOSON_BIN_SIZES = config["analysis"]["transposon_bin_sizes"]
 
 # Main rule - defines all outputs
 rule all:
