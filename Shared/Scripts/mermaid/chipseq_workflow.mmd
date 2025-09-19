@@ -73,10 +73,10 @@ graph TD
     chop_transposon --> chopped_transposon("Chopped Transposon (bg4)")
     
     %% Styling
-    classDef inputFiles fill:white,stroke:#333,stroke-width:2px,color:#000
-    classDef processing fill:white,stroke:#666,stroke-width:1px,color:#000
-    classDef output fill:transparent,stroke:#999,stroke-width:1px,stroke-dasharray: 3 3,color:#000
-    classDef index fill:white,stroke:#333,stroke-width:1px,color:#000
+    classDef inputFiles fill:#f0f8ff,stroke:#333,stroke-width:1x,color:#000,font-size:16px
+    classDef processing fill:#e6f3ff,stroke:#666,stroke-width:2px,color:#000,font-size:16px
+    classDef output fill:white,stroke:#CCC,stroke-width:1px,stroke-dasharray: 3 3,color:#000,font-size:12px,padding:0px
+    classDef index fill:#f0f8ff,stroke:#333,stroke-width:1px,color:#000,font-size:16px
     
     class raw_fastq,dm6_genome,vector_42ab,vector_20a inputFiles
     class fastqc_raw,cutadapt,trimmomatic,fastqc_trimmed,trim_50bp,build_dm6_index,build_42ab_index,build_20a_index,generate_chrom_sizes,bowtie_genome,sam_to_bam,sort_index_bam,remove_mito,sort_no_mito,remove_duplicates,bowtie_vector,vector_sam_to_bam,sort_vector_bam,make_bigwig,chip_vs_input,coverage_analysis,chop_bedgraph,transposon_coverage,chop_transposon processing
