@@ -46,8 +46,26 @@ The `run_workflow.sh` script provides a unified interface for managing both work
 
 | Option | Description |
 |--------|-------------|
-| `--cores N` | Number of CPU cores to use (default: 8) |
+| `--cores N` | Number of CPU cores to use (prompts interactively if not specified) |
 | `--rerun-incomplete` | Re-run incomplete jobs |
+
+### Interactive Features
+
+The script now includes several interactive features to improve user experience:
+
+1. **Smart Core Detection**: 
+   - Automatically detects total CPU cores and current system load
+   - Suggests optimal core count based on system resources
+   - Prompts user with intelligent default (just press Enter to accept)
+
+2. **Overwrite Protection**:
+   - Checks for existing results before running workflows
+   - Shows preview of existing files and prompts for confirmation
+   - Prevents accidental overwriting of valuable results
+
+3. **Execution Timing**:
+   - Tracks total execution time for `run` and `run-force` commands
+   - Displays formatted time (HH:MM:SS) upon completion
 
 ## Examples
 
@@ -72,6 +90,21 @@ The `run_workflow.sh` script provides a unified interface for managing both work
 ./run_workflow.sh
 # Output: "Please select a workflow (1 or 4):"
 # Enter: 1 (for ChIP-seq) or 4 (for totalRNA-seq)
+# Then shows system resources and prompts for cores
+```
+
+### Interactive Core Selection
+```bash
+# Run workflow with automatic core detection
+./run_workflow.sh 1
+# Output:
+# === System Resources ===
+# Total CPU cores: 16
+# Current load average: 2.1
+# Available memory: 32GB
+# 
+# Number of cores to use [12]: 
+# Press Enter to use suggested 12 cores, or enter a different number
 ```
 
 ### Traditional Text Options
@@ -109,6 +142,9 @@ The `run_workflow.sh` script provides a unified interface for managing both work
 - **Unified Interface**: Single script for both workflows
 - **Numeric Shortcuts**: Use `1` for ChIP-seq, `4` for totalRNA-seq
 - **Interactive Selection**: Prompts for workflow selection when none specified
+- **Smart Resource Detection**: Auto-detects system resources and suggests optimal core count
+- **Overwrite Protection**: Prompts before overwriting existing results
+- **Execution Timing**: Displays total runtime upon workflow completion
 - **Default Command**: `run` is the default - just specify workflow to start
 - **Environment Management**: Automatically activates `snakemake_env`
 - **Error Handling**: Validates environments and directories
