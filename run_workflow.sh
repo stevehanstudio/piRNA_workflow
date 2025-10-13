@@ -582,7 +582,7 @@ case "$COMMAND" in
             echo "Note: Cleaning up any incomplete file metadata first..."
             run_snakemake "$WORKFLOW_DIR" "snakemake --cleanup-metadata --use-conda" 2>/dev/null || true
             START_TIME=$(date +%s)
-            run_snakemake "$WORKFLOW_DIR" "snakemake all --forceall --use-conda --cores $CORES $EXTRA_FLAGS"
+            run_snakemake "$WORKFLOW_DIR" "snakemake all --forceall --rerun-incomplete --use-conda --cores $CORES $EXTRA_FLAGS"
         else
             echo "Running $WORKFLOW workflow..."
             START_TIME=$(date +%s)
@@ -605,8 +605,10 @@ case "$COMMAND" in
         ;;
     run-force)
         echo "Force running $WORKFLOW workflow (all steps)..."
+        echo "Note: Cleaning up any incomplete file metadata first..."
+        run_snakemake "$WORKFLOW_DIR" "snakemake --cleanup-metadata --use-conda" 2>/dev/null || true
         START_TIME=$(date +%s)
-        run_snakemake "$WORKFLOW_DIR" "snakemake all --forceall --use-conda --cores $CORES $EXTRA_FLAGS"
+        run_snakemake "$WORKFLOW_DIR" "snakemake all --forceall --rerun-incomplete --use-conda --cores $CORES $EXTRA_FLAGS"
         END_TIME=$(date +%s)
         DURATION=$((END_TIME - START_TIME))
         echo ""
