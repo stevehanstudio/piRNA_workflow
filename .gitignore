@@ -132,3 +132,6 @@ Thumbs.db
 *.temp
 *.bak
 *.backup
+
+# Presentation files (private/local only)
+PRESENTATION_*.md
