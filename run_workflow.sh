@@ -84,19 +84,33 @@ check_existing_outputs() {
     local workflow_dir=$1
     local existing_dirs=()
 
-    # Check for different result directory patterns
-    if [[ "$workflow_dir" == "CHIP-seq" ]]; then
-        # CHIP-seq uses configurable results directories
-        for dir in "$workflow_dir"/results_*; do
-            if [[ -d "$dir" ]] && [[ -n "$(ls -A "$dir" 2>/dev/null)" ]]; then
-                existing_dirs+=("$dir")
-            fi
-        done
-    elif [[ "$workflow_dir" == "totalRNA-seq" ]]; then
-        # totalRNA-seq uses fixed "results" directory
-        if [[ -d "$workflow_dir/results" ]] && [[ -n "$(ls -A "$workflow_dir/results" 2>/dev/null)" ]]; then
-            existing_dirs+=("$workflow_dir/results")
+    # Try to read the actual configured results directory from config.yaml
+    local config_file="$workflow_dir/config.yaml"
+    local results_dir=""
+
+    if [[ -f "$config_file" ]]; then
+        # Extract results_dir from config.yaml
+        # Look for: results_dir: "path" or results_dir: path
+        results_dir=$(grep -E '^\s*results_dir\s*:\s*' "$config_file" | sed -E 's/^\s*results_dir\s*:\s*//; s/^"//; s/"$//; s/^'\''//; s/'\''$//' | head -1)
+
+        # If results_dir is relative, prepend workflow_dir
+        if [[ -n "$results_dir" && ! "$results_dir" =~ ^/ ]]; then
+            results_dir="$workflow_dir/$results_dir"
         fi
+    fi
+
+    # Fallback to default patterns if config reading failed
+    if [[ -z "$results_dir" ]]; then
+        if [[ "$workflow_dir" == "CHIP-seq" ]]; then
+            results_dir="$workflow_dir/results"
+        elif [[ "$workflow_dir" == "totalRNA-seq" ]]; then
+            results_dir="$workflow_dir/results"
+        fi
+    fi
+
+    # Check if the configured results directory exists and is non-empty
+    if [[ -n "$results_dir" ]] && [[ -d "$results_dir" ]] && [[ -n "$(ls -A "$results_dir" 2>/dev/null)" ]]; then
+        existing_dirs+=("$results_dir")
     fi
 
     # If existing results found, prompt user
