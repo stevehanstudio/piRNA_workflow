@@ -56,29 +56,48 @@ The `run_workflow.sh` script provides a unified interface for managing both work
 
 The script now includes several interactive features to improve user experience:
 
-1. **Smart Core Detection**: 
+1. **Smart Core Detection**:
    - Automatically detects total CPU cores and current system load
    - Suggests optimal core count based on system resources
    - Prompts user with intelligent default (just press Enter to accept)
 
-2. **Overwrite Protection**:
+2. **Auto-Unlock Stale Locks**:
+   - Detects stale locks from interrupted runs (SSH disconnects, kills, etc.)
+   - Checks if Snakemake processes are actually running
+   - Automatically unlocks if safe (no active processes)
+   - Prevents manual unlock steps after connection drops
+
+3. **Config-Aware Results Detection**:
+   - Reads actual `results_dir` from config.yaml
+   - Only checks the configured results directory for overwrites
+   - Ignores old/archived `results_*` directories
+   - Supports both relative and absolute paths
+
+4. **Index Fallback Validation**:
+   - Validates source FASTA files for index building
+   - Doesn't require pre-built indexes if source files exist
+   - Supports Snakemake's fallback index-building rules
+   - Shows informative notes when indexes will be auto-built
+
+5. **Overwrite Protection**:
    - Checks for existing results before running workflows
    - Shows preview of existing files and prompts for confirmation
    - Prevents accidental overwriting of valuable results
+   - Auto-applies `--forceall --rerun-incomplete` when user confirms
 
-3. **Execution Timing**:
+6. **Execution Timing**:
    - Tracks total execution time for `run` and `run-force` commands
    - Displays formatted time (HH:MM:SS) upon completion
 
-4. **Input File Validation**:
+7. **Input File Validation**:
    - Comprehensive checking of all required input files
    - Intelligent validation for indexes vs source files
    - Specific guidance on missing files with download instructions
    - Pre-flight validation prevents workflow failures
 
-5. **Error Recovery**:
+8. **Error Recovery**:
    - Automatic Snakemake lock detection and resolution
-   - Incomplete file cleanup and recovery
+   - Incomplete file cleanup and recovery with `--rerun-incomplete`
    - Smart metadata management
 
 ## Examples
@@ -116,8 +135,8 @@ The script now includes several interactive features to improve user experience:
 # Total CPU cores: 16
 # Current load average: 2.1
 # Available memory: 32GB
-# 
-# Number of cores to use [12]: 
+#
+# Number of cores to use [12]:
 # Press Enter to use suggested 12 cores, or enter a different number
 ```
 
@@ -188,15 +207,18 @@ The script now includes several interactive features to improve user experience:
 - **Numeric Shortcuts**: Use `1` for ChIP-seq, `4` for totalRNA-seq
 - **Interactive Selection**: Prompts for workflow selection when none specified
 - **Smart Resource Detection**: Auto-detects system resources and suggests optimal core count
+- **Auto-Unlock Stale Locks**: Automatically fixes locks from interrupted runs
+- **Config-Aware Results Detection**: Reads actual results_dir from config.yaml
+- **Index Fallback Support**: Validates source files for auto-building missing indexes
 - **Overwrite Protection**: Prompts before overwriting existing results
 - **Execution Timing**: Displays total runtime upon workflow completion
 - **Default Command**: `run` is the default - just specify workflow to start
 - **Environment Management**: Automatically activates `snakemake_env`
-- **Error Handling**: Validates environments and directories
+- **Error Handling**: Validates environments, auto-unlocks, and handles incomplete files
 - **Flexible Options**: Configurable cores and advanced flags
 - **Status Checking**: Monitor workflow progress
 - **Easy Cleanup**: Remove results directories
-- **Modern Snakemake**: Updated commands and better compatibility
+- **Modern Snakemake**: Updated commands with `--rerun-incomplete` support
 
 ## Troubleshooting
 
@@ -231,9 +253,18 @@ If workflows fail due to missing files:
 ```
 
 ### Lock and Incomplete File Issues
-If workflows are interrupted:
+If workflows are interrupted (e.g., SSH disconnects):
+
+**✨ Auto-unlock (recommended):**
+The workflow manager automatically detects and unlocks stale locks when you run:
 ```bash
-# Clear Snakemake locks
+./run_workflow.sh [workflow] run
+# The script will detect stale locks and auto-unlock before running
+```
+
+**Manual unlock (if needed):**
+```bash
+# Manually clear Snakemake locks
 ./run_workflow.sh [workflow] unlock
 
 # Fix incomplete files
@@ -241,6 +272,14 @@ If workflows are interrupted:
 
 # Resume workflow
 ./run_workflow.sh [workflow] run --rerun-incomplete
+```
+
+**💡 Tip:** Use `screen` or `tmux` to prevent SSH disconnections:
+```bash
+screen -S workflow_run
+./run_workflow.sh 1
+# Press Ctrl+A then D to detach
+# Later: screen -r workflow_run to reattach
 ```
 
 ## Workflow-Specific Notes
@@ -259,7 +298,7 @@ If workflows are interrupted:
 This script replaces the individual `run_workflow.sh` scripts in each workflow directory. The new features include:
 
 - **Better error handling**
-- **Unified interface** 
+- **Unified interface**
 - **Modern Snakemake commands**
 - **Flexible core allocation**
 - **Status monitoring**

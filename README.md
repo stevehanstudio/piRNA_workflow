@@ -40,10 +40,13 @@ Use the unified workflow manager with **intelligent automation** and **interacti
 
 **🆕 Enhanced Features:**
 - ✅ **Smart Resource Detection**: Auto-detects CPU cores, load, and memory
+- ✅ **Auto-Unlock Stale Locks**: Automatically unlocks directories after interrupted runs
+- ✅ **Config-Aware Validation**: Reads actual results_dir from config.yaml
+- ✅ **Index Fallback Support**: Validates source files for auto-building missing indexes
 - ✅ **Input Validation**: Checks all required files before running
 - ✅ **Overwrite Protection**: Prompts before overwriting existing results
 - ✅ **Execution Timing**: Shows total runtime upon completion
-- ✅ **Auto-Force Rerun**: Automatically uses `--forceall` when overwriting
+- ✅ **Auto-Force Rerun**: Automatically uses `--forceall --rerun-incomplete` when overwriting
 - ✅ **Interactive Core Selection**: Suggests optimal core count based on system load
 - ✅ **Comprehensive Error Handling**: Unlock, incomplete files, missing inputs
 

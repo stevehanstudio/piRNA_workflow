@@ -32,11 +32,18 @@ snakemake --cores 2  # Limit entire workflow to 2 cores
 
 ## 🆕 Recent Improvements
 
+### Workflow Manager Enhancements
+- **✅ Auto-Unlock Stale Locks**: Automatically detects and fixes locks from interrupted runs
+- **✅ Config-Aware Validation**: Reads actual `results_dir` from config.yaml, ignores old directories
+- **✅ Index Fallback Support**: Validates source FASTA files for auto-building missing indexes
+- **✅ Smart Error Recovery**: Auto-applies `--rerun-incomplete` when forcing reruns
+
+### Pipeline Improvements
 - **✅ Cross-Platform Threading**: Configurable thread counts for different system capabilities
 - **✅ Parameterized Paths**: No more symlinks needed - use `INPUT_DATA_DIR` variable to specify input file location
 - **✅ Flexible Results Directory**: Customize output directory name with `RESULTS_DIR` variable (e.g., `results_White_GLKD`)
 - **✅ Enhanced Error Handling**: Fixed FastQC output naming issues and improved Snakemake syntax
-- **✅ Simplified Usage**: Convenient alias setup (`alias sm='snakemake --use-conda --cores 8'`)
+- **✅ Simplified Usage**: Convenient workflow manager or alias setup (`alias sm='snakemake --use-conda --cores 8'`)
 - **✅ Better Documentation**: Updated troubleshooting guide and configuration examples
 
 ## Overview

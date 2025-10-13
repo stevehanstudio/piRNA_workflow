@@ -405,6 +405,29 @@ select_workflow() {
     done
 }
 
+# Function to check if snakemake is running and auto-unlock if safe
+auto_unlock_if_safe() {
+    local workflow_dir=$1
+
+    # Check if any snakemake processes are running
+    if pgrep -f "snakemake.*$workflow_dir" > /dev/null; then
+        echo "⚠️  Snakemake process detected - another workflow may be running." >&2
+        echo "Please ensure no other Snakemake instances are using this directory." >&2
+        return 1
+    fi
+
+    # Check if lock directory exists
+    if [[ -d "$workflow_dir/.snakemake/locks" ]] && [[ -n "$(ls -A "$workflow_dir/.snakemake/locks" 2>/dev/null)" ]]; then
+        echo "🔓 Stale lock detected - automatically unlocking workflow directory..." >&2
+        run_snakemake "$workflow_dir" "snakemake --unlock --use-conda" 2>&1 | grep -v "Unlocking working directory" || true
+        echo "✅ Directory unlocked successfully!" >&2
+        echo "" >&2
+        return 0
+    fi
+
+    return 0
+}
+
 # Function to show usage
 show_usage() {
     echo "Usage: $0 [WORKFLOW] [COMMAND] [OPTIONS]"
@@ -431,6 +454,7 @@ show_usage() {
     echo ""
     echo "Interactive Features:"
     echo "  • Auto-detects system resources and suggests optimal core count"
+    echo "  • Auto-unlocks stale locks from interrupted runs"
     echo "  • Prompts before overwriting existing results"
     echo "  • Displays total execution time upon completion"
     echo "  • Interactive workflow selection if not specified"
@@ -552,6 +576,11 @@ fi
 # Check input files before running workflows (unless it's help, status, clean, unlock, or check-inputs)
 if [[ "$COMMAND" != "help" && "$COMMAND" != "status" && "$COMMAND" != "clean" && "$COMMAND" != "unlock" && "$COMMAND" != "check-inputs" ]]; then
     check_input_files "$WORKFLOW_DIR"
+fi
+
+# Auto-unlock if there's a stale lock (before any run commands)
+if [[ "$COMMAND" == "run" || "$COMMAND" == "run-force" || "$COMMAND" == "dryrun" || "$COMMAND" == "fix-incomplete" ]]; then
+    auto_unlock_if_safe "$WORKFLOW_DIR"
 fi
 
 # Check for existing outputs before running destructive commands
