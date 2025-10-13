@@ -109,39 +109,33 @@ The **piRNA-seq Pipeline** has been identified as the next priority for conversi
 
 ```
 piRNA_workflow/
-├── CHIP-seq/                 # ✅ ChIP-seq analysis pipeline (Converted)
+├── CHIP-seq/                 # ✅ ChIP-seq analysis pipeline (Production Ready)
 │   ├── Snakefile            # Main workflow definition
 │   ├── config.yaml          # Configuration file
 │   ├── envs/                # Conda environment definitions (13 files)
 │   ├── results/             # Analysis outputs
 │   └── README.md            # Detailed ChIP-seq documentation
-├── totalRNA-seq/            # ✅ Total RNA-seq processing pipeline (Converted)
+├── totalRNA-seq/            # ✅ Total RNA-seq processing pipeline (Production Ready)
 │   ├── Snakefile            # Main workflow definition
 │   ├── config.yaml          # Configuration file
 │   ├── envs/                # Conda environment definitions (9 files)
 │   ├── results/             # Analysis outputs
 │   └── README.md            # Detailed RNA-seq documentation
-├── piRNA-seq/               # 📋 piRNA-seq pipeline (Next Priority)
-│   ├── Snakefile            # Main workflow definition (to be created)
-│   ├── envs/                # Conda environment definitions (to be created)
-│   ├── results/             # Analysis outputs (to be created)
-│   └── README.md            # Detailed piRNA-seq documentation (to be created)
-├── fusion-reads/            # 📋 Fusion reads pipeline (Planned)
-│   ├── Snakefile            # Main workflow definition (planned)
-│   ├── envs/                # Conda environment definitions
-│   ├── results/             # Analysis outputs
-│   └── README.md            # Detailed fusion reads documentation
-├── RIP-seq/                 # 📋 RIP-seq pipeline (Planned)
-│   ├── Snakefile            # Main workflow definition (planned)
-│   ├── envs/                # Conda environment definitions
-│   ├── results/             # Analysis outputs
-│   └── README.md            # Detailed RIP-seq documentation
-├── Shared/                   # Common resources
+├── Shared/                  # Common resources for all workflows
 │   ├── Scripts/             # Shared Python, shell, and PlantUML scripts
 │   ├── DataFiles/           # Common genome files and datasets
+│   │   ├── genome/          # Reference genomes and indexes
+│   │   └── datasets/        # Input FASTQ files
 │   └── README.md            # Shared resources documentation
-└── README.md                 # This file
+├── run_workflow.sh          # Unified workflow manager script
+├── WORKFLOW_MANAGER.md      # Workflow manager documentation
+└── README.md                # This file
 ```
+
+**📋 Planned Workflows** (see [Development Priorities](#-development-priorities) for details):
+- `piRNA-seq/` - Next priority for conversion
+- `fusion-reads/` - Planned future pipeline
+- `RIP-seq/` - Planned future pipeline
 
 ## 🎯 Key Features
 
@@ -177,15 +171,51 @@ piRNA_workflow/
 
 ### Prerequisites
 
+#### **Platform Requirements**
+
+The workflow manager (`run_workflow.sh`) is designed for **Linux/macOS** and requires the following Unix utilities:
+
+- `nproc` - CPU core detection
+- `uptime` - System load monitoring
+- `free` - Memory availability checking
+- `bc` - Floating-point arithmetic for resource calculations
+- `pgrep` - Process detection for lock management
+
+**For Windows Users:**
+- ✅ **Recommended**: Use [WSL2 (Windows Subsystem for Linux)](https://docs.microsoft.com/en-us/windows/wsl/install) for full compatibility
+- ⚠️ **Git Bash Users**: Auto-resource detection may fail. Use `--cores N` flag to manually specify core count:
+  ```bash
+  ./run_workflow.sh 1 run --cores 4
+  ```
+
+#### **Software Dependencies**
+
 1. **Install Miniconda**:
    ```bash
+   # Linux
    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
    bash Miniconda3-latest-Linux-x86_64.sh
+
+   # macOS
+   wget https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh
+   bash Miniconda3-latest-MacOSX-x86_64.sh
    ```
 
-2. **Install mamba** (recommended):
+2. **Install mamba** (recommended for faster dependency resolution):
    ```bash
    conda install mamba -n base -c conda-forge
+   ```
+
+3. **Install bc** (if not already present):
+   ```bash
+   # Ubuntu/Debian
+   sudo apt-get install bc
+
+   # macOS (usually pre-installed, if not):
+   brew install bc
+
+   # WSL2 users
+   sudo apt-get install bc
    ```
 
 ### Basic Usage
@@ -336,6 +366,27 @@ The `run_workflow.sh` script provides a comprehensive workflow management system
 - Tracks resource usage during runs
 
 ## 🐛 Troubleshooting
+
+### **Platform-Specific Issues**
+
+#### **Windows Git Bash**
+If you see errors like `nproc: command not found`, `free: command not found`, or `bc: command not found`:
+```bash
+# Workaround: Manually specify cores to bypass auto-detection
+./run_workflow.sh 1 run --cores 4
+./run_workflow.sh 4 dryrun --cores 8
+```
+
+**Better Solution**: Use WSL2 for full Linux compatibility:
+1. Install WSL2: `wsl --install` (in PowerShell as Administrator)
+2. Install Ubuntu from Microsoft Store
+3. Clone repository inside WSL2 and run normally
+
+#### **macOS**
+If `bc` is missing:
+```bash
+brew install bc
+```
 
 ### **Workflow Manager Issues**
 ```bash
