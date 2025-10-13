@@ -8,7 +8,7 @@ This repository contains a bioinformatics workflow system that is **converting a
 
 - **CHIP-seq Pipeline**: ✅ Converted - ChIP-seq analysis from raw FASTQ to BigWig visualization
 - **TotalRNA-seq Pipeline**: ✅ Converted - Total RNA-seq processing with rRNA removal and alignment
-- **piRNA-seq Pipeline**: 🚧 Converting - Specialized piRNA analysis pipeline
+- **piRNA-seq Pipeline**: 📋 Next Priority - Specialized piRNA analysis pipeline
 - **Fusion Reads Pipeline**: 📋 Planned - Detection and analysis of fusion reads
 - **RIP-seq Pipeline**: 📋 Planned - RNA immunoprecipitation sequencing
 - **Shared Resources**: Common scripts, genomes, and data files used by all workflows
@@ -49,6 +49,29 @@ Use the unified workflow manager with **intelligent automation** and **interacti
 
 For detailed usage, see [WORKFLOW_MANAGER.md](WORKFLOW_MANAGER.md).
 
+## 🎯 Development Priorities
+
+### **Current Status**
+- ✅ **CHIP-seq Pipeline**: Fully converted and production-ready
+- ✅ **totalRNA-seq Pipeline**: Fully converted and production-ready
+- 📋 **piRNA-seq Pipeline**: **Next priority** - ready to begin conversion
+
+### **Confirmed Next Steps**
+The **piRNA-seq Pipeline** has been confirmed as the next workflow to convert from shell scripts to Snakemake. This decision is based on:
+
+1. **Logical progression**: Builds on the completed CHIP-seq and totalRNA-seq workflows
+2. **Shared resources**: Can leverage existing genome files, indexes, and scripts
+3. **Workflow integration**: Will complete the core trio of sequencing analysis pipelines
+4. **User demand**: piRNA analysis is a key component of the original research
+
+### **piRNA-seq Conversion Plan**
+When ready to begin, the piRNA-seq conversion will include:
+- Analysis of existing shell scripts from the original repository
+- Creation of Snakemake workflow structure
+- Development of conda environment definitions
+- Integration with shared resources and existing workflows
+- Comprehensive documentation and testing
+
 ## 🔄 Relationship to Original Work
 
 This project is a **modernization and extension** of the original work by [Luo et al. 2025](https://www.sciencedirect.com/science/article/pii/S1097276523007979?dgcid=coauthor) and the [Peng-He-Lab/Luo_2025_piRNA repository](https://github.com/Peng-He-Lab/Luo_2025_piRNA).
@@ -68,9 +91,16 @@ This project is a **modernization and extension** of the original work by [Luo e
 
 ### **Conversion Plan**
 - **Phase 1**: ✅ CHIP-seq and TotalRNA-seq (Completed)
-- **Phase 2**: 🚧 piRNA-seq (In Progress)
+- **Phase 2**: 📋 piRNA-seq (Next Priority - Not Started)
 - **Phase 3**: 📋 Fusion Reads and RIP-seq (Planned)
 - **Goal**: Complete conversion of all 5 original workflows to Snakemake
+
+### **Next Steps**
+The **piRNA-seq Pipeline** has been identified as the next priority for conversion from shell scripts to Snakemake. This pipeline will focus on:
+- Specialized piRNA analysis and processing
+- Adapter trimming and quality control for piRNA data
+- piRNA-specific mapping and annotation
+- Integration with existing CHIP-seq and totalRNA-seq workflows
 
 ## 📁 Project Structure
 
@@ -88,11 +118,11 @@ piRNA_workflow/
 │   ├── envs/                # Conda environment definitions (9 files)
 │   ├── results/             # Analysis outputs
 │   └── README.md            # Detailed RNA-seq documentation
-├── piRNA-seq/               # 🚧 piRNA-seq pipeline (Converting)
-│   ├── Snakefile            # Main workflow definition (in progress)
-│   ├── envs/                # Conda environment definitions
-│   ├── results/             # Analysis outputs
-│   └── README.md            # Detailed piRNA-seq documentation
+├── piRNA-seq/               # 📋 piRNA-seq pipeline (Next Priority)
+│   ├── Snakefile            # Main workflow definition (to be created)
+│   ├── envs/                # Conda environment definitions (to be created)
+│   ├── results/             # Analysis outputs (to be created)
+│   └── README.md            # Detailed piRNA-seq documentation (to be created)
 ├── fusion-reads/            # 📋 Fusion reads pipeline (Planned)
 │   ├── Snakefile            # Main workflow definition (planned)
 │   ├── envs/                # Conda environment definitions
@@ -173,11 +203,11 @@ piRNA_workflow/
    ```bash
    # Interactive mode - guided setup
    ./run_workflow.sh
-   
+
    # Quick runs with automatic resource detection
    ./run_workflow.sh 1    # ChIP-seq (prompts for cores)
    ./run_workflow.sh 4    # totalRNA-seq (prompts for cores)
-   
+
    # Manual control
    ./run_workflow.sh 1 run --cores 8
    ./run_workflow.sh totalrna-seq dryrun
@@ -196,7 +226,7 @@ Based on the [Peng-He-Lab/Luo_2025_piRNA repository](https://github.com/Peng-He-
 ### ✅ **Completed Workflows**
 - **ChIP-seq Pipeline**: ✅ **Converted to Snakemake** ⭐ **Production Ready**
   - Quality Control: FastQC, adapter trimming, quality filtering
-  - Read Mapping: Bowtie alignment to reference genome  
+  - Read Mapping: Bowtie alignment to reference genome
   - Signal Generation: BigWig tracks and enrichment analysis
   - Coverage Analysis: Multiple bin sizes and resolutions
   - Transposon Analysis: Specialized transposon element analysis
@@ -209,11 +239,12 @@ Based on the [Peng-He-Lab/Luo_2025_piRNA repository](https://github.com/Peng-He-
   - Alignment: STAR transcriptome mapping
   - Vector Mapping: Vector sequence analysis
 
-### 🚧 **Workflows in Progress**
-- **piRNA-seq Pipeline**: 🚧 **Converting to Snakemake**
+### 📋 **Next Priority**
+- **piRNA-seq Pipeline**: 📋 **Next to Convert** (Not Started)
   - Specialized piRNA analysis pipeline
-  - Adapter trimming and quality control
-  - piRNA-specific mapping and analysis
+  - Adapter trimming and quality control for piRNA data
+  - piRNA-specific mapping and annotation
+  - **Status**: Ready to begin conversion from shell scripts to Snakemake
 
 ### 📋 **Planned Workflows**
 - **Fusion Reads Pipeline**: 📋 **Planned for Snakemake conversion**
@@ -272,7 +303,7 @@ The `run_workflow.sh` script provides a comprehensive workflow management system
 # Total CPU cores: 16
 # Current load average: 2.1
 # Available memory: 32GB
-# Number of cores to use [12]: 
+# Number of cores to use [12]:
 ```
 - Analyzes CPU cores, load average, and memory
 - Suggests optimal core count based on system load

@@ -25,7 +25,7 @@ get_optimal_cores() {
     local total_cores=$(nproc)
     local load_avg=$(uptime | awk -F'load average:' '{ print $2 }' | awk '{ print $1 }' | sed 's/,//')
     local memory_gb=$(free -g | awk '/^Mem:/{print $2}')
-    
+
     # Calculate suggested cores based on system load
     local suggested_cores
     if (( $(echo "$load_avg < $total_cores * 0.3" | bc -l) )); then
@@ -38,12 +38,12 @@ get_optimal_cores() {
         # High load: use up to 25% of cores
         suggested_cores=$(echo "$total_cores * 0.25" | bc | cut -d. -f1)
     fi
-    
+
     # Ensure at least 1 core
     if [[ $suggested_cores -lt 1 ]]; then
         suggested_cores=1
     fi
-    
+
     echo $suggested_cores
 }
 
@@ -53,22 +53,22 @@ prompt_cores() {
     local suggested_cores=$(get_optimal_cores)
     local load_avg=$(uptime | awk -F'load average:' '{ print $2 }' | awk '{ print $1 }' | sed 's/,//')
     local memory_gb=$(free -g | awk '/^Mem:/{print $2}')
-    
+
     echo "=== System Resources ===" >&2
     echo "Total CPU cores: $total_cores" >&2
     echo "Current load average: $load_avg" >&2
     echo "Available memory: ${memory_gb}GB" >&2
     echo "" >&2
-    
+
     while true; do
         read -p "Number of cores to use [$suggested_cores]: " user_cores >&2
-        
+
         # Use suggested cores if user just presses enter
         if [[ -z "$user_cores" ]]; then
             echo $suggested_cores
             return
         fi
-        
+
         # Validate user input
         if [[ "$user_cores" =~ ^[0-9]+$ ]] && [[ $user_cores -ge 1 ]] && [[ $user_cores -le $total_cores ]]; then
             echo $user_cores
@@ -83,7 +83,7 @@ prompt_cores() {
 check_existing_outputs() {
     local workflow_dir=$1
     local existing_dirs=()
-    
+
     # Check for different result directory patterns
     if [[ "$workflow_dir" == "CHIP-seq" ]]; then
         # CHIP-seq uses configurable results directories
@@ -98,7 +98,7 @@ check_existing_outputs() {
             existing_dirs+=("$workflow_dir/results")
         fi
     fi
-    
+
     # If existing results found, prompt user
     if [[ ${#existing_dirs[@]} -gt 0 ]]; then
         echo "Warning: Existing results directories found:" >&2
@@ -113,11 +113,11 @@ check_existing_outputs() {
             fi
             echo "" >&2
         done
-        
+
         while true; do
             read -p "Do you want to proceed and potentially overwrite existing results? (y/N): " choice >&2
             case $choice in
-                [Yy]* ) 
+                [Yy]* )
                     echo "FORCE_OVERWRITE"  # Signal that user wants to overwrite
                     return 0
                     ;;
@@ -125,7 +125,7 @@ check_existing_outputs() {
                     echo "Operation cancelled by user." >&2
                     exit 0
                     ;;
-                * ) 
+                * )
                     echo "Please answer yes (y) or no (n)." >&2
                     ;;
             esac
@@ -140,11 +140,11 @@ check_input_files() {
     local missing_files=()
     local missing_dirs=()
     local all_files_present=true
-    
+
     echo "=== Input File Validation ===" >&2
     echo "Checking required input files for $workflow_dir workflow..." >&2
     echo "" >&2
-    
+
     if [[ "$workflow_dir" == "CHIP-seq" ]]; then
         # CHIP-seq required files
         local required_files=(
@@ -156,15 +156,15 @@ check_input_files() {
             "Shared/Scripts/python/trimfastq.py"
             "Shared/Scripts/python/makewigglefromBAM-NH.py"
         )
-        
+
         local required_dirs=(
             "Shared/DataFiles/datasets/chip-seq/chip_inputs"
             "Shared/DataFiles/genome/bowtie-indexes"
             "Shared/DataFiles/genome/YichengVectors"
         )
-        
-        # Check for bowtie index files (indexes are required for workflow)
-        local bowtie_index_files=(
+
+        # Check for dm6 bowtie indexes: either indexes exist OR source file exists
+        local dm6_bowtie_index_files=(
             "Shared/DataFiles/genome/bowtie-indexes/dm6.1.ebwt"
             "Shared/DataFiles/genome/bowtie-indexes/dm6.2.ebwt"
             "Shared/DataFiles/genome/bowtie-indexes/dm6.3.ebwt"
@@ -172,8 +172,23 @@ check_input_files() {
             "Shared/DataFiles/genome/bowtie-indexes/dm6.rev.1.ebwt"
             "Shared/DataFiles/genome/bowtie-indexes/dm6.rev.2.ebwt"
         )
-        
-        # Check for vector index files (only 42AB_UBIG, 20A is temporarily disabled)
+
+        # Check if all dm6 index files exist
+        local all_dm6_indexes_exist=true
+        for index_file in "${dm6_bowtie_index_files[@]}"; do
+            if [[ ! -f "$index_file" ]]; then
+                all_dm6_indexes_exist=false
+                break
+            fi
+        done
+
+        # If indexes don't exist, dm6.fa must exist (so Snakemake can build them)
+        if [[ "$all_dm6_indexes_exist" == "false" ]]; then
+            # dm6.fa is already in required_files, so we're good - Snakemake will build indexes
+            echo "ℹ️  Note: dm6 bowtie indexes will be built from dm6.fa" >&2
+        fi
+
+        # Check for vector index files: either indexes exist OR source file exists
         local vector_index_files=(
             "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.1.ebwt"
             "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.2.ebwt"
@@ -182,9 +197,22 @@ check_input_files() {
             "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.rev.1.ebwt"
             "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.rev.2.ebwt"
         )
-        
-        required_files+=("${bowtie_index_files[@]}" "${vector_index_files[@]}")
-        
+
+        # Check if all vector index files exist
+        local all_vector_indexes_exist=true
+        for index_file in "${vector_index_files[@]}"; do
+            if [[ ! -f "$index_file" ]]; then
+                all_vector_indexes_exist=false
+                break
+            fi
+        done
+
+        # If indexes don't exist, 42AB_UBIG.fa must exist (so Snakemake can build them)
+        if [[ "$all_vector_indexes_exist" == "false" ]]; then
+            # 42AB_UBIG.fa is already in required_files, so we're good - Snakemake will build indexes
+            echo "ℹ️  Note: Vector bowtie indexes will be built from 42AB_UBIG.fa" >&2
+        fi
+
     elif [[ "$workflow_dir" == "totalRNA-seq" ]]; then
         # totalRNA-seq required files (basic files that are always needed)
         local required_files=(
@@ -194,14 +222,14 @@ check_input_files() {
             "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.fa"
             "Shared/Scripts/python/trimfastq.py"
         )
-        
+
         local required_dirs=(
             "Shared/DataFiles/datasets/totalrna-seq"
             "Shared/DataFiles/genome/rrna"
             "Shared/DataFiles/genome/annotations"
             "Shared/DataFiles/genome/YichengVectors"
         )
-        
+
         # Check for rRNA: either source file OR index files must exist
         local rrna_source="Shared/DataFiles/genome/rrna/dmel_rRNA_unit.fa"
         local rrna_index_files=(
@@ -212,7 +240,7 @@ check_input_files() {
             "Shared/DataFiles/genome/rrna/dmel_rRNA_unit.rev.1.ebwt"
             "Shared/DataFiles/genome/rrna/dmel_rRNA_unit.rev.2.ebwt"
         )
-        
+
         # Check if rRNA indexes exist (preferred) or source file exists
         local rrna_available=false
         if [[ -f "$rrna_source" ]]; then
@@ -235,7 +263,7 @@ check_input_files() {
                 required_files+=("${rrna_index_files[@]}")
             fi
         fi
-        
+
         # Check for vector index files
         local vector_index_files=(
             "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.1.ebwt"
@@ -245,10 +273,10 @@ check_input_files() {
             "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.rev.1.ebwt"
             "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.rev.2.ebwt"
         )
-        
+
         required_files+=("${vector_index_files[@]}")
     fi
-    
+
     # Check directories first
     for dir in "${required_dirs[@]}"; do
         if [[ ! -d "$dir" ]]; then
@@ -256,7 +284,7 @@ check_input_files() {
             all_files_present=false
         fi
     done
-    
+
     # Check files
     for file in "${required_files[@]}"; do
         if [[ ! -f "$file" ]]; then
@@ -264,7 +292,7 @@ check_input_files() {
             all_files_present=false
         fi
     done
-    
+
     # Report results
     if [[ "$all_files_present" == "true" ]]; then
         echo "✅ All required input files are present!" >&2
@@ -273,7 +301,7 @@ check_input_files() {
     else
         echo "❌ Missing required input files:" >&2
         echo "" >&2
-        
+
         if [[ ${#missing_dirs[@]} -gt 0 ]]; then
             echo "Missing directories:" >&2
             for dir in "${missing_dirs[@]}"; do
@@ -281,7 +309,7 @@ check_input_files() {
             done
             echo "" >&2
         fi
-        
+
         if [[ ${#missing_files[@]} -gt 0 ]]; then
             echo "Missing files:" >&2
             for file in "${missing_files[@]}"; do
@@ -289,10 +317,10 @@ check_input_files() {
             done
             echo "" >&2
         fi
-        
+
         echo "📋 Required actions:" >&2
         echo "" >&2
-        
+
         if [[ "$workflow_dir" == "CHIP-seq" ]]; then
             echo "1. Download and prepare reference files:" >&2
             echo "   • Download dm6.fa, dm6-blacklist.v2.bed.gz, AllAdaptors.fa" >&2
@@ -313,16 +341,16 @@ check_input_files() {
             echo "   Shared/DataFiles/datasets/totalrna-seq/all.50mers.fastq" >&2
             echo "" >&2
         fi
-        
+
         echo "3. For detailed setup instructions, see:" >&2
         echo "   • $workflow_dir/README.md" >&2
         echo "   • INDEX_BUILDING_STRATEGY.md" >&2
         echo "" >&2
-        
+
         while true; do
             read -p "Would you like to proceed anyway? The workflow will likely fail. (y/N): " choice >&2
             case $choice in
-                [Yy]* ) 
+                [Yy]* )
                     echo "⚠️  Proceeding with missing files - workflow may fail!" >&2
                     echo "" >&2
                     return 0
@@ -331,7 +359,7 @@ check_input_files() {
                     echo "Workflow cancelled. Please prepare the required files first." >&2
                     exit 1
                     ;;
-                * ) 
+                * )
                     echo "Please answer yes (y) or no (n)." >&2
                     ;;
             esac
@@ -353,7 +381,7 @@ select_workflow() {
                 return
                 ;;
             4)
-                echo "totalrna-seq" 
+                echo "totalrna-seq"
                 return
                 ;;
             *)
@@ -410,12 +438,12 @@ run_snakemake() {
     local workflow_dir=$1
     local command=$2
     shift 2
-    
+
     echo "Activating snakemake_env..."
     echo "Running in directory: ${workflow_dir}"
     echo "Command: ${command}"
     echo ""
-    
+
     # Use conda run to execute in the snakemake_env environment with proper directory
     conda run -n snakemake_env bash -c "
         cd '${workflow_dir}'

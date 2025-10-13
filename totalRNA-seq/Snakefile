@@ -42,6 +42,22 @@ RRNA_DIR = f"{RESULTS_DIR}/rrna_removal"
 STAR_DIR = f"{RESULTS_DIR}/star_alignment"
 VECTOR_DIR = f"{RESULTS_DIR}/vector_mapping"
 
+# Rule all - defines the final outputs
+rule all:
+    input:
+        f"{FASTQC_INITIAL_DIR}/all.50mers_fastqc.html",
+        f"{FASTQC_TRIMMED_DIR}/allfastq{READ_LENGTH}_fastqc.html",
+        f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam",
+        f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam.bai",
+        f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.bam",
+        f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.bam.bai",
+        # Optional visualization outputs (comment out if having issues)
+        # f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bg.bigWig",
+        # f"{STAR_DIR}/dm6.50merAligned.sortedByCoord.coverage",
+        # rules.build_rsem_index.output.rsem_index,
+        f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.rsem.genes.results",
+        f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.10.bg4"
+
 # Index building rules - these generate indexes from source files
 rule build_vector_42AB_index:
     input:
@@ -139,23 +155,6 @@ rule rsem_quantification:
                                   {SHARED_GENOME}/rsem \
                                   {STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.rsem
         """
-
-# Rule all - defines the final outputs
-rule all:
-    input:
-        f"{FASTQC_INITIAL_DIR}/all.50mers_fastqc.html",
-        f"{FASTQC_TRIMMED_DIR}/allfastq{READ_LENGTH}_fastqc.html",
-        f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam",
-        f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam.bai",
-        f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.bam",
-        f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.bam.bai",
-        # Optional visualization outputs (comment out if having issues)
-        # f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bg.bigWig",
-        # f"{STAR_DIR}/dm6.50merAligned.sortedByCoord.coverage",
-        # rules.build_rsem_index.output.rsem_index,
-        f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.rsem.genes.results",
-        f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.10.bg4"
-
 
 # Initial FastQC quality check
 rule fastqc_initial:

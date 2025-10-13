@@ -31,13 +31,13 @@ references:
   dm6_blacklist: "../Shared/DataFiles/genome/dm6-blacklist.v2.bed.gz"
   dm6_chrom_sizes: "../Shared/DataFiles/genome/bowtie-indexes/dm6.chrom.sizes"
   dm6_bowtie_index: "../Shared/DataFiles/genome/bowtie-indexes/dm6"
-  
+
   # Vector files
   vector_42ab_index: "../Shared/DataFiles/genome/YichengVectors/42AB_UBIG"
   vector_42ab_fasta: "../Shared/DataFiles/genome/YichengVectors/42AB_UBIG.fa"
   vector_20a_index: "../Shared/DataFiles/genome/YichengVectors/20A"
   vector_20a_fasta: "../Shared/DataFiles/genome/YichengVectors/20A.fa"
-  
+
   # Adapter files
   adapters_file: "../Shared/DataFiles/genome/AllAdaptors.fa"
 
@@ -48,4 +48,7 @@ scripts:
 
 # Processing parameters
 processing:
-  threads: 8  # Default thread count for rules that support threading
+  # Thread count for parallel processing
+  # Recommended: Use 1-2 cores for systems with <4 cores, 4-8 for systems with 8+ cores
+  # You can override this at runtime with: snakemake --cores N
+  threads: 4

@@ -11,8 +11,28 @@ A reproducible ChIP-seq analysis pipeline converted from shell commands to Snake
 > ```
 > For details, see [WORKFLOW_MANAGER.md](../WORKFLOW_MANAGER.md).
 
+## 🖥️ System Requirements
+
+### Hardware Requirements
+- **Minimum**: 4 GB RAM, 2 CPU cores
+- **Recommended**: 8+ GB RAM, 4+ CPU cores
+- **Storage**: At least 10 GB free space for results and temporary files
+
+### Thread Configuration
+The pipeline uses configurable threading for parallel processing. Default settings work for most systems:
+
+- **Low-end systems** (< 4 cores): Set `threads: 2` in `config.yaml`
+- **Standard systems** (4-8 cores): Use default `threads: 4`
+- **High-end systems** (8+ cores): Set `threads: 8` or higher
+
+You can also override at runtime:
+```bash
+snakemake --cores 2  # Limit entire workflow to 2 cores
+```
+
 ## 🆕 Recent Improvements
 
+- **✅ Cross-Platform Threading**: Configurable thread counts for different system capabilities
 - **✅ Parameterized Paths**: No more symlinks needed - use `INPUT_DATA_DIR` variable to specify input file location
 - **✅ Flexible Results Directory**: Customize output directory name with `RESULTS_DIR` variable (e.g., `results_White_GLKD`)
 - **✅ Enhanced Error Handling**: Fixed FastQC output naming issues and improved Snakemake syntax
@@ -44,7 +64,7 @@ This pipeline processes ChIP-seq data from raw FASTQ files to BigWig visualizati
 - **Enrichment**: Requires both ChIP and Input samples
 
 ### Workflow Diagram
-The workflow diagram above shows the complete ChIP-seq analysis pipeline with **specific output file names and types**. The diagram is generated from the PlantUML source file located at `../Shared/Scripts/plantuml/chipseq_workflow.puml`. 
+The workflow diagram above shows the complete ChIP-seq analysis pipeline with **specific output file names and types**. The diagram is generated from the PlantUML source file located at `../Shared/Scripts/plantuml/chipseq_workflow.puml`.
 
 **Key Features of the Updated Diagram:**
 - ✅ **Specific File Names**: Shows actual output file naming conventions (e.g., `{sample}.alltrimmed_fastqc.html`)
@@ -349,10 +369,10 @@ sm --latency-wait 60
    # First create and activate the snakemake environment
    conda create -n snakemake_env snakemake
    conda activate snakemake_env
-   
+
    # Then run the pipeline (Snakemake will create tool environments automatically)
    snakemake --use-conda --cores 4
-   
+
    # Use alias for convenience
    alias sm='snakemake --use-conda --cores 8'
    sm
@@ -384,7 +404,7 @@ snakemake --version
    ```bash
    # Check if BEDOPS is properly installed
    bedops --version
-   
+
    # Verify input BAM files exist
    ls -la results/bowtie/*.bam
    ```
@@ -393,7 +413,7 @@ snakemake --version
    ```bash
    # Check if vector files exist
    ls -la ../Shared/DataFiles/genome/YichengVectors/
-   
+
    # Verify vector indexes are built
    ls -la ../Shared/DataFiles/genome/YichengVectors/*.ebwt
    ```
@@ -402,7 +422,7 @@ snakemake --version
    ```bash
    # Use fewer cores for memory-intensive operations
    snakemake --use-conda --conda-frontend mamba --cores 2 make_coverage
-   
+
    # Check available memory
    free -h
    ```
@@ -413,7 +433,7 @@ snakemake --version
    # If you see MissingOutputException for fastqc files, check that rule outputs match:
    # Expected: {sample}.alltrimmed_fastqc.html
    # Not: {sample}_fastqc.html
-   
+
    # Verify FastQC outputs exist
    ls -la {RESULTS_DIR}/fastqc_trimmed/
    ```

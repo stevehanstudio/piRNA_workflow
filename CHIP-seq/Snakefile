@@ -43,24 +43,24 @@ rule all:
         # Quality control outputs
         expand(f"{RESULTS_DIR}/fastqc_trimmed/{{sample}}.alltrimmed_fastqc.html", sample=SAMPLES),
         expand(f"{RESULTS_DIR}/trimmed_50bp/{{sample}}.fastq", sample=SAMPLES),
-        
+
         # Genome mapping outputs
         expand(f"{RESULTS_DIR}/bowtie/{{sample}}.sorted_final.bam", sample=SAMPLES),
         expand(f"{RESULTS_DIR}/bowtie/{{sample}}.sorted_final.bam.bai", sample=SAMPLES),
         expand(f"{RESULTS_DIR}/bowtie/{{sample}}.no_mito_sorted.bam", sample=SAMPLES),
         expand(f"{RESULTS_DIR}/bowtie/{{sample}}.rmdup.bam", sample=SAMPLES),
         expand(f"{RESULTS_DIR}/bowtie/{{sample}}.rmdup.bam.bai", sample=SAMPLES),
-        
+
         # Vector mapping outputs
         expand(f"{RESULTS_DIR}/vector_mapping/{{sample}}.vectoronly.dup.bam", sample=SAMPLES),
         expand(f"{RESULTS_DIR}/vector_mapping/{{sample}}.vectoronly.dup.bam.bai", sample=SAMPLES),
-        
+
         # Signal outputs
         expand(f"{RESULTS_DIR}/bowtie/{{sample}}.bigwig", sample=SAMPLES),
-        
+
         # Enrichment analysis
         f"{RESULTS_DIR}/enrichment/Panx_GLKD_ChIP_input_1st_S1_R1_001_vs_Panx_GLKD_ChIP_input_2nd_S4_R1_001.enrichment.bigwig",
-        
+
         # Coverage analysis
         expand(
             f"{RESULTS_DIR}/coverage/{{sample}}.{{binsize}}.bg4",
@@ -88,7 +88,7 @@ rule all:
         #     sample=SAMPLES,
         #     binsize=BIN_SIZES,
         # ),
-        
+
         # Transposon analysis
         expand(
             f"{RESULTS_DIR}/transposon/{{sample}}.{{binsize}}.42AB.bg4",
@@ -256,7 +256,7 @@ rule bowtie_mapping:
         sam = RESULTS_DIR + "/bowtie/{sample}.sam"
     conda:
         "envs/bowtie.yaml"
-    threads: 8
+    threads: config["processing"]["threads"]
     shell:
         """
         mkdir -p {RESULTS_DIR}/bowtie
@@ -340,7 +340,7 @@ rule bowtie_vector_mapping:
         sam = RESULTS_DIR + "/vector_mapping/{sample}.vectoronly.sam"
     conda:
         "envs/bowtie.yaml"
-    threads: 8
+    threads: config["processing"]["threads"]
     shell:
         """
         mkdir -p {RESULTS_DIR}/vector_mapping
@@ -398,7 +398,7 @@ rule make_enrichment_track:
         enrichment_bigwig = f"{RESULTS_DIR}/enrichment/Panx_GLKD_ChIP_input_1st_S1_R1_001_vs_Panx_GLKD_ChIP_input_2nd_S4_R1_001.enrichment.bigwig"
     conda:
         "envs/deeptools.yaml"
-    threads: 8
+    threads: config["processing"]["threads"]
     shell:
         """
         mkdir -p {RESULTS_DIR}/enrichment
