@@ -1,8 +1,8 @@
 name: samtools-0.1.8
 channels:
-  - bioconda
   - conda-forge
+  - bioconda
 dependencies:
-  - samtools=0.1.8
+  - samtools>=1.18
   - ncurses
   - zlib

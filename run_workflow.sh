@@ -458,8 +458,8 @@ run_snakemake() {
     echo "Command: ${command}"
     echo ""
 
-    # Use conda run to execute in the snakemake_env environment with proper directory
-    conda run -n snakemake_env bash -c "
+    # Use conda run with --no-capture-output to show real-time output
+    conda run --no-capture-output -n snakemake_env bash -c "
         cd '${workflow_dir}'
         # Set up sm alias
         alias sm='snakemake'
@@ -569,25 +569,25 @@ fi
 case "$COMMAND" in
     setup)
         echo "Setting up conda environments for $WORKFLOW..."
-        run_snakemake "$WORKFLOW_DIR" "snakemake --use-conda --conda-create-envs-only all"
+        run_snakemake "$WORKFLOW_DIR" "snakemake --use-conda --conda-frontend mamba --conda-create-envs-only all"
         echo "Setup completed successfully!"
         ;;
     dryrun)
         echo "Performing dry run for $WORKFLOW..."
-        run_snakemake "$WORKFLOW_DIR" "snakemake all --use-conda --cores $CORES --dry-run"
+        run_snakemake "$WORKFLOW_DIR" "snakemake all --use-conda --conda-frontend mamba --cores $CORES --dry-run"
         ;;
     run)
         if [[ "$FORCE_RERUN" == "true" ]]; then
             echo "Force running $WORKFLOW workflow (all steps)..."
             echo "Note: Cleaning up any incomplete file metadata first..."
-            run_snakemake "$WORKFLOW_DIR" "snakemake --cleanup-metadata --use-conda" 2>/dev/null || true
+            run_snakemake "$WORKFLOW_DIR" "snakemake --cleanup-metadata --use-conda --conda-frontend mamba" 2>/dev/null || true
             START_TIME=$(date +%s)
-            run_snakemake "$WORKFLOW_DIR" "snakemake all --forceall --rerun-incomplete --use-conda --cores $CORES $EXTRA_FLAGS"
+            run_snakemake "$WORKFLOW_DIR" "snakemake all --forceall --rerun-incomplete --use-conda --conda-frontend mamba --cores $CORES $EXTRA_FLAGS"
         else
             echo "Running $WORKFLOW workflow..."
             START_TIME=$(date +%s)
             # Try regular run first, if it fails with incomplete files, suggest fix-incomplete
-            if ! run_snakemake "$WORKFLOW_DIR" "snakemake all --use-conda --cores $CORES $EXTRA_FLAGS"; then
+            if ! run_snakemake "$WORKFLOW_DIR" "snakemake all --use-conda --conda-frontend mamba --cores $CORES $EXTRA_FLAGS"; then
                 echo ""
                 echo "❌ Workflow failed. This might be due to incomplete files from a previous run."
                 echo "💡 Try running: $0 $WORKFLOW fix-incomplete"
@@ -606,9 +606,9 @@ case "$COMMAND" in
     run-force)
         echo "Force running $WORKFLOW workflow (all steps)..."
         echo "Note: Cleaning up any incomplete file metadata first..."
-        run_snakemake "$WORKFLOW_DIR" "snakemake --cleanup-metadata --use-conda" 2>/dev/null || true
+        run_snakemake "$WORKFLOW_DIR" "snakemake --cleanup-metadata --use-conda --conda-frontend mamba" 2>/dev/null || true
         START_TIME=$(date +%s)
-        run_snakemake "$WORKFLOW_DIR" "snakemake all --forceall --rerun-incomplete --use-conda --cores $CORES $EXTRA_FLAGS"
+        run_snakemake "$WORKFLOW_DIR" "snakemake all --forceall --rerun-incomplete --use-conda --conda-frontend mamba --cores $CORES $EXTRA_FLAGS"
         END_TIME=$(date +%s)
         DURATION=$((END_TIME - START_TIME))
         echo ""
@@ -621,11 +621,11 @@ case "$COMMAND" in
         echo "Fixing incomplete files for $WORKFLOW workflow..."
         echo "Step 1: Attempting to clean up metadata for incomplete files..."
         # Try to cleanup metadata - this might fail if no specific files are provided, that's OK
-        run_snakemake "$WORKFLOW_DIR" "snakemake --cleanup-metadata --use-conda || true" 2>/dev/null || true
+        run_snakemake "$WORKFLOW_DIR" "snakemake --cleanup-metadata --use-conda --conda-frontend mamba || true" 2>/dev/null || true
         echo ""
         echo "Step 2: Re-running workflow with incomplete file recovery..."
         START_TIME=$(date +%s)
-        run_snakemake "$WORKFLOW_DIR" "snakemake all --rerun-incomplete --use-conda --cores $CORES $EXTRA_FLAGS"
+        run_snakemake "$WORKFLOW_DIR" "snakemake all --rerun-incomplete --use-conda --conda-frontend mamba --cores $CORES $EXTRA_FLAGS"
         END_TIME=$(date +%s)
         DURATION=$((END_TIME - START_TIME))
         echo ""
@@ -641,12 +641,12 @@ case "$COMMAND" in
         ;;
     unlock)
         echo "Unlocking $WORKFLOW workflow directory..."
-        run_snakemake "$WORKFLOW_DIR" "snakemake --unlock --use-conda"
+        run_snakemake "$WORKFLOW_DIR" "snakemake --unlock --use-conda --conda-frontend mamba"
         echo "Workflow directory unlocked successfully!"
         ;;
     status)
         echo "Checking $WORKFLOW workflow status..."
-        run_snakemake "$WORKFLOW_DIR" "snakemake all --use-conda --dry-run --quiet"
+        run_snakemake "$WORKFLOW_DIR" "snakemake all --use-conda --conda-frontend mamba --dry-run --quiet"
         if [[ -d "$WORKFLOW_DIR/results" ]]; then
             echo ""
             echo "Results directory contents:"
