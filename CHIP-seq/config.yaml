@@ -2,8 +2,10 @@
 
 # Sample configuration
 samples:
-  chip: "White_GLKD_ChIP_input_1st_S7_R1_001"    # ChIP sample
-  input: "White_GLKD_ChIP_input_2nd_S10_R1_001"  # Input control sample
+  # chip: "White_GLKD_ChIP_input_1st_S7_R1_001"    # ChIP sample
+  # input: "White_GLKD_ChIP_input_2nd_S10_R1_001"  # Input control sample
+  chip: "Panx_GLKD_ChIP_input_1st_S1_R1_001"    # ChIP sample
+  input: "Panx_GLKD_ChIP_input_2nd_S4_R1_001"  # Input control sample
 
 # Shared file paths
 shared_paths:
