@@ -381,8 +381,8 @@ check_input_files() {
     fi
 }
 
-# Function to interactively select workflow
-select_workflow() {
+# Function to interactively select workflow and configure paths
+select_workflow_and_paths() {
     echo "Available workflows:" >&2
     echo "  1) ChIP-seq analysis workflow" >&2
     echo "  4) Total RNA-seq analysis workflow" >&2
@@ -391,18 +391,105 @@ select_workflow() {
         read -p "Please select a workflow (1 or 4): " choice >&2
         case $choice in
             1)
-                echo "chip-seq"
-                return
+                WORKFLOW="chip-seq"
+                break
                 ;;
             4)
-                echo "totalrna-seq"
-                return
+                WORKFLOW="totalrna-seq"
+                break
                 ;;
             *)
                 echo "Invalid choice. Please enter 1 or 4." >&2
                 ;;
         esac
     done
+    
+    echo "" >&2
+    echo "=== Path Configuration (optional) ===" >&2
+    echo "You can override the default paths from config.yaml files." >&2
+    echo "Press Enter to use defaults, or provide custom paths:" >&2
+    echo "" >&2
+    
+    # Get default paths from config files
+    local config_file
+    if [[ "$WORKFLOW" == "chip-seq" ]]; then
+        config_file="CHIP-seq/config.yaml"
+    else
+        config_file="totalRNA-seq/config.yaml"
+    fi
+    
+    # Genome path
+    local default_genome
+    if [[ "$WORKFLOW" == "chip-seq" ]]; then
+        default_genome=$(grep -A 20 "references:" "$config_file" | grep -E '^\s*dm6_fasta\s*:' | sed -E 's/^\s*dm6_fasta\s*:\s*//; s/^"//; s/"$//' | head -1)
+    else
+        # For totalRNA-seq, genome path might be different - check if it exists
+        default_genome=$(grep -E '^\s*dm6_fasta\s*:' "$config_file" | sed -E 's/^\s*dm6_fasta\s*:\s*//; s/^"//; s/"$//' | head -1)
+    fi
+    read -p "Genome FASTA file path [default: $default_genome]: " genome_input >&2
+    if [[ -n "$genome_input" ]]; then
+        GENOME_PATH="$genome_input"
+        echo "Using custom genome path: $GENOME_PATH" >&2
+    fi
+    echo "" >&2
+    
+    # Index path
+    local default_index
+    if [[ "$WORKFLOW" == "chip-seq" ]]; then
+        default_index=$(grep -A 20 "references:" "$config_file" | grep -E '^\s*dm6_bowtie_index\s*:' | sed -E 's/^\s*dm6_bowtie_index\s*:\s*//; s/^"//; s/"$//' | head -1)
+    else
+        # For totalRNA-seq, check for rrna_index
+        default_index=$(grep -E '^\s*rrna_index\s*:' "$config_file" | sed -E 's/^\s*rrna_index\s*:\s*//; s/^"//; s/"$//' | head -1)
+    fi
+    read -p "Bowtie index directory path [default: $default_index]: " index_input >&2
+    if [[ -n "$index_input" ]]; then
+        INDEX_PATH="$index_input"
+        echo "Using custom index path: $INDEX_PATH" >&2
+    fi
+    echo "" >&2
+    
+    # Dataset path
+    local default_dataset
+    if [[ "$WORKFLOW" == "chip-seq" ]]; then
+        # For CHIP-seq, get the data_dir under input_data section
+        default_dataset=$(grep -A 10 "input_data:" "$config_file" | grep -E '^\s*data_dir\s*:' | sed -E 's/^\s*data_dir\s*:\s*//; s/^"//; s/"$//' | head -1)
+        read -p "Input dataset directory path [default: $default_dataset]: " dataset_input >&2
+    else
+        default_dataset=$(grep -E '^\s*fastq_file\s*:' "$config_file" | sed -E 's/^\s*fastq_file\s*:\s*//; s/^"//; s/"$//' | head -1)
+        read -p "Input FASTQ file path [default: $default_dataset]: " dataset_input >&2
+    fi
+    if [[ -n "$dataset_input" ]]; then
+        DATASET_PATH="$dataset_input"
+        echo "Using custom dataset path: $DATASET_PATH" >&2
+    fi
+    echo "" >&2
+    
+    # Vector path
+    local default_vector
+    if [[ "$WORKFLOW" == "chip-seq" ]]; then
+        # For CHIP-seq, get vector_42ab_index under references section
+        default_vector=$(grep -A 20 "references:" "$config_file" | grep -E '^\s*vector_42ab_index\s*:' | sed -E 's/^\s*vector_42ab_index\s*:\s*//; s/^"//; s/"$//' | head -1)
+    else
+        # For totalRNA-seq, check for vector_index
+        default_vector=$(grep -E '^\s*vector_index\s*:' "$config_file" | sed -E 's/^\s*vector_index\s*:\s*//; s/^"//; s/"$//' | head -1)
+    fi
+    read -p "Vector index directory path [default: $default_vector]: " vector_input >&2
+    if [[ -n "$vector_input" ]]; then
+        VECTOR_PATH="$vector_input"
+        echo "Using custom vector path: $VECTOR_PATH" >&2
+    fi
+    echo "" >&2
+    
+    # Adapter path
+    local default_adapter=$(grep -E '^\s*adapters_file\s*:' "$config_file" | sed -E 's/^\s*adapters_file\s*:\s*//; s/^"//; s/"$//' | head -1)
+    read -p "Adapter sequences file path [default: $default_adapter]: " adapter_input >&2
+    if [[ -n "$adapter_input" ]]; then
+        ADAPTER_PATH="$adapter_input"
+        echo "Using custom adapter path: $ADAPTER_PATH" >&2
+    fi
+    echo "" >&2
+    
+    echo "$WORKFLOW"
 }
 
 # Function to check if snakemake is running and auto-unlock if safe
@@ -452,12 +539,20 @@ show_usage() {
     echo "  --cores N     - Number of CPU cores to use (prompts interactively if not specified)"
     echo "  --rerun-incomplete - Re-run incomplete jobs"
     echo ""
+    echo "Path Override Options (defaults to config.yaml values):"
+    echo "  --genome-path PATH    - Override genome FASTA file path"
+    echo "  --index-path PATH     - Override bowtie index directory path"
+    echo "  --dataset-path PATH   - Override input dataset directory/file path"
+    echo "  --vector-path PATH    - Override vector index directory path"
+    echo "  --adapter-path PATH   - Override adapter sequences file path"
+    echo ""
     echo "Interactive Features:"
     echo "  • Auto-detects system resources and suggests optimal core count"
     echo "  • Auto-unlocks stale locks from interrupted runs"
     echo "  • Prompts before overwriting existing results"
     echo "  • Displays total execution time upon completion"
     echo "  • Interactive workflow selection if not specified"
+    echo "  • Interactive path configuration for custom input locations"
     echo ""
     echo "Examples:"
     echo "  $0 1 run --cores 4        # Run ChIP-seq workflow with 4 cores"
@@ -466,9 +561,69 @@ show_usage() {
     echo "  $0 totalrna-seq status    # Check totalRNA-seq status"
     echo "  $0 1 fix-incomplete       # Fix incomplete ChIP-seq files and continue"
     echo "  $0 4 check-inputs         # Validate totalRNA-seq input files"
-    echo "  $0                        # Interactive mode - prompts for workflow and cores"
+    echo "  $0                        # Interactive mode - prompts for workflow, paths, and cores"
+    echo ""
+    echo "Path Override Examples:"
+    echo "  $0 1 run --dataset-path /path/to/my/data  # Use custom dataset directory"
+    echo "  $0 1 run --genome-path /path/to/genome.fa # Use custom genome file"
+    echo "  $0 4 run --index-path /path/to/indexes    # Use custom bowtie indexes"
+    echo "  $0 1 run --vector-path /path/to/vectors   # Use custom vector indexes"
     echo ""
     echo "Note: Workflows must be run from their respective directories."
+}
+
+# Function to create temporary config with path overrides
+create_temp_config() {
+    local workflow_dir=$1
+    local original_config="$workflow_dir/config.yaml"
+    local temp_config="$workflow_dir/config_override.yaml"
+    
+    # Copy original config
+    cp "$original_config" "$temp_config"
+    
+    # Apply path overrides if provided
+    if [[ -n "$GENOME_PATH" ]]; then
+        sed -i "s|dm6_fasta: .*|dm6_fasta: \"$GENOME_PATH\"|" "$temp_config"
+        echo "Override: Using genome path: $GENOME_PATH" >&2
+    fi
+    
+    if [[ -n "$INDEX_PATH" ]]; then
+        sed -i "s|dm6_bowtie_index: .*|dm6_bowtie_index: \"$INDEX_PATH\"|" "$temp_config"
+        echo "Override: Using index path: $INDEX_PATH" >&2
+    fi
+    
+    if [[ -n "$DATASET_PATH" ]]; then
+        if [[ "$workflow_dir" == "CHIP-seq" ]]; then
+            sed -i "s|data_dir: .*|data_dir: \"$DATASET_PATH\"|" "$temp_config"
+        elif [[ "$workflow_dir" == "totalRNA-seq" ]]; then
+            sed -i "s|fastq_file: .*|fastq_file: \"$DATASET_PATH\"|" "$temp_config"
+        fi
+        echo "Override: Using dataset path: $DATASET_PATH" >&2
+    fi
+    
+    # Additional totalRNA-seq specific overrides
+    if [[ "$workflow_dir" == "totalRNA-seq" ]]; then
+        if [[ -n "$INDEX_PATH" ]]; then
+            # For totalRNA-seq, INDEX_PATH can override the rRNA index
+            sed -i "s|rrna_index: .*|rrna_index: \"$INDEX_PATH\"|" "$temp_config"
+        fi
+        if [[ -n "$VECTOR_PATH" ]]; then
+            # For totalRNA-seq, VECTOR_PATH overrides the vector index
+            sed -i "s|vector_index: .*|vector_index: \"$VECTOR_PATH\"|" "$temp_config"
+        fi
+    fi
+    
+    if [[ -n "$VECTOR_PATH" ]]; then
+        sed -i "s|vector_42ab_index: .*|vector_42ab_index: \"$VECTOR_PATH\"|" "$temp_config"
+        echo "Override: Using vector path: $VECTOR_PATH" >&2
+    fi
+    
+    if [[ -n "$ADAPTER_PATH" ]]; then
+        sed -i "s|adapters_file: .*|adapters_file: \"$ADAPTER_PATH\"|" "$temp_config"
+        echo "Override: Using adapter path: $ADAPTER_PATH" >&2
+    fi
+    
+    echo "$temp_config"
 }
 
 # Function to activate snakemake environment and run command
@@ -482,13 +637,32 @@ run_snakemake() {
     echo "Command: ${command}"
     echo ""
 
+    # Create temporary config if path overrides are provided
+    local temp_config=""
+    if [[ -n "$GENOME_PATH" || -n "$INDEX_PATH" || -n "$DATASET_PATH" || -n "$VECTOR_PATH" || -n "$ADAPTER_PATH" ]]; then
+        temp_config=$(create_temp_config "$workflow_dir")
+        echo "Using temporary config with path overrides: $temp_config" >&2
+    fi
+
     # Use conda run with --no-capture-output to show real-time output
+    # Pass the temp config file if it exists
+    local config_override=""
+    if [[ -n "$temp_config" && -f "$temp_config" ]]; then
+        config_override="--configfile $(basename "$temp_config")"
+    fi
+    
     conda run --no-capture-output -n snakemake_env bash -c "
         cd '${workflow_dir}'
         # Set up sm alias
         alias sm='snakemake'
-        ${command}
+        ${command} ${config_override}
     "
+    
+    # Clean up temporary config
+    if [[ -n "$temp_config" && -f "$temp_config" ]]; then
+        rm -f "$temp_config"
+        echo "Cleaned up temporary config file" >&2
+    fi
 }
 
 # Parse cores option and other flags
@@ -496,9 +670,22 @@ CORES=""
 EXTRA_FLAGS=""
 CORES_SPECIFIED=false
 
+# Path override variables
+GENOME_PATH=""
+INDEX_PATH=""
+DATASET_PATH=""
+VECTOR_PATH=""
+ADAPTER_PATH=""
+
+# Parse all arguments first - collect positional args separately
+POSITIONAL_ARGS=()
 while [[ $# -gt 0 ]]; do
     case $1 in
         --cores)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --cores requires a value" >&2
+                exit 1
+            fi
             CORES="$2"
             CORES_SPECIFIED=true
             shift 2
@@ -507,19 +694,60 @@ while [[ $# -gt 0 ]]; do
             EXTRA_FLAGS="${EXTRA_FLAGS} --rerun-incomplete"
             shift
             ;;
+        --genome-path)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --genome-path requires a value" >&2
+                exit 1
+            fi
+            GENOME_PATH="$2"
+            shift 2
+            ;;
+        --index-path)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --index-path requires a value" >&2
+                exit 1
+            fi
+            INDEX_PATH="$2"
+            shift 2
+            ;;
+        --dataset-path)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --dataset-path requires a value" >&2
+                exit 1
+            fi
+            DATASET_PATH="$2"
+            shift 2
+            ;;
+        --vector-path)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --vector-path requires a value" >&2
+                exit 1
+            fi
+            VECTOR_PATH="$2"
+            shift 2
+            ;;
+        --adapter-path)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --adapter-path requires a value" >&2
+                exit 1
+            fi
+            ADAPTER_PATH="$2"
+            shift 2
+            ;;
         *)
-            break
+            POSITIONAL_ARGS+=("$1")
+            shift
             ;;
     esac
 done
 
-# Parse workflow and command
-WORKFLOW=${1:-}
-COMMAND=${2:-run}
+# Parse workflow and command from positional arguments
+WORKFLOW=${POSITIONAL_ARGS[0]:-}
+COMMAND=${POSITIONAL_ARGS[1]:-run}
 
-# If no workflow specified, interactively select one
+# If no workflow specified, interactively select one and configure paths
 if [[ -z "$WORKFLOW" ]]; then
-    WORKFLOW=$(select_workflow)
+    WORKFLOW=$(select_workflow_and_paths)
     COMMAND="run"  # Default to run when interactively selected
 fi
 

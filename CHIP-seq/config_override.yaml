@@ -1,0 +1,56 @@
+# Configuration file for CHIP-seq Snakemake workflow
+
+# Sample configuration
+samples:
+  # chip: "White_GLKD_ChIP_input_1st_S7_R1_001"    # ChIP sample
+  # input: "White_GLKD_ChIP_input_2nd_S10_R1_001"  # Input control sample
+  chip: "Panx_GLKD_ChIP_input_1st_S1_R1_001"    # ChIP sample
+  input: "Panx_GLKD_ChIP_input_2nd_S4_R1_001"  # Input control sample
+
+# Shared file paths
+shared_paths:
+  scripts_dir: "../Shared/Scripts"
+  data_dir: "/custom/dataset/path"
+  genome_dir: "../Shared/DataFiles/genome"
+
+# Input data
+input_data:
+  data_dir: "/custom/dataset/path"
+
+# Output directories
+output:
+  results_dir: "results"
+
+# Analysis parameters
+analysis:
+  bin_sizes: [10, 100, 1000]
+  transposon_bin_sizes: [10, 50, 100, 500, 1000]
+
+# Reference files (automatically constructed from shared paths)
+references:
+  # Genome files
+  dm6_fasta: "/custom/genome.fa"
+  dm6_blacklist: "../Shared/DataFiles/genome/dm6-blacklist.v2.bed.gz"
+  dm6_chrom_sizes: "../Shared/DataFiles/genome/bowtie-indexes/dm6.chrom.sizes"
+  dm6_bowtie_index: "../Shared/DataFiles/genome/bowtie-indexes/dm6"
+
+  # Vector files
+  vector_42ab_index: "../Shared/DataFiles/genome/YichengVectors/42AB_UBIG"
+  vector_42ab_fasta: "../Shared/DataFiles/genome/YichengVectors/42AB_UBIG.fa"
+  vector_20a_index: "../Shared/DataFiles/genome/YichengVectors/20A"
+  vector_20a_fasta: "../Shared/DataFiles/genome/YichengVectors/20A.fa"
+
+  # Adapter files
+  adapters_file: "../Shared/DataFiles/genome/AllAdaptors.fa"
+
+# Scripts
+scripts:
+  trimfastq: "../Shared/Scripts/python/trimfastq.py"
+  makewiggle: "../Shared/Scripts/python/makewigglefromBAM-NH.py"
+
+# Processing parameters
+processing:
+  # Thread count for parallel processing
+  # Recommended: Use 1-2 cores for systems with <4 cores, 4-8 for systems with 8+ cores
+  # You can override this at runtime with: snakemake --cores N
+  threads: 4
