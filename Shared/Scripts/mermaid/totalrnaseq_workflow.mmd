@@ -1,0 +1,50 @@
+flowchart TD
+    Start([Raw FASTQ file<br/>fastq/fastq.gz])
+    
+    Start --> FastQC_Initial
+    
+    FastQC_Initial[FastQC Quality Control<br/>fastqc_initial<br/>Initial QC reports]
+    FastQC_Initial -->|<sample>_fastqc.html| CutadaptCheck{Adapters<br/>specified?}
+    
+    CutadaptCheck -->|Yes| CutadaptTrim[Adapter Trimming<br/>cutadapt_trim<br/>Remove adapters]
+    CutadaptCheck -->|No| TrimReads
+    
+    CutadaptTrim -->|<sample>.cutadapt.fastq| TrimReads[Read Trimming<br/>trim_reads<br/>Trim to 50bp using cutadapt]
+    
+    TrimReads -->|<sample>.trimmed.fastq| FastQC_Trimmed[FastQC on Trimmed<br/>fastqc_trimmed<br/>Final QC reports]
+    
+    FastQC_Trimmed -->|<sample>.trimmed_fastqc.html| RRNARemoval[rRNA Removal<br/>rrna_removal<br/>Bowtie mapping to rRNA]
+    
+    RRNARemoval -->|<sample>.rrna_unmapped.fastq<br/>Unmapped reads| STARAlign[Transcriptome Alignment<br/>star_alignment<br/>STAR mapping to genome]
+    RRNARemoval -->|<sample>.rrna.bam<br/>rRNA reads| RRNAEnd([rRNA mapped reads])
+    
+    STARAlign -->|<sample>.Aligned.sortedByCoord.out.bam<br/>Genome aligned| STAREnd([Transcriptome BAM])
+    STARAlign -->|<sample>.star_unmapped.fastq<br/>Unmapped reads| VectorMap[Vector Mapping<br/>vector_mapping<br/>Bowtie mapping to vectors]
+    
+    VectorMap -->|<sample>.vector.sorted.bam<br/>Vector aligned| VectorEnd([Vector BAM])
+    VectorMap -->|<sample>.vector_unmapped.fastq<br/>Unmapped reads| UnmappedEnd([Unmapped reads])
+    
+    RRNAEnd --> FinalOutputs
+    STAREnd --> FinalOutputs
+    VectorEnd --> FinalOutputs
+    UnmappedEnd --> FinalOutputs
+    
+    FinalOutputs[Final Outputs:<br/>• FastQC reports .html, .zip<br/>• Trimmed FASTQ files<br/>• rRNA removal BAM<br/>• STAR alignment BAM<br/>• Vector mapping BAM<br/>• Unmapped reads FASTQ]
+    
+    FinalOutputs --> End([End])
+    
+    style Start fill:#e1f5ff
+    style End fill:#e1f5ff
+    style FastQC_Initial fill:#fff4e6
+    style FastQC_Trimmed fill:#fff4e6
+    style CutadaptTrim fill:#f3e5f5
+    style TrimReads fill:#f3e5f5
+    style RRNARemoval fill:#e8f5e9
+    style STARAlign fill:#e8f5e9
+    style VectorMap fill:#e8f5e9
+    style FinalOutputs fill:#fff9c4
+    style CutadaptCheck fill:#ffebee
+    style RRNAEnd fill:#e0e0e0
+    style STAREnd fill:#e0e0e0
+    style VectorEnd fill:#e0e0e0
+    style UnmappedEnd fill:#e0e0e0

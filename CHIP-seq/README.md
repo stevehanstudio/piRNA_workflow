@@ -2,49 +2,7 @@
 
 A reproducible ChIP-seq analysis pipeline converted from shell commands to Snakemake workflow.
 
-**✅ Production Ready**: This pipeline is fully functional and has been tested with multiple datasets. It provides a complete ChIP-seq analysis workflow from raw data to publication-ready results.
-
-> **🚀 Quick Start**: Use the unified workflow manager from the project root:
-> ```bash
-> ./run_workflow.sh 1 check-inputs    # Validate requirements
-> ./run_workflow.sh 1                 # Run with interactive guidance
-> ```
-> For details, see [WORKFLOW_MANAGER.md](../WORKFLOW_MANAGER.md).
-
-## 🖥️ System Requirements
-
-### Hardware Requirements
-- **Minimum**: 4 GB RAM, 2 CPU cores
-- **Recommended**: 8+ GB RAM, 4+ CPU cores
-- **Storage**: At least 10 GB free space for results and temporary files
-
-### Thread Configuration
-The pipeline uses configurable threading for parallel processing. Default settings work for most systems:
-
-- **Low-end systems** (< 4 cores): Set `threads: 2` in `config.yaml`
-- **Standard systems** (4-8 cores): Use default `threads: 4`
-- **High-end systems** (8+ cores): Set `threads: 8` or higher
-
-You can also override at runtime:
-```bash
-snakemake --cores 2  # Limit entire workflow to 2 cores
-```
-
-## 🆕 Recent Improvements
-
-### Workflow Manager Enhancements
-- **✅ Auto-Unlock Stale Locks**: Automatically detects and fixes locks from interrupted runs
-- **✅ Config-Aware Validation**: Reads actual `results_dir` from config.yaml, ignores old directories
-- **✅ Index Fallback Support**: Validates source FASTA files for auto-building missing indexes
-- **✅ Smart Error Recovery**: Auto-applies `--rerun-incomplete` when forcing reruns
-
-### Pipeline Improvements
-- **✅ Cross-Platform Threading**: Configurable thread counts for different system capabilities
-- **✅ Parameterized Paths**: No more symlinks needed - use `INPUT_DATA_DIR` variable to specify input file location
-- **✅ Flexible Results Directory**: Customize output directory name with `RESULTS_DIR` variable (e.g., `results_White_GLKD`)
-- **✅ Enhanced Error Handling**: Fixed FastQC output naming issues and improved Snakemake syntax
-- **✅ Simplified Usage**: Convenient workflow manager or alias setup (`alias sm='snakemake --use-conda --cores 8'`)
-- **✅ Better Documentation**: Updated troubleshooting guide and configuration examples
+> **Note**: A unified workflow manager (`./run_workflow.sh`) is available from the project root, providing interactive guidance, automatic resource detection, input validation, and error recovery. See [WORKFLOW_MANAGER.md](../WORKFLOW_MANAGER.md) for details.
 
 ## Overview
 
@@ -56,7 +14,6 @@ This pipeline processes ChIP-seq data from raw FASTQ files to BigWig visualizati
 - **Scalable**: Parallel processing with Snakemake
 - **Quality Control**: FastQC integration at multiple steps
 - **Flexible**: Supports multiple samples and comparisons
-- **Modern**: Updated to Python 3 and current software versions
 
 ## Workflow Overview
 
@@ -70,62 +27,22 @@ This pipeline processes ChIP-seq data from raw FASTQ files to BigWig visualizati
 - **Coverage**: Depends on successful mapping
 - **Enrichment**: Requires both ChIP and Input samples
 
-### Workflow Diagram
-The workflow diagram above shows the complete ChIP-seq analysis pipeline with **specific output file names and types**. The diagram is generated from the PlantUML source file located at `../Shared/Scripts/plantuml/chipseq_workflow.puml`.
+## Direct Snakemake Usage
 
-**Key Features of the Updated Diagram:**
-- ✅ **Specific File Names**: Shows actual output file naming conventions (e.g., `{sample}.alltrimmed_fastqc.html`)
-- ✅ **File Types**: Displays all major file types (.fastq, .bam, .bigwig, .bg4, .html)
-- ✅ **Branching Paths**: Illustrates parallel genome and vector mapping workflows
-- ✅ **Output Summary**: Includes a note with key final output files
-
-To regenerate the image or modify the workflow visualization, edit the PUML file and run:
-```bash
-cd ../Shared/Scripts/plantuml
-plantuml -tpng chipseq_workflow.puml -o ../../DataFiles/workflow_images/
-```
-
-## Quick Start
-
-### 1. Prerequisites
+For advanced users who prefer to run Snakemake directly (instead of using the workflow manager):
 
 ```bash
-# Install mamba for faster environment creation
-conda install mamba -n base -c conda-forge
-
-# Create and activate the base environment
-mamba create -n snakemake_env snakemake
+# Activate the snakemake environment
 conda activate snakemake_env
-```
-
-### 2. Setup
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd chipseq-workflow
-
-# Download required data files (see Data Download section below)
-# Snakemake will create tool environments automatically
-```
-
-### 3. Run the Pipeline
-
-```bash
-# Activate the environment
-conda activate snakemake_env
-
-# Set up convenient alias
-alias sm='snakemake --use-conda --cores 8'
 
 # Run the complete pipeline
-sm
-
-# Or run with specific number of cores
-snakemake --use-conda --cores 24
+snakemake --use-conda --cores 8
 
 # Dry run to check what will be executed
-sm -n
+snakemake --use-conda --cores 8 --dry-run
+
+# Use mamba for faster environment creation
+snakemake --use-conda --conda-frontend mamba --cores 8
 ```
 
 ## Data Requirements
@@ -324,169 +241,18 @@ The pipeline uses conda environments defined in `envs/`:
 - `envs/bedops.yaml`: BEDOPS for genomic operations
 - `envs/macs2-2.1.0.yaml`: MACS2 for peak calling
 
-## Usage Examples
-
-### Basic Run
-```bash
-# Set up alias for convenience
-alias sm='snakemake --use-conda --cores 8'
-sm
-```
-
-### Force Re-run All Steps
-```bash
-sm --forceall
-```
-
-### Run Specific Rule
-```bash
-sm make_enrichment_track
-```
-
-### Dry Run (Check What Will Be Run)
-```bash
-sm -n
-# or
-sm --dry-run
-```
-
-### Clean Up
-```bash
-sm --cleanup-metadata
-```
-
-### Advanced Usage
-```bash
-# Use more cores for faster processing
-snakemake --use-conda --cores 24
-
-# Use mamba for faster environment creation
-snakemake --use-conda --conda-frontend mamba --cores 8
-
-# Run with higher latency wait for network filesystems
-sm --latency-wait 60
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Snakemake Environment Setup**
-   ```bash
-   # First create and activate the snakemake environment
-   conda create -n snakemake_env snakemake
-   conda activate snakemake_env
-
-   # Then run the pipeline (Snakemake will create tool environments automatically)
-   snakemake --use-conda --cores 4
-
-   # Use alias for convenience
-   alias sm='snakemake --use-conda --cores 8'
-   sm
-   ```
-
-2. **Memory Issues**
-   ```bash
-   # Reduce number of cores
-   snakemake --use-conda --conda-frontend mamba --cores 4
-   ```
-
-3. **File Not Found Errors**
-   ```bash
-   # Check file paths in Snakefile
-   # Ensure all required files are present
-   ls -la dm6.fa AllAdaptors.fa
-   ```
-
-4. **Python Version Issues**
-   ```bash
-   # Check Snakemake version
-snakemake --version
-
-# Note: Python versions are managed by individual tool environments
-# Each rule uses its own environment with the appropriate Python version
-   ```
-
-5. **Coverage Analysis Issues**
-   ```bash
-   # Check if BEDOPS is properly installed
-   bedops --version
-
-   # Verify input BAM files exist
-   ls -la results/bowtie/*.bam
-   ```
-
-6. **Transposon Analysis Issues**
-   ```bash
-   # Check if vector files exist
-   ls -la ../Shared/DataFiles/genome/YichengVectors/
-
-   # Verify vector indexes are built
-   ls -la ../Shared/DataFiles/genome/YichengVectors/*.ebwt
-   ```
-
-7. **Memory Issues with Large Files**
-   ```bash
-   # Use fewer cores for memory-intensive operations
-   snakemake --use-conda --conda-frontend mamba --cores 2 make_coverage
-
-   # Check available memory
-   free -h
-   ```
-
-8. **FastQC Output Naming Issues**
-   ```bash
-   # FastQC creates files with .alltrimmed_fastqc.html suffix
-   # If you see MissingOutputException for fastqc files, check that rule outputs match:
-   # Expected: {sample}.alltrimmed_fastqc.html
-   # Not: {sample}_fastqc.html
-
-   # Verify FastQC outputs exist
-   ls -la {RESULTS_DIR}/fastqc_trimmed/
-   ```
-
-### Debug Mode
-
-```bash
-# Run with verbose output
-snakemake --use-conda --conda-frontend mamba --cores 24 --verbose
-
-# Check specific rule execution
-snakemake --use-conda --conda-frontend mamba --cores 24 make_bigwig --verbose
-```
-
 ## Performance Optimization
 
 ### Recommended System Requirements
-- **CPU**: 8+ cores for optimal performance (24+ cores for server environments)
-- **Memory**: 16GB+ RAM (32GB recommended for large datasets)
-- **Storage**: 50GB+ free space (100GB+ for multiple samples)
-- **Time**: 2-4 hours per sample (faster with more cores)
+- **CPU**: 8+ cores recommended
+- **Memory**: 16GB+ RAM
+- **Storage**: 50GB+ free space
+- **Time**: 2-4 hours per sample (depends on cores and data size)
 
-### Resource Monitoring
-
-```bash
-# Monitor CPU and memory usage
-htop
-
-# Monitor disk usage
-df -h
-
-# Monitor Snakemake progress
-snakemake --use-conda --conda-frontend mamba --cores 24 --verbose
-
-# Check specific rule resource usage
-snakemake --use-conda --conda-frontend mamba --cores 24 make_bigwig --verbose
-```
-
-### Performance Tips
-1. **Use SSD storage** for faster I/O
-2. **Increase cores** for parallel processing
-3. **Monitor memory usage** during peak operations (BAM processing, BigWig generation)
-4. **Use `--cores`** to limit resource usage
-5. **Consider mamba** for large/complex environments: `--conda-frontend mamba`
-6. **Use `--latency-wait`** for network file systems: `--latency-wait 60`
-7. **Clean up intermediate files** periodically to save disk space
+### Tips
+- Use `--cores` to control parallelization
+- Use `--conda-frontend mamba` for faster environment creation
+- Use `--latency-wait 60` for network file systems
 
 ## Biological Context
 
@@ -541,6 +307,75 @@ Specialized analysis for transposon elements:
 - **20A elements**: Another transposon family
 - **Multiple resolutions**: Analysis at different bin sizes for different purposes
 
+## Workflow Diagram
+
+The [workflow diagram](../Shared/DataFiles/workflow_images/chipseq_workflow.png) at the top of this README shows the complete ChIP-seq analysis pipeline with **specific output file names and types**.
+
+**Key Features:**
+- ✅ **Specific File Names**: Shows actual output file naming conventions (e.g., `{sample}.alltrimmed_fastqc.html`)
+- ✅ **File Types**: Displays all major file types (.fastq, .bam, .bigwig, .bg4, .html)
+- ✅ **Branching Paths**: Illustrates parallel genome and vector mapping workflows
+- ✅ **Output Summary**: Includes a note with key final output files
+
+**Source:** The diagram is defined in [Mermaid format](../Shared/Scripts/mermaid/chipseq_workflow.mmd) and can be viewed/edited directly on GitHub.
+
+**To regenerate the PNG:**
+1. Copy the contents of `chipseq_workflow.mmd`
+2. Paste into [Mermaid Chart](https://www.mermaidchart.com/)
+3. Export as PNG and save to `../../DataFiles/workflow_images/chipseq_workflow.png`
+
+## Troubleshooting
+
+**Nothing to do (all outputs exist):**
+```bash
+# Check what Snakemake would run
+snakemake --use-conda --cores 8 --dry-run
+
+# Force re-run all steps
+snakemake --use-conda --cores 8 --forceall
+
+# Force re-run from a specific rule
+snakemake --use-conda --cores 8 --forcerun trim_adapters
+```
+
+**Incomplete or corrupted outputs:**
+```bash
+# Remove specific output files and re-run
+rm results/bowtie/*.bam
+snakemake --use-conda --cores 8
+
+# Clean all outputs and start fresh
+rm -rf results/
+snakemake --use-conda --cores 8
+```
+
+**Lock directory errors:**
+```bash
+# Unlock the working directory
+snakemake --unlock
+```
+
+**Environment issues:**
+```bash
+# Recreate conda environments
+snakemake --use-conda --conda-create-envs-only
+
+# Check Snakemake version
+snakemake --version
+```
+
+**Debugging:**
+```bash
+# Dry run to see what will execute
+snakemake --use-conda --cores 8 --dry-run
+
+# Verbose output
+snakemake --use-conda --cores 8 --verbose
+
+# Print shell commands without executing
+snakemake --use-conda --cores 8 --dry-run --printshellcmds
+```
+
 ## Citation
 
 If you use this pipeline, please cite:
@@ -556,32 +391,5 @@ If you use this pipeline, please cite:
 ## Related Documentation
 
 - **[Main Project README](../README.md)**: Overview of the entire piRNA workflow project
-- **[Quick Setup Guide](QUICK_SETUP.md)**: Fast setup instructions
 - **[Dataset Recommendations](DATASET_RECOMMENDATIONS.md)**: Data quality guidelines and recommendations
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Support
-
-For issues and questions:
-1. Check the troubleshooting section above
-2. Review the CHANGELOG.md for recent changes
-3. Open an issue on the repository
-4. Contact the development team
-
-## Acknowledgments
-
-- **Peng-He-Lab**: Original ChIP-seq pipeline development and methodology
-- **Snakemake community**: Workflow engine and best practices
-- **Bioconda contributors**: Software packaging and distribution
-- **Open-source bioinformatics community**: Tools and resources
+- **[Workflow Manager Guide](../WORKFLOW_MANAGER.md)**: Detailed usage and troubleshooting

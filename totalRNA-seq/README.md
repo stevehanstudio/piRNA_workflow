@@ -1,15 +1,14 @@
 # TotalRNA-seq Processing Pipeline
 
-This repository contains a Snakemake workflow for processing totalRNA-seq data, converting the original shell commands into a reproducible and scalable pipeline.
+A Snakemake workflow for processing totalRNA-seq data with rRNA removal and transcriptome alignment.
 
-> **🚀 Quick Start**: Use the unified workflow manager from the project root:
-> ```bash
-> ./run_workflow.sh 4 check-inputs    # Validate requirements
-> ./run_workflow.sh 4                 # Run with interactive guidance
-> ```
-> For details, see [WORKFLOW_MANAGER.md](../WORKFLOW_MANAGER.md).
+> **Note**: A unified workflow manager (`./run_workflow.sh`) is available from the project root, providing interactive guidance, automatic resource detection, input validation, and error recovery. See [WORKFLOW_MANAGER.md](../WORKFLOW_MANAGER.md) for details.
 
 ## Overview
+
+![TotalRNA-seq Workflow](../Shared/DataFiles/workflow_images/totalRNAseq_workflow.png)
+
+*The totalRNA-seq workflow processes raw FASTQ files through quality control, optional adapter trimming, read trimming, rRNA removal, transcriptome alignment with STAR, and vector mapping.*
 
 The pipeline performs the following steps:
 1. **Quality Control**: Initial FastQC analysis on raw reads
@@ -19,47 +18,6 @@ The pipeline performs the following steps:
 5. **Ribosomal RNA Removal**: Maps reads against rRNA references using bowtie
 6. **Transcriptome Alignment**: Maps unmapped reads to transcriptome using STAR
 7. **Vector Mapping**: Maps unmapped reads to vector sequences using bowtie
-
-## 🆕 Recent Improvements
-
-This pipeline has been recently modernized with several key enhancements:
-
-### **✅ Chromosome Harmonization**
-- **Problem**: Automatic detection and fixing of chromosome naming mismatches between FASTA (UCSC format: chr1, chr2, chrX) and GTF (Ensembl format: 1, 2, X) files
-- **Solution**: Added `harmonize_chromosome_names` rule that converts Ensembl to UCSC format
-- **Benefit**: Eliminates STAR alignment failures due to chromosome naming conflicts
-
-### **✅ Shared Resource Architecture**
-- **Migration**: Moved from local `indexes/` folder to centralized `../Shared/DataFiles/` structure
-- **Benefits**: Consistent resource sharing across workflows, eliminates duplication
-- **Direct paths**: No symbolic links, uses direct paths to shared folders [[memory:7692900]]
-
-### **✅ Modern Tool Compatibility**
-- **Updated samtools syntax**: Fixed deprecated `samtools sort` commands for modern versions
-- **STAR index automation**: Automatic building of STAR genome indexes with harmonized annotations
-- **Better error handling**: Improved pipeline robustness and error reporting
-
-## Prerequisites
-
-- [Conda](https://docs.conda.io/en/latest/) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html)
-- [Snakemake](https://snakemake.readthedocs.io/) (will be installed via conda)
-
-## Installation
-
-1. Clone this repository:
-```bash
-git clone <repository-url>
-cd totalRNA-seq
-```
-
-2. Install Snakemake and create conda environments:
-```bash
-# Install Snakemake
-conda install -c bioconda -c conda-forge snakemake
-
-# Create all conda environments
-snakemake --use-conda --conda-create-envs-only
-```
 
 ## Configuration
 
@@ -80,38 +38,19 @@ rrna_index: "../Shared/DataFiles/genome/rrna/dmel_rRNA_unit"
 vector_index: "../Shared/DataFiles/genome/YichengVectors/42AB_UBIG"
 ```
 
-## Usage
+## Direct Snakemake Usage
 
-### Basic Run
-
-Run the complete workflow:
-```bash
-snakemake --use-conda
-```
-
-### Dry Run
-
-Check what will be executed without running:
-```bash
-snakemake --use-conda --dryrun
-```
-
-### Run with Specific Number of Cores
+For advanced users who prefer to run Snakemake directly (instead of using the workflow manager):
 
 ```bash
-snakemake --use-conda --cores 4
-```
+# Run the complete workflow
+snakemake --use-conda --cores 8
 
-### Run Specific Rules
+# Dry run to check what will be executed
+snakemake --use-conda --cores 8 --dry-run
 
-Run only the initial FastQC:
-```bash
-snakemake --use-conda fastqc_initial
-```
-
-Run only the trimming step:
-```bash
-snakemake --use-conda trim_reads
+# Use mamba for faster environment creation
+snakemake --use-conda --conda-frontend mamba --cores 8
 ```
 
 ## Output Files
@@ -138,81 +77,75 @@ All outputs are organized in the `results/` directory:
 
 ## Troubleshooting
 
-### Conda Environment Issues
-
-If you encounter conda environment problems:
+**Nothing to do (all outputs exist):**
 ```bash
-# Remove and recreate environments
-snakemake --use-conda --conda-clean-envs
+# Check what Snakemake would run
+snakemake --use-conda --cores 8 --dry-run
+
+# Force re-run all steps
+snakemake --use-conda --cores 8 --forceall
+
+# Force re-run from a specific rule
+snakemake --use-conda --cores 8 --forcerun trim_reads
+```
+
+**Incomplete or corrupted outputs:**
+```bash
+# Remove specific output files and re-run
+rm results/star_alignment/*.bam
+snakemake --use-conda --cores 8
+
+# Clean all outputs and start fresh
+rm -rf results/
+snakemake --use-conda --cores 8
+```
+
+**Lock directory errors:**
+```bash
+# Unlock the working directory
+snakemake --unlock
+```
+
+**Environment issues:**
+```bash
+# Recreate conda environments
 snakemake --use-conda --conda-create-envs-only
+
+# Check Snakemake version
+snakemake --version
 ```
 
-### Python Environment
-
-The `trimfastq.py` script has been modernized to use Python 3.9+. The conda environment `python.yaml` handles all dependencies automatically. The script maintains full compatibility with the original Python 2.7 version.
-
-## Original Commands
-
-This workflow replaces the following shell commands:
-
+**Debugging:**
 ```bash
-# Create directory
-mkdir -p FastQCk6
+# Dry run to see what will execute
+snakemake --use-conda --cores 8 --dry-run
 
-# Initial FastQC
-FastQC-0.11.3/fastqc all.fastq -o FastQCk6 -k 6
+# Verbose output
+snakemake --use-conda --cores 8 --verbose
 
-# Read trimming
-python2 trimfastq.py all.fastq 50 stdout > allfastq50
-
-# Final FastQC
-FastQC-0.11.3/fastqc allfastq50 -o FastQCk6 -k 6
-
-# Ribosomal RNA removal
-bowtie dmel_rRNA_unit -p 8 -v 2 -k 1 --best -t --sam-nh -q \
-    allfastq50 --un Unmapped50.fastq allfastq.rRNA.mapped50.map
-
-# STAR alignment
-STAR --genomeDir dm6/ --readFilesIn Unmapped50.fastq --runThreadN 8 \
-     --genomeLoad NoSharedMemory --outFilterMultimapNmax 1 --alignSJoverhangMin 8 \
-     --alignSJDBoverhangMin 1 --outFilterMismatchNmax 999 \
-     --outFilterMismatchNoverReadLmax 0.0 --alignIntronMin 20 \
-     --alignIntronMax 1000000 --alignMatesGapMax 1000000 \
-     --outSAMheaderCommentFile COfile.txt --outSAMheaderHD @HD VN:1.4 SO:coordinate \
-     --outSAMunmapped Within --outFilterType BySJout --outSAMattributes NH HI AS NM MD \
-     --outSAMtype BAM SortedByCoordinate --quantMode TranscriptomeSAM GeneCounts \
-     --sjdbScore 1 --limitBAMsortRAM 30000000000 --outFileNamePrefix dm6.50mer \
-     --outSAMstrandField intronMotif
-
-# Vector mapping
-bowtie UBIG -p 8 --chunkmbs 1024 -v 0 -a -m 1 -t --sam-nh --best --strata -q --sam \
-    Unmapped50.fastq -k 1 --al dm6.50mer.UBIG.vectoronly.fastq | \
-    samtools view -F 4 -bT UBIG.fa - | samtools sort - dm6.50mer.UBIG.vectoronly.dup
+# Print shell commands without executing
+snakemake --use-conda --cores 8 --dry-run --printshellcmds
 ```
 
-## Contributing
+## Workflow Diagram
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+The [workflow diagram](../Shared/DataFiles/workflow_images/totalRNAseq_workflow.png) at the top of this README shows the complete totalRNA-seq analysis pipeline with **specific output file names and types**.
 
-## License
+**Key Features:**
+- ✅ **Specific File Names**: Shows actual output file naming conventions (e.g., `{sample}_fastqc.html`, `{sample}.trimmed.fastq`)
+- ✅ **File Types**: Displays all major file types (.fastq, .bam, .html, .zip)
+- ✅ **Branching Paths**: Illustrates conditional adapter trimming and parallel mapping workflows
+- ✅ **Output Summary**: Includes a note with key final output files
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+**Source:** The diagram is defined in [Mermaid format](../Shared/Scripts/mermaid/totalrnaseq_workflow.mmd) and can be viewed/edited directly on GitHub.
 
-## Contributing
+**To regenerate the PNG:**
+1. Copy the contents of `totalrnaseq_workflow.mmd`
+2. Paste into [Mermaid Chart](https://www.mermaidchart.com/)
+3. Export as PNG and save to `../../DataFiles/workflow_images/totalRNAseq_workflow.png`
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+## Related Documentation
 
-## Support
-
-For issues and questions:
-1. Check the troubleshooting section above
-2. Review the main project README
-3. Open an issue on the repository
-4. Contact the development team
+- **[Main Project README](../README.md)**: Overview of the entire piRNA workflow project
+- **[Workflow Manager Guide](../WORKFLOW_MANAGER.md)**: Detailed usage and troubleshooting
 
