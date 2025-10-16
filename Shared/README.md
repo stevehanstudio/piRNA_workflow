@@ -49,16 +49,9 @@ This folder contains resources shared between the CHIP-seq and totalRNA-seq work
 ## datasets/
 
 ### chip-seq/
-- **srr_datasets/**: Individual SRR datasets from public repositories
-  - `SRR030270.fastq` (627MB) - ChIP-seq dataset
-  - `SRR030295.fastq` (904MB) - ChIP-seq dataset  
-  - `SRR030360.fastq` (132MB) - ChIP-seq dataset
-  - `SRR10094667.fastq` (8.6GB) - ChIP-seq dataset
 - **chip_inputs/**: ChIP input control datasets
   - `White_GLKD_ChIP_input_*.fastq` - White GLKD ChIP input samples
   - `Panx_GLKD_ChIP_input_*.fastq` - Panx GLKD ChIP input samples
-- **combined/**: Merged and processed datasets
-  - `all.fastq` (8.6GB) - Combined dataset for analysis
 
 ### totalrna-seq/
 - **all.50mers.fastq** (6.1GB) - Length-trimmed totalRNA-seq dataset

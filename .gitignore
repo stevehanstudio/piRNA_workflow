@@ -44,6 +44,9 @@ results_*/
 *.log.*
 CHIP-seq/Panx_White_GLKD/
 
+# Workflow manager temporary files
+**/config_override.yaml
+
 # Large data files
 *.fastq
 *.fastq.gz

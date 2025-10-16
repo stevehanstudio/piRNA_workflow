@@ -52,6 +52,45 @@ The `run_workflow.sh` script provides a unified interface for managing both work
 | `--cores N` | Number of CPU cores to use (prompts interactively if not specified) |
 | `--rerun-incomplete` | Re-run incomplete jobs |
 
+### Path Override Options
+
+| Option | Description |
+|--------|-------------|
+| `--genome-path PATH` | Override genome FASTA file path |
+| `--index-path PATH` | Override bowtie index directory path |
+| `--dataset-path PATH` | Override input dataset directory/file path |
+| `--vector-path PATH` | Override vector index directory path |
+| `--adapter-path PATH` | Override adapter sequences file path |
+
+#### How Path Overrides Work
+
+When you use path override options, the workflow manager preserves your original configuration:
+
+1. **Creates temporary config**: A `config_override.yaml` file is created in the workflow directory
+2. **Substitutes paths**: Your custom paths are inserted into this temporary config
+3. **Runs workflow**: Snakemake uses the override config instead of the original
+4. **Auto-cleanup**: The temporary file is automatically deleted after completion
+5. **Original preserved**: Your `config.yaml` remains unchanged
+
+**Benefits:**
+- ✅ **Safe testing** of different datasets without editing configs
+- ✅ **Original configuration** always preserved
+- ✅ **Easy A/B testing** - compare multiple datasets quickly
+- ✅ **No accidental commits** of test paths
+- ✅ **Reproducible defaults** - config.yaml contains production values
+
+**Example workflow:**
+```bash
+# Test dataset A
+./run_workflow.sh 1 run --dataset-path /data/datasetA --cores 8
+
+# Test dataset B (config.yaml unchanged)
+./run_workflow.sh 1 run --dataset-path /data/datasetB --cores 8
+
+# Production run (uses config.yaml defaults)
+./run_workflow.sh 1 run --cores 8
+```
+
 ### Interactive Features
 
 The script now includes several interactive features to improve user experience:
@@ -293,14 +332,10 @@ screen -S workflow_run
 - **Input files**: Configure in workflow-specific config files
 - **Output**: Results in `CHIP-seq/results/`
 
-## Migration from Old Scripts
+## Best Practices
 
-This script replaces the individual `run_workflow.sh` scripts in each workflow directory. The new features include:
-
-- **Better error handling**
-- **Unified interface**
-- **Modern Snakemake commands**
-- **Flexible core allocation**
-- **Status monitoring**
-
-Use this script from the project root instead of the old individual scripts.
+- **Run from project root**: Always execute `./run_workflow.sh` from the project root directory
+- **Use screen/tmux**: For long-running workflows, use `screen` or `tmux` to prevent SSH disconnections
+- **Check inputs first**: Run `check-inputs` before starting a workflow to catch missing files early
+- **Monitor progress**: Use `status` or `dryrun` commands to check workflow state
+- **Preserve results**: The script will prompt before overwriting existing results

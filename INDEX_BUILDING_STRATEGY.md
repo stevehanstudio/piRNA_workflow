@@ -4,7 +4,7 @@
 
 This document explains our approach to handling bioinformatics index files in the piRNA workflow project.
 
-## Why Indexes is not stored in this repository
+## Why Indexes Are Not Stored in This Repository
 
 ### **1. File Size Issues**
 - **Bowtie indexes** (`.ebwt` files): 2-10GB each
@@ -191,23 +191,3 @@ snakemake --use-conda --cores 4
    - Verify source file integrity
    - Check conda environment for required tools
    - Review error messages for specific issues
-
-## Future Improvements
-
-### **1. Index Validation**
-Add rules to validate built indexes:
-```python
-rule validate_index:
-    input:
-        index_files = expand("{index}.{ext}", ext=["1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt"])
-    output:
-        validation = "{index}.validated"
-    shell:
-        "bowtie-inspect {wildcards.index} > {output.validation}"
-```
-
-### **2. Index Caching**
-Consider using Snakemake's `--cache` feature for sharing indexes between users.
-
-### **3. Index Versioning**
-Track index versions and rebuild when source files change.

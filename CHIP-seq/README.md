@@ -92,8 +92,6 @@ mkdir -p ../Shared/DataFiles/genome/YichengVectors
 bowtie-build ../Shared/DataFiles/genome/YichengVectors/42AB_UBIG.fa ../Shared/DataFiles/genome/YichengVectors/42AB_UBIG
 ```
 
-**Note**: You may need to download your own FASTQ files or use the provided SRR030295.fastq and SRR030270.fastq files.
-
 ## Pipeline Steps
 
 ### 1. Quality Control
@@ -260,7 +258,9 @@ The pipeline uses conda environments defined in `envs/`:
 - **Current Example**: White GLKD ChIP-seq experiment
   - **ChIP Sample**: White_GLKD_ChIP_input_1st_S7_R1_001
   - **Input Control**: White_GLKD_ChIP_input_2nd_S10_R1_001
-- **Historical Example**: H3K27Ac ChIP-seq (SRR030295/SRR030270)
+- **Alternative Example**: Panx GLKD ChIP-seq experiment
+  - **ChIP Sample**: Panx_GLKD_ChIP_input_1st_S1_R1_001
+  - **Input Control**: Panx_GLKD_ChIP_input_2nd_S4_R1_001
 
 ### Analysis Purpose
 - **H3K27Ac**: Marks active enhancers and promoters

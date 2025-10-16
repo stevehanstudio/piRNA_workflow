@@ -1,14 +1,59 @@
 # Dataset Recommendations for ChIP-seq Pipeline
 
-## Current Dataset Issues
+## Using Custom Datasets
 
-The current dataset (SRR030295/SRR030270) has **very poor quality**:
-- **100% of reads dropped** with standard Trimmomatic parameters
-- **Very low quality scores** (lots of `?` characters in FASTQ)
-- **Old sequencing technology** (likely from early 2000s)
-- **Requires extremely lenient parameters** to retain any reads
+The workflow manager (`run_workflow.sh`) supports flexible dataset configuration, making it easy to test different datasets without modifying configuration files.
 
-> **⚠️ Warning**: These datasets are primarily for testing pipeline functionality. For production analysis, use high-quality datasets as recommended below.
+### **Quick Start with Custom Dataset**
+
+#### **Option 1: Interactive Mode**
+```bash
+# Run workflow manager without arguments for interactive prompts
+./run_workflow.sh
+
+# You'll be prompted for:
+# 1. Workflow selection (1 for ChIP-seq)
+# 2. Custom dataset path (or press Enter for default)
+# 3. Other paths if needed (genome, indexes, etc.)
+# 4. Number of cores to use
+```
+
+#### **Option 2: Command-Line Mode**
+```bash
+# Specify custom dataset path directly
+./run_workflow.sh 1 run --dataset-path /path/to/your/chip-seq/data
+
+# Test with dry-run first
+./run_workflow.sh 1 dryrun --dataset-path /path/to/your/chip-seq/data
+
+# Override multiple paths at once
+./run_workflow.sh 1 run \
+    --dataset-path /path/to/data \
+    --genome-path /path/to/genome.fa \
+    --cores 8
+```
+
+### **Testing a New Dataset**
+```bash
+# 1. Download and prepare your dataset
+fastq-dump --split-3 --gzip SRR_NEW_DATASET
+
+# 2. Test quality
+fastqc SRR_NEW_DATASET_1.fastq.gz
+
+# 3. Dry-run with the new dataset
+./run_workflow.sh 1 dryrun --dataset-path /path/to/new/dataset
+
+# 4. Run the pipeline
+./run_workflow.sh 1 run --dataset-path /path/to/new/dataset --cores 8
+```
+
+### **Benefits of This Approach**
+- ✅ **No config file editing** required
+- ✅ **Easy A/B testing** of different datasets
+- ✅ **Original configs preserved** (creates temporary override)
+- ✅ **Quick validation** with check-inputs command
+- ✅ **Interactive prompts** guide you through setup
 
 ## Recommended High-Quality Datasets
 
@@ -100,33 +145,50 @@ wgsim -N 1000000 -1 50 -2 0 dm6.fa test_input.fastq /dev/null
 ```bash
 # Download first 10,000 reads for testing
 fastq-dump --split-3 --gzip SRR_NEW_DATASET -X 10000
+
+# Place in a test directory
+mkdir -p test_datasets/chip-seq
+mv SRR_NEW_DATASET*.fastq.gz test_datasets/chip-seq/
 ```
 
 ### **Step 2: Quality Check**
 ```bash
 # Run FastQC
-fastqc SRR_NEW_DATASET_1.fastq.gz
+fastqc test_datasets/chip-seq/SRR_NEW_DATASET*.fastq.gz
 
-# Check quality scores
-head -1000 SRR_NEW_DATASET_1.fastq.gz | grep "^@" -A 1 -B 1 | tail -100
+# Check quality scores manually
+zcat test_datasets/chip-seq/SRR_NEW_DATASET_1.fastq.gz | head -400 | tail -100
 ```
 
-### **Step 3: Test Trimmomatic**
+### **Step 3: Test with Workflow Manager**
 ```bash
-# Test with standard parameters
-trimmomatic SE SRR_NEW_DATASET_1.fastq.gz test_trimmed.fastq \
-    ILLUMINACLIP:AllAdaptors.fa:2:30:10 \
-    LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:50
+# Validate input files (checks if all required files exist)
+./run_workflow.sh 1 check-inputs --dataset-path test_datasets/chip-seq
 
-# Check survival rate
-echo "Surviving reads: $(wc -l < test_trimmed.fastq | awk '{print $1/4}')"
+# Dry-run to see what will execute
+./run_workflow.sh 1 dryrun --dataset-path test_datasets/chip-seq
+
+# Run the pipeline
+./run_workflow.sh 1 run --dataset-path test_datasets/chip-seq --cores 4
 ```
 
-### **Step 4: Expected Results**
-- ✅ **>80% reads survive** Trimmomatic
-- ✅ **Good quality scores** in FastQC
-- ✅ **Low adapter content** (<5%)
-- ✅ **Consistent read lengths**
+### **Step 4: Evaluate Results**
+```bash
+# Check FastQC reports in results
+ls -la CHIP-seq/results/fastqc_trimmed/
+
+# Check mapping rates
+grep "overall alignment rate" CHIP-seq/results/bowtie/*.sam
+
+# Verify BigWig tracks were generated
+ls -la CHIP-seq/results/bowtie/*.bigwig
+```
+
+### **Expected Results**
+- ✅ **>80% reads survive** trimming steps
+- ✅ **Good quality scores** in FastQC reports
+- ✅ **High mapping rates** (>70%)
+- ✅ **Clean BigWig tracks** generated
 
 ## Recommended Search Strategy
 
@@ -170,22 +232,37 @@ echo "Surviving reads: $(wc -l < test_trimmed.fastq | awk '{print $1/4}')"
 4. **Download sample data** for quality testing
 
 ### **Phase 2: Quality Testing**
-1. **Run FastQC** on sample data
-2. **Test Trimmomatic** with standard parameters
-3. **Verify mapping rates** with Bowtie
-4. **Check for technical artifacts**
+```bash
+# Download candidate dataset
+fastq-dump --split-3 --gzip SRR_CANDIDATE -X 10000
+
+# Run quality checks
+fastqc SRR_CANDIDATE*.fastq.gz
+
+# Test with workflow manager (dry-run)
+./run_workflow.sh 1 dryrun --dataset-path /path/to/SRR_CANDIDATE
+```
 
 ### **Phase 3: Pipeline Testing**
-1. **Update Snakefile** with new sample names
-2. **Test complete pipeline** with new data
-3. **Verify all outputs** are generated correctly
-4. **Document results** and quality metrics
+```bash
+# Run complete pipeline with new dataset
+./run_workflow.sh 1 run --dataset-path /path/to/SRR_CANDIDATE --cores 8
 
-### **Phase 4: Documentation Update**
-1. **Update README.md** with new dataset info
-2. **Modify CHANGELOG.md** to reflect changes
-3. **Update sample configuration** in Snakefile
-4. **Test with standard parameters** throughout
+# Verify all outputs are generated
+./run_workflow.sh 1 status
+
+# Check quality metrics
+ls -la CHIP-seq/results/
+```
+
+### **Phase 4: Adoption (Optional)**
+If the new dataset is better than the default:
+1. **Update config.yaml** to use new dataset as default
+2. **Document dataset details** in README.md
+3. **Commit changes** to repository
+4. **Update documentation** with quality metrics
+
+> **Note**: With the workflow manager, you don't need to modify configuration files to test datasets. Only update the default config if you want to permanently adopt a new dataset.
 
 ## Expected Benefits
 
@@ -202,18 +279,54 @@ echo "Surviving reads: $(wc -l < test_trimmed.fastq | awk '{print $1/4}')"
 - ❌ **Unreliable enrichment analysis**
 - ❌ **Poor demonstration** of pipeline capabilities
 
+## Quick Reference Commands
+
+### **Finding and Testing New Datasets**
+```bash
+# 1. Search and download a candidate dataset
+fastq-dump --split-3 --gzip SRR_CANDIDATE
+
+# 2. Quick quality check
+fastqc SRR_CANDIDATE*.fastq.gz
+
+# 3. Test with workflow manager
+./run_workflow.sh 1 check-inputs --dataset-path /path/to/SRR_CANDIDATE
+./run_workflow.sh 1 dryrun --dataset-path /path/to/SRR_CANDIDATE
+
+# 4. Run full pipeline
+./run_workflow.sh 1 run --dataset-path /path/to/SRR_CANDIDATE --cores 8
+
+# 5. Compare results with default dataset
+ls -la CHIP-seq/results/
+```
+
+### **Comparing Multiple Datasets**
+```bash
+# Test dataset A
+./run_workflow.sh 1 run --dataset-path /path/to/datasetA --cores 8
+mv CHIP-seq/results CHIP-seq/results_datasetA
+
+# Test dataset B  
+./run_workflow.sh 1 run --dataset-path /path/to/datasetB --cores 8
+mv CHIP-seq/results CHIP-seq/results_datasetB
+
+# Compare quality metrics
+grep "overall alignment rate" CHIP-seq/results_datasetA/bowtie/*.sam
+grep "overall alignment rate" CHIP-seq/results_datasetB/bowtie/*.sam
+```
+
 ## Next Steps
 
 1. **Search for high-quality datasets** using the strategies above
 2. **Download and test** sample data for quality
-3. **Update pipeline configuration** with new datasets
-4. **Test complete pipeline** with standard parameters
-5. **Update documentation** with new dataset information
+3. **Test with workflow manager** using `--dataset-path` option
+4. **Compare results** with default dataset
+5. **Optionally update** config.yaml if new dataset is superior
 
 This will provide a much better demonstration of the pipeline's capabilities and ensure reproducible, high-quality results.
 
 ## Related Documentation
 
-- **[Main README](README.md)**: Comprehensive pipeline documentation
-- **[Quick Setup Guide](QUICK_SETUP.md)**: Fast setup instructions
+- **[ChIP-seq Pipeline README](README.md)**: Comprehensive pipeline documentation
+- **[Workflow Manager Guide](../WORKFLOW_MANAGER.md)**: Complete guide to run_workflow.sh features
 - **[Main Project README](../README.md)**: Overview of the entire project
