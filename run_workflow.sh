@@ -518,8 +518,6 @@ select_workflow_and_paths() {
         echo "Using custom adapter path: $ADAPTER_PATH" >&2
     fi
     echo "" >&2
-    
-    echo "$WORKFLOW"
 }
 
 # Function to check if snakemake is running and auto-unlock if safe
@@ -777,7 +775,7 @@ COMMAND=${POSITIONAL_ARGS[1]:-run}
 
 # If no workflow specified, interactively select one and configure paths
 if [[ -z "$WORKFLOW" ]]; then
-    WORKFLOW=$(select_workflow_and_paths)
+    select_workflow_and_paths
     COMMAND="run"  # Default to run when interactively selected
 fi
 
