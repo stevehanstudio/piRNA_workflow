@@ -148,6 +148,16 @@ check_existing_outputs() {
     return 0
 }
 
+# Helper function to expand ~ in paths
+expand_path() {
+    local path="$1"
+    # Expand ~ to home directory
+    if [[ "$path" == "~"* ]]; then
+        path="${path/#\~/$HOME}"
+    fi
+    echo "$path"
+}
+
 # Function to check required input files
 check_input_files() {
     local workflow_dir=$1
@@ -157,24 +167,40 @@ check_input_files() {
 
     echo "=== Input File Validation ===" >&2
     echo "Checking required input files for $workflow_dir workflow..." >&2
+    
+    # Use override paths if provided, otherwise use defaults
+    local genome_path="${GENOME_PATH:-Shared/DataFiles/genome/dm6.fa}"
+    local dataset_path="${DATASET_PATH:-Shared/DataFiles/datasets/chip-seq/chip_inputs}"
+    local adapter_path="${ADAPTER_PATH:-Shared/DataFiles/genome/AllAdaptors.fa}"
+    local vector_path="${VECTOR_PATH:-Shared/DataFiles/genome/YichengVectors/42AB_UBIG}"
+    
+    # Expand ~ in paths
+    genome_path=$(expand_path "$genome_path")
+    dataset_path=$(expand_path "$dataset_path")
+    adapter_path=$(expand_path "$adapter_path")
+    vector_path=$(expand_path "$vector_path")
+    
+    if [[ -n "$GENOME_PATH" || -n "$DATASET_PATH" || -n "$ADAPTER_PATH" || -n "$VECTOR_PATH" ]]; then
+        echo "ℹ️  Using custom paths for validation" >&2
+    fi
     echo "" >&2
 
     if [[ "$workflow_dir" == "CHIP-seq" ]]; then
-        # CHIP-seq required files
+        # CHIP-seq required files - use custom paths if provided
         local required_files=(
-            "Shared/DataFiles/genome/dm6.fa"
+            "$genome_path"
             "Shared/DataFiles/genome/dm6-blacklist.v2.bed.gz"
             "Shared/DataFiles/genome/bowtie-indexes/dm6.chrom.sizes"
-            "Shared/DataFiles/genome/AllAdaptors.fa"
-            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.fa"
+            "$adapter_path"
+            "${vector_path}.fa"
             "Shared/Scripts/python/trimfastq.py"
             "Shared/Scripts/python/makewigglefromBAM-NH.py"
         )
 
         local required_dirs=(
-            "Shared/DataFiles/datasets/chip-seq/chip_inputs"
+            "$dataset_path"
             "Shared/DataFiles/genome/bowtie-indexes"
-            "Shared/DataFiles/genome/YichengVectors"
+            "$(dirname "$vector_path")"
         )
 
         # Check for dm6 bowtie indexes: either indexes exist OR source file exists
@@ -204,12 +230,12 @@ check_input_files() {
 
         # Check for vector index files: either indexes exist OR source file exists
         local vector_index_files=(
-            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.1.ebwt"
-            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.2.ebwt"
-            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.3.ebwt"
-            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.4.ebwt"
-            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.rev.1.ebwt"
-            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.rev.2.ebwt"
+            "${vector_path}.1.ebwt"
+            "${vector_path}.2.ebwt"
+            "${vector_path}.3.ebwt"
+            "${vector_path}.4.ebwt"
+            "${vector_path}.rev.1.ebwt"
+            "${vector_path}.rev.2.ebwt"
         )
 
         # Check if all vector index files exist
@@ -221,27 +247,31 @@ check_input_files() {
             fi
         done
 
-        # If indexes don't exist, 42AB_UBIG.fa must exist (so Snakemake can build them)
+        # If indexes don't exist, vector .fa must exist (so Snakemake can build them)
         if [[ "$all_vector_indexes_exist" == "false" ]]; then
-            # 42AB_UBIG.fa is already in required_files, so we're good - Snakemake will build indexes
-            echo "ℹ️  Note: Vector bowtie indexes will be built from 42AB_UBIG.fa" >&2
+            # Vector .fa is already in required_files, so we're good - Snakemake will build indexes
+            echo "ℹ️  Note: Vector bowtie indexes will be built from $(basename "$vector_path").fa" >&2
         fi
 
     elif [[ "$workflow_dir" == "totalRNA-seq" ]]; then
+        # totalRNA-seq - update paths for this workflow
+        dataset_path="${DATASET_PATH:-Shared/DataFiles/datasets/totalrna-seq/all.50mers.fastq}"
+        dataset_path=$(expand_path "$dataset_path")
+        
         # totalRNA-seq required files (basic files that are always needed)
         local required_files=(
-            "Shared/DataFiles/datasets/totalrna-seq/all.50mers.fastq"
-            "Shared/DataFiles/genome/dm6.fa"
+            "$dataset_path"
+            "$genome_path"
             "Shared/DataFiles/genome/annotations/dm6.gtf"
-            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.fa"
+            "${vector_path}.fa"
             "Shared/Scripts/python/trimfastq.py"
         )
 
         local required_dirs=(
-            "Shared/DataFiles/datasets/totalrna-seq"
+            "$(dirname "$dataset_path")"
             "Shared/DataFiles/genome/rrna"
             "Shared/DataFiles/genome/annotations"
-            "Shared/DataFiles/genome/YichengVectors"
+            "$(dirname "$vector_path")"
         )
 
         # Check for rRNA: either source file OR index files must exist
@@ -280,12 +310,12 @@ check_input_files() {
 
         # Check for vector index files
         local vector_index_files=(
-            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.1.ebwt"
-            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.2.ebwt"
-            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.3.ebwt"
-            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.4.ebwt"
-            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.rev.1.ebwt"
-            "Shared/DataFiles/genome/YichengVectors/42AB_UBIG.rev.2.ebwt"
+            "${vector_path}.1.ebwt"
+            "${vector_path}.2.ebwt"
+            "${vector_path}.3.ebwt"
+            "${vector_path}.4.ebwt"
+            "${vector_path}.rev.1.ebwt"
+            "${vector_path}.rev.2.ebwt"
         )
 
         required_files+=("${vector_index_files[@]}")
