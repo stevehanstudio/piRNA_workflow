@@ -1,5 +1,84 @@
 # Dataset Recommendations for ChIP-seq Pipeline
 
+## Required Input Files
+
+### **Complete File Requirements**
+
+The ChIP-seq workflow requires the following files to be present before running:
+
+#### **1. Reference Genome Files**
+- `dm6.fa` - Drosophila melanogaster reference genome (dm6 assembly)
+- `dm6-blacklist.v2.bed.gz` - Genomic blacklist regions
+- `dm6.chrom.sizes` - Chromosome sizes file
+
+#### **2. Bowtie Index Files** (either pre-built OR source files)
+- **Option A: Pre-built indexes** (recommended for speed)
+  - `dm6.1.ebwt`, `dm6.2.ebwt`, `dm6.3.ebwt`, `dm6.4.ebwt`
+  - `dm6.rev.1.ebwt`, `dm6.rev.2.ebwt`
+- **Option B: Source files** (workflow will build indexes)
+  - `dm6.fa` (already required above)
+
+#### **3. Vector Reference Files**
+- `42AB_UBIG.fa` - Vector reference sequence
+- **Vector indexes** (either pre-built OR source file)
+  - **Option A: Pre-built indexes**
+    - `42AB_UBIG.1.ebwt`, `42AB_UBIG.2.ebwt`, `42AB_UBIG.3.ebwt`, `42AB_UBIG.4.ebwt`
+    - `42AB_UBIG.rev.1.ebwt`, `42AB_UBIG.rev.2.ebwt`
+  - **Option B: Source file**
+    - `42AB_UBIG.fa` (already required above)
+
+#### **4. Adapter Sequences**
+- `AllAdaptors.fa` - Adapter sequences for trimming
+
+#### **5. Input Dataset Files**
+- **ChIP sample FASTQ**: `{sample_name}.fastq` (e.g., `Panx_GLKD_ChIP_input_1st_S1_R1_001.fastq`)
+- **Input control FASTQ**: `{sample_name}.fastq` (e.g., `Panx_GLKD_ChIP_input_2nd_S4_R1_001.fastq`)
+
+#### **6. Python Scripts**
+- `trimfastq.py` - Read trimming script
+- `makewigglefromBAM-NH.py` - BigWig generation script
+
+### **File Validation**
+
+Use the workflow manager to validate all required files:
+
+```bash
+# Check if all required files are present
+./run_workflow.sh 1 check-inputs
+
+# Check with custom paths
+./run_workflow.sh 1 check-inputs \
+  --dataset-path /path/to/your/data \
+  --genome-path /path/to/dm6.fa
+```
+
+## TotalRNA-seq Input Requirements
+
+For completeness, the totalRNA-seq workflow requires:
+
+#### **1. Input Dataset**
+- `all.50mers.fastq` - Combined 50-mer reads dataset
+
+#### **2. Reference Files** (same as ChIP-seq)
+- `dm6.fa` - Reference genome
+- `dm6.gtf` - Gene annotation file
+- `dm6_chr_harmonized.gtf` - Chromosome-harmonized GTF
+
+#### **3. rRNA Reference**
+- `dmel_rRNA_unit.fa` - Ribosomal RNA sequences
+- **rRNA indexes** (pre-built OR source file)
+
+#### **4. Vector Files** (same as ChIP-seq)
+- `42AB_UBIG.fa` and indexes
+
+#### **5. Python Scripts**
+- `trimfastq.py` - Read trimming script
+
+**Validation:**
+```bash
+./run_workflow.sh 4 check-inputs
+```
+
 ## Using Custom Datasets
 
 The workflow manager (`run_workflow.sh`) supports flexible dataset configuration, making it easy to test different datasets without modifying configuration files.
@@ -306,7 +385,7 @@ ls -la CHIP-seq/results/
 ./run_workflow.sh 1 run --dataset-path /path/to/datasetA --cores 8
 mv CHIP-seq/results CHIP-seq/results_datasetA
 
-# Test dataset B  
+# Test dataset B
 ./run_workflow.sh 1 run --dataset-path /path/to/datasetB --cores 8
 mv CHIP-seq/results CHIP-seq/results_datasetB
 

@@ -19,6 +19,45 @@ The pipeline performs the following steps:
 6. **Transcriptome Alignment**: Maps unmapped reads to transcriptome using STAR
 7. **Vector Mapping**: Maps unmapped reads to vector sequences using bowtie
 
+## Required Input Files
+
+### **Complete File Requirements**
+
+The totalRNA-seq workflow requires the following files to be present before running:
+
+#### **1. Input Dataset**
+- `all.50mers.fastq` - Combined 50-mer reads dataset
+
+#### **2. Reference Files**
+- `dm6.fa` - Drosophila melanogaster reference genome (dm6 assembly)
+- `dm6.gtf` - Gene annotation file
+- `dm6_chr_harmonized.gtf` - Chromosome-harmonized GTF
+
+#### **3. rRNA Reference**
+- `dmel_rRNA_unit.fa` - Ribosomal RNA sequences
+- **rRNA indexes** (either pre-built OR source file)
+
+#### **4. Vector Files**
+- `42AB_UBIG.fa` - Vector reference sequence
+- **Vector indexes** (either pre-built OR source file)
+
+#### **5. Python Scripts**
+- `trimfastq.py` - Read trimming script
+
+### **File Validation**
+
+Use the workflow manager to validate all required files:
+
+```bash
+# Check if all required files are present
+./run_workflow.sh 4 check-inputs
+
+# Check with custom paths
+./run_workflow.sh 4 check-inputs \
+  --dataset-path /path/to/your/data \
+  --genome-path /path/to/dm6.fa
+```
+
 ## Configuration
 
 Edit `config.yaml` to customize your workflow:

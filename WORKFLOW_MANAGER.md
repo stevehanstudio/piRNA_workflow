@@ -10,12 +10,43 @@ The `run_workflow.sh` script provides a unified interface for managing both work
 
 ## Prerequisites
 
+### **Platform Requirements**
+
+The workflow manager (`run_workflow.sh`) is designed for **Linux/macOS** and requires the following Unix utilities:
+
+- `nproc` - CPU core detection
+- `uptime` - System load monitoring
+- `free` - Memory availability checking
+- `bc` - Floating-point arithmetic for resource calculations
+- `pgrep` - Process detection for lock management
+
+**For Windows Users:**
+- ✅ **Recommended**: Use [WSL2 (Windows Subsystem for Linux)](https://docs.microsoft.com/en-us/windows/wsl/install) for full compatibility
+- ⚠️ **Git Bash Users**: Auto-resource detection may fail. Use `--cores N` flag to manually specify core count:
+  ```bash
+  ./run_workflow.sh 1 run --cores 4
+  ```
+
+### **Software Dependencies**
+
 1. **Conda environment**: Create the `snakemake_env` environment:
    ```bash
    conda create -n snakemake_env -c bioconda -c conda-forge snakemake
    ```
 
-2. **Workflow directories**: Ensure both `CHIP-seq/` and `totalRNA-seq/` directories exist with valid Snakefiles.
+2. **Install bc** (if not already present):
+   ```bash
+   # Ubuntu/Debian
+   sudo apt-get install bc
+
+   # macOS (usually pre-installed, if not):
+   brew install bc
+
+   # WSL2 users
+   sudo apt-get install bc
+   ```
+
+3. **Workflow directories**: Ensure both `CHIP-seq/` and `totalRNA-seq/` directories exist with valid Snakefiles.
 
 ## Usage
 

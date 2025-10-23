@@ -4,6 +4,8 @@
 
 This document explains our approach to handling bioinformatics index files in the piRNA workflow project.
 
+> **Platform Note**: Index building requires Unix utilities (`nproc`, `uptime`, `free`, `bc`, `pgrep`). Windows users should use WSL2 or manually specify `--cores N` to bypass auto-detection.
+
 ## Why Indexes Are Not Stored in This Repository
 
 ### **1. File Size Issues**
@@ -103,7 +105,7 @@ Indexes are automatically built when needed:
 
 ### **✅ Keep in Git (Source Files)**
 - `dm6.fa` - Reference genome
-- `dm6.gtf` - Gene annotations  
+- `dm6.gtf` - Gene annotations
 - `42AB_UBIG.fa` - Vector sequences
 - `AllAdaptors.fa` - Adapter sequences
 - `dm6-blacklist.v2.bed.gz` - Blacklist regions
