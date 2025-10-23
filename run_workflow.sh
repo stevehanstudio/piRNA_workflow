@@ -186,11 +186,19 @@ check_input_files() {
     echo "" >&2
 
     if [[ "$workflow_dir" == "CHIP-seq" ]]; then
+        # Determine paths for genome-related files based on custom paths
+        local index_path="${INDEX_PATH:-Shared/DataFiles/genome/bowtie-indexes/dm6}"
+        index_path=$(expand_path "$index_path")
+        local index_dir=$(dirname "$index_path")
+        local index_basename=$(basename "$index_path")
+        
+        local genome_dir=$(dirname "$genome_path")
+        
         # CHIP-seq required files - use custom paths if provided
         local required_files=(
             "$genome_path"
-            "Shared/DataFiles/genome/dm6-blacklist.v2.bed.gz"
-            "Shared/DataFiles/genome/bowtie-indexes/dm6.chrom.sizes"
+            "${genome_dir}/dm6-blacklist.v2.bed.gz"
+            "${index_dir}/${index_basename}.chrom.sizes"
             "$adapter_path"
             "${vector_path}.fa"
             "Shared/Scripts/python/trimfastq.py"
@@ -199,18 +207,18 @@ check_input_files() {
 
         local required_dirs=(
             "$dataset_path"
-            "Shared/DataFiles/genome/bowtie-indexes"
+            "$index_dir"
             "$(dirname "$vector_path")"
         )
 
         # Check for dm6 bowtie indexes: either indexes exist OR source file exists
         local dm6_bowtie_index_files=(
-            "Shared/DataFiles/genome/bowtie-indexes/dm6.1.ebwt"
-            "Shared/DataFiles/genome/bowtie-indexes/dm6.2.ebwt"
-            "Shared/DataFiles/genome/bowtie-indexes/dm6.3.ebwt"
-            "Shared/DataFiles/genome/bowtie-indexes/dm6.4.ebwt"
-            "Shared/DataFiles/genome/bowtie-indexes/dm6.rev.1.ebwt"
-            "Shared/DataFiles/genome/bowtie-indexes/dm6.rev.2.ebwt"
+            "${index_path}.1.ebwt"
+            "${index_path}.2.ebwt"
+            "${index_path}.3.ebwt"
+            "${index_path}.4.ebwt"
+            "${index_path}.rev.1.ebwt"
+            "${index_path}.rev.2.ebwt"
         )
 
         # Check if all dm6 index files exist
@@ -609,46 +617,61 @@ create_temp_config() {
     # Copy original config
     cp "$original_config" "$temp_config"
     
-    # Apply path overrides if provided
+    # Apply path overrides if provided (expand ~ to full paths)
     if [[ -n "$GENOME_PATH" ]]; then
-        sed -i "s|dm6_fasta: .*|dm6_fasta: \"$GENOME_PATH\"|" "$temp_config"
-        echo "Override: Using genome path: $GENOME_PATH" >&2
+        local expanded_genome=$(expand_path "$GENOME_PATH")
+        local genome_dir=$(dirname "$expanded_genome")
+        sed -i "s|dm6_fasta: .*|dm6_fasta: \"$expanded_genome\"|" "$temp_config"
+        sed -i "s|dm6_blacklist: .*|dm6_blacklist: \"${genome_dir}/dm6-blacklist.v2.bed.gz\"|" "$temp_config"
+        echo "Override: Using genome path: $expanded_genome" >&2
+        echo "Override: Using blacklist path: ${genome_dir}/dm6-blacklist.v2.bed.gz" >&2
     fi
     
     if [[ -n "$INDEX_PATH" ]]; then
-        sed -i "s|dm6_bowtie_index: .*|dm6_bowtie_index: \"$INDEX_PATH\"|" "$temp_config"
-        echo "Override: Using index path: $INDEX_PATH" >&2
+        local expanded_index=$(expand_path "$INDEX_PATH")
+        local index_dir=$(dirname "$expanded_index")
+        local index_basename=$(basename "$expanded_index")
+        sed -i "s|dm6_bowtie_index: .*|dm6_bowtie_index: \"$expanded_index\"|" "$temp_config"
+        sed -i "s|dm6_chrom_sizes: .*|dm6_chrom_sizes: \"${index_dir}/${index_basename}.chrom.sizes\"|" "$temp_config"
+        echo "Override: Using index path: $expanded_index" >&2
+        echo "Override: Using chrom.sizes path: ${index_dir}/${index_basename}.chrom.sizes" >&2
     fi
     
     if [[ -n "$DATASET_PATH" ]]; then
+        local expanded_dataset=$(expand_path "$DATASET_PATH")
         if [[ "$workflow_dir" == "CHIP-seq" ]]; then
-            sed -i "s|data_dir: .*|data_dir: \"$DATASET_PATH\"|" "$temp_config"
+            sed -i "s|data_dir: .*|data_dir: \"$expanded_dataset\"|" "$temp_config"
         elif [[ "$workflow_dir" == "totalRNA-seq" ]]; then
-            sed -i "s|fastq_file: .*|fastq_file: \"$DATASET_PATH\"|" "$temp_config"
+            sed -i "s|fastq_file: .*|fastq_file: \"$expanded_dataset\"|" "$temp_config"
         fi
-        echo "Override: Using dataset path: $DATASET_PATH" >&2
+        echo "Override: Using dataset path: $expanded_dataset" >&2
     fi
     
     # Additional totalRNA-seq specific overrides
     if [[ "$workflow_dir" == "totalRNA-seq" ]]; then
         if [[ -n "$INDEX_PATH" ]]; then
             # For totalRNA-seq, INDEX_PATH can override the rRNA index
-            sed -i "s|rrna_index: .*|rrna_index: \"$INDEX_PATH\"|" "$temp_config"
+            local expanded_index=$(expand_path "$INDEX_PATH")
+            sed -i "s|rrna_index: .*|rrna_index: \"$expanded_index\"|" "$temp_config"
         fi
         if [[ -n "$VECTOR_PATH" ]]; then
             # For totalRNA-seq, VECTOR_PATH overrides the vector index
-            sed -i "s|vector_index: .*|vector_index: \"$VECTOR_PATH\"|" "$temp_config"
+            local expanded_vector=$(expand_path "$VECTOR_PATH")
+            sed -i "s|vector_index: .*|vector_index: \"$expanded_vector\"|" "$temp_config"
         fi
     fi
     
     if [[ -n "$VECTOR_PATH" ]]; then
-        sed -i "s|vector_42ab_index: .*|vector_42ab_index: \"$VECTOR_PATH\"|" "$temp_config"
-        echo "Override: Using vector path: $VECTOR_PATH" >&2
+        local expanded_vector=$(expand_path "$VECTOR_PATH")
+        sed -i "s|vector_42ab_index: .*|vector_42ab_index: \"$expanded_vector\"|" "$temp_config"
+        sed -i "s|vector_42ab_fasta: .*|vector_42ab_fasta: \"${expanded_vector}.fa\"|" "$temp_config"
+        echo "Override: Using vector path: $expanded_vector" >&2
     fi
     
     if [[ -n "$ADAPTER_PATH" ]]; then
-        sed -i "s|adapters_file: .*|adapters_file: \"$ADAPTER_PATH\"|" "$temp_config"
-        echo "Override: Using adapter path: $ADAPTER_PATH" >&2
+        local expanded_adapter=$(expand_path "$ADAPTER_PATH")
+        sed -i "s|adapters_file: .*|adapters_file: \"$expanded_adapter\"|" "$temp_config"
+        echo "Override: Using adapter path: $expanded_adapter" >&2
     fi
     
     echo "$temp_config"
