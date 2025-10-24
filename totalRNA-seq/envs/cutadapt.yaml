@@ -2,7 +2,8 @@ name: cutadapt
 channels:
   - bioconda
   - conda-forge
+  - defaults
 dependencies:
-  - cutadapt=4.4
+  - cutadapt>=4.4
   - python=3.9
-  - xopen=1.7.0
+  - xopen>=1.7.0

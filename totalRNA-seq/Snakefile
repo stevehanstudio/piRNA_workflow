@@ -12,19 +12,22 @@ SHARED_DATA = "../Shared/DataFiles"
 SHARED_GENOME = f"{SHARED_DATA}/genome"
 
 # Scripts
-TRIMFASTQ_SCRIPT = f"{SHARED_SCRIPTS}/python/trimfastq.py"
+TRIMFASTQ_SCRIPT = config.get("trimfastq_script", f"{SHARED_SCRIPTS}/python/trimfastq.py")
 
-# Vector files
-VECTOR_42AB_INDEX = f"{SHARED_GENOME}/YichengVectors/42AB_UBIG"
-VECTOR_42AB_REF = f"{SHARED_GENOME}/YichengVectors/42AB_UBIG.fa"
+# Vector files - read from config if available, otherwise use defaults
+VECTOR_42AB_INDEX = config.get("vector_index", f"{SHARED_GENOME}/YichengVectors/42AB_UBIG")
+VECTOR_42AB_REF = config.get("vector_ref", f"{SHARED_GENOME}/YichengVectors/42AB_UBIG.fa")
 
-# Additional shared files
-DM6_REFERENCE = f"{SHARED_GENOME}/dm6.fa"
-RRNA_REFERENCE = f"{SHARED_GENOME}/rrna/dmel_rRNA_unit.fa"
+# Additional shared files - read from config if available
+DM6_REFERENCE = config.get("dm6_fasta", f"{SHARED_GENOME}/dm6.fa")
+RRNA_REFERENCE = config.get("rrna_fasta", f"{SHARED_GENOME}/rrna/dmel_rRNA_unit.fa")
 
-# GTF files - original and chromosome-harmonized
-ORIGINAL_GTF = f"{SHARED_GENOME}/annotations/dm6.gtf"
-HARMONIZED_GTF = f"{SHARED_GENOME}/annotations/dm6_chr_harmonized.gtf"
+# GTF files - original and chromosome-harmonized - read from config if available
+# Derive genome directory from dm6_fasta path for consistent annotation location
+import os
+genome_dir = os.path.dirname(DM6_REFERENCE)
+ORIGINAL_GTF = config.get("original_gtf", f"{genome_dir}/annotations/dm6.gtf")
+HARMONIZED_GTF = config.get("harmonized_gtf", f"{genome_dir}/annotations/dm6_chr_harmonized.gtf")
 
 # Define input files
 FASTQ_FILE = config["fastq_file"]

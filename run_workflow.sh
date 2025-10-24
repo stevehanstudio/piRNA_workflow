@@ -266,54 +266,57 @@ check_input_files() {
         dataset_path="${DATASET_PATH:-Shared/DataFiles/datasets/totalrna-seq/all.50mers.fastq}"
         dataset_path=$(expand_path "$dataset_path")
         
+        # For totalRNA-seq, INDEX_PATH refers to rRNA index
+        local rrna_index_path="${INDEX_PATH:-Shared/DataFiles/genome/rrna/dmel_rRNA_unit}"
+        rrna_index_path=$(expand_path "$rrna_index_path")
+        local rrna_dir=$(dirname "$rrna_index_path")
+        local rrna_basename=$(basename "$rrna_index_path")
+        
+        # GTF file is in annotations directory alongside genome
+        local genome_dir=$(dirname "$genome_path")
+        local annotations_dir="${genome_dir}/annotations"
+        
         # totalRNA-seq required files (basic files that are always needed)
         local required_files=(
             "$dataset_path"
             "$genome_path"
-            "Shared/DataFiles/genome/annotations/dm6.gtf"
+            "${annotations_dir}/dm6.gtf"
             "${vector_path}.fa"
             "Shared/Scripts/python/trimfastq.py"
         )
 
         local required_dirs=(
             "$(dirname "$dataset_path")"
-            "Shared/DataFiles/genome/rrna"
-            "Shared/DataFiles/genome/annotations"
+            "$rrna_dir"
+            "$annotations_dir"
             "$(dirname "$vector_path")"
         )
 
         # Check for rRNA: either source file OR index files must exist
-        local rrna_source="Shared/DataFiles/genome/rrna/dmel_rRNA_unit.fa"
+        local rrna_source="${rrna_dir}/${rrna_basename}.fa"
         local rrna_index_files=(
-            "Shared/DataFiles/genome/rrna/dmel_rRNA_unit.1.ebwt"
-            "Shared/DataFiles/genome/rrna/dmel_rRNA_unit.2.ebwt"
-            "Shared/DataFiles/genome/rrna/dmel_rRNA_unit.3.ebwt"
-            "Shared/DataFiles/genome/rrna/dmel_rRNA_unit.4.ebwt"
-            "Shared/DataFiles/genome/rrna/dmel_rRNA_unit.rev.1.ebwt"
-            "Shared/DataFiles/genome/rrna/dmel_rRNA_unit.rev.2.ebwt"
+            "${rrna_index_path}.1.ebwt"
+            "${rrna_index_path}.2.ebwt"
+            "${rrna_index_path}.3.ebwt"
+            "${rrna_index_path}.4.ebwt"
+            "${rrna_index_path}.rev.1.ebwt"
+            "${rrna_index_path}.rev.2.ebwt"
         )
 
         # Check if rRNA indexes exist (preferred) or source file exists
-        local rrna_available=false
-        if [[ -f "$rrna_source" ]]; then
-            rrna_available=true
-            required_files+=("$rrna_source")
-        else
-            # Check if all index files exist
-            local all_rrna_indexes_exist=true
-            for index_file in "${rrna_index_files[@]}"; do
-                if [[ ! -f "$index_file" ]]; then
-                    all_rrna_indexes_exist=false
-                    break
-                fi
-            done
-            if [[ "$all_rrna_indexes_exist" == "true" ]]; then
-                rrna_available=true
-                # Don't add to required_files since they exist
-            else
-                # Neither source nor complete indexes exist
-                required_files+=("${rrna_index_files[@]}")
+        local all_rrna_indexes_exist=true
+        for index_file in "${rrna_index_files[@]}"; do
+            if [[ ! -f "$index_file" ]]; then
+                all_rrna_indexes_exist=false
+                break
             fi
+        done
+
+        # If rRNA indexes don't exist, check for source file
+        if [[ "$all_rrna_indexes_exist" == "false" ]]; then
+            # Source file must exist so Snakemake can build indexes
+            required_files+=("$rrna_source")
+            echo "ℹ️  Note: rRNA bowtie indexes will be built from ${rrna_basename}.fa" >&2
         fi
 
         # Check for vector index files
@@ -326,7 +329,20 @@ check_input_files() {
             "${vector_path}.rev.2.ebwt"
         )
 
-        required_files+=("${vector_index_files[@]}")
+        # Check if all vector index files exist
+        local all_vector_indexes_exist=true
+        for index_file in "${vector_index_files[@]}"; do
+            if [[ ! -f "$index_file" ]]; then
+                all_vector_indexes_exist=false
+                break
+            fi
+        done
+
+        # If vector indexes don't exist, source file must exist
+        if [[ "$all_vector_indexes_exist" == "false" ]]; then
+            # Vector .fa is already in required_files, so we're good - Snakemake will build indexes
+            echo "ℹ️  Note: Vector bowtie indexes will be built from $(basename "$vector_path").fa" >&2
+        fi
     fi
 
     # Check directories first
@@ -461,8 +477,8 @@ select_workflow_and_paths() {
     if [[ "$WORKFLOW" == "chip-seq" ]]; then
         default_genome=$(grep -A 20 "references:" "$config_file" | grep -E '^\s*dm6_fasta\s*:' | sed -E 's/^\s*dm6_fasta\s*:\s*//; s/^"//; s/"$//' | head -1)
     else
-        # For totalRNA-seq, genome path might be different - check if it exists
-        default_genome=$(grep -E '^\s*dm6_fasta\s*:' "$config_file" | sed -E 's/^\s*dm6_fasta\s*:\s*//; s/^"//; s/"$//' | head -1)
+        # For totalRNA-seq, genome path is hardcoded in Snakefile, provide sensible default
+        default_genome="../Shared/DataFiles/genome/dm6.fa"
     fi
     read -p "Genome FASTA file path [default: $default_genome]: " genome_input >&2
     if [[ -n "$genome_input" ]]; then
@@ -476,8 +492,10 @@ select_workflow_and_paths() {
     if [[ "$WORKFLOW" == "chip-seq" ]]; then
         default_index=$(grep -A 20 "references:" "$config_file" | grep -E '^\s*dm6_bowtie_index\s*:' | sed -E 's/^\s*dm6_bowtie_index\s*:\s*//; s/^"//; s/"$//' | head -1)
     else
-        # For totalRNA-seq, check for rrna_index
+        # For totalRNA-seq, get rRNA index from config
         default_index=$(grep -E '^\s*rrna_index\s*:' "$config_file" | sed -E 's/^\s*rrna_index\s*:\s*//; s/^"//; s/"$//' | head -1)
+        # Fallback if not found
+        [[ -z "$default_index" ]] && default_index="../Shared/DataFiles/genome/rrna/dmel_rRNA_unit"
     fi
     read -p "Bowtie index directory path [default: $default_index]: " index_input >&2
     if [[ -n "$index_input" ]]; then
@@ -491,9 +509,11 @@ select_workflow_and_paths() {
     if [[ "$WORKFLOW" == "chip-seq" ]]; then
         # For CHIP-seq, get the data_dir under input_data section
         default_dataset=$(grep -A 10 "input_data:" "$config_file" | grep -E '^\s*data_dir\s*:' | sed -E 's/^\s*data_dir\s*:\s*//; s/^"//; s/"$//' | head -1)
+        [[ -z "$default_dataset" ]] && default_dataset="../Shared/DataFiles/datasets/chip-seq/chip_inputs"
         read -p "Input dataset directory path [default: $default_dataset]: " dataset_input >&2
     else
         default_dataset=$(grep -E '^\s*fastq_file\s*:' "$config_file" | sed -E 's/^\s*fastq_file\s*:\s*//; s/^"//; s/"$//' | head -1)
+        [[ -z "$default_dataset" ]] && default_dataset="../Shared/DataFiles/datasets/totalrna-seq/all.50mers.fastq"
         read -p "Input FASTQ file path [default: $default_dataset]: " dataset_input >&2
     fi
     if [[ -n "$dataset_input" ]]; then
@@ -507,9 +527,11 @@ select_workflow_and_paths() {
     if [[ "$WORKFLOW" == "chip-seq" ]]; then
         # For CHIP-seq, get vector_42ab_index under references section
         default_vector=$(grep -A 20 "references:" "$config_file" | grep -E '^\s*vector_42ab_index\s*:' | sed -E 's/^\s*vector_42ab_index\s*:\s*//; s/^"//; s/"$//' | head -1)
+        [[ -z "$default_vector" ]] && default_vector="../Shared/DataFiles/genome/YichengVectors/42AB_UBIG"
     else
         # For totalRNA-seq, check for vector_index
         default_vector=$(grep -E '^\s*vector_index\s*:' "$config_file" | sed -E 's/^\s*vector_index\s*:\s*//; s/^"//; s/"$//' | head -1)
+        [[ -z "$default_vector" ]] && default_vector="../Shared/DataFiles/genome/YichengVectors/42AB_UBIG"
     fi
     read -p "Vector index directory path [default: $default_vector]: " vector_input >&2
     if [[ -n "$vector_input" ]]; then
@@ -520,6 +542,7 @@ select_workflow_and_paths() {
     
     # Adapter path
     local default_adapter=$(grep -E '^\s*adapters_file\s*:' "$config_file" | sed -E 's/^\s*adapters_file\s*:\s*//; s/^"//; s/"$//' | head -1)
+    [[ -z "$default_adapter" ]] && default_adapter="../Shared/DataFiles/genome/AllAdaptors.fa"
     read -p "Adapter sequences file path [default: $default_adapter]: " adapter_input >&2
     if [[ -n "$adapter_input" ]]; then
         ADAPTER_PATH="$adapter_input"
@@ -649,15 +672,49 @@ create_temp_config() {
     
     # Additional totalRNA-seq specific overrides
     if [[ "$workflow_dir" == "totalRNA-seq" ]]; then
+        if [[ -n "$GENOME_PATH" ]]; then
+            # Add dm6_fasta config entry if it doesn't exist
+            local expanded_genome=$(expand_path "$GENOME_PATH")
+            local genome_dir=$(dirname "$expanded_genome")
+            if ! grep -q "^dm6_fasta:" "$temp_config"; then
+                echo "dm6_fasta: \"$expanded_genome\"" >> "$temp_config"
+            else
+                sed -i "s|^dm6_fasta: .*|dm6_fasta: \"$expanded_genome\"|" "$temp_config"
+            fi
+            # Add GTF paths
+            if ! grep -q "^original_gtf:" "$temp_config"; then
+                echo "original_gtf: \"${genome_dir}/annotations/dm6.gtf\"" >> "$temp_config"
+            else
+                sed -i "s|^original_gtf: .*|original_gtf: \"${genome_dir}/annotations/dm6.gtf\"|" "$temp_config"
+            fi
+            if ! grep -q "^harmonized_gtf:" "$temp_config"; then
+                echo "harmonized_gtf: \"${genome_dir}/annotations/dm6_chr_harmonized.gtf\"" >> "$temp_config"
+            else
+                sed -i "s|^harmonized_gtf: .*|harmonized_gtf: \"${genome_dir}/annotations/dm6_chr_harmonized.gtf\"|" "$temp_config"
+            fi
+        fi
         if [[ -n "$INDEX_PATH" ]]; then
             # For totalRNA-seq, INDEX_PATH can override the rRNA index
             local expanded_index=$(expand_path "$INDEX_PATH")
+            local rrna_dir=$(dirname "$expanded_index")
+            local rrna_basename=$(basename "$expanded_index")
             sed -i "s|rrna_index: .*|rrna_index: \"$expanded_index\"|" "$temp_config"
+            # Add rrna_fasta config entry
+            if ! grep -q "^rrna_fasta:" "$temp_config"; then
+                echo "rrna_fasta: \"${rrna_dir}/${rrna_basename}.fa\"" >> "$temp_config"
+            else
+                sed -i "s|^rrna_fasta: .*|rrna_fasta: \"${rrna_dir}/${rrna_basename}.fa\"|" "$temp_config"
+            fi
         fi
         if [[ -n "$VECTOR_PATH" ]]; then
-            # For totalRNA-seq, VECTOR_PATH overrides the vector index
+            # For totalRNA-seq, VECTOR_PATH overrides the vector index and ref
             local expanded_vector=$(expand_path "$VECTOR_PATH")
             sed -i "s|vector_index: .*|vector_index: \"$expanded_vector\"|" "$temp_config"
+            if ! grep -q "^vector_ref:" "$temp_config"; then
+                echo "vector_ref: \"${expanded_vector}.fa\"" >> "$temp_config"
+            else
+                sed -i "s|^vector_ref: .*|vector_ref: \"${expanded_vector}.fa\"|" "$temp_config"
+            fi
         fi
     fi
     
