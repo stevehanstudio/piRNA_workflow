@@ -6,4 +6,3 @@ channels:
 dependencies:
   - cutadapt>=4.4
   - python=3.9
-  - xopen>=1.7.0
