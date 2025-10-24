@@ -645,19 +645,30 @@ create_temp_config() {
         local expanded_genome=$(expand_path "$GENOME_PATH")
         local genome_dir=$(dirname "$expanded_genome")
         sed -i "s|dm6_fasta: .*|dm6_fasta: \"$expanded_genome\"|" "$temp_config"
-        sed -i "s|dm6_blacklist: .*|dm6_blacklist: \"${genome_dir}/dm6-blacklist.v2.bed.gz\"|" "$temp_config"
         echo "Override: Using genome path: $expanded_genome" >&2
-        echo "Override: Using blacklist path: ${genome_dir}/dm6-blacklist.v2.bed.gz" >&2
+        
+        # Blacklist is only for ChIP-seq
+        if [[ "$workflow_dir" == "CHIP-seq" ]]; then
+            sed -i "s|dm6_blacklist: .*|dm6_blacklist: \"${genome_dir}/dm6-blacklist.v2.bed.gz\"|" "$temp_config"
+            echo "Override: Using blacklist path: ${genome_dir}/dm6-blacklist.v2.bed.gz" >&2
+        fi
     fi
     
     if [[ -n "$INDEX_PATH" ]]; then
         local expanded_index=$(expand_path "$INDEX_PATH")
         local index_dir=$(dirname "$expanded_index")
         local index_basename=$(basename "$expanded_index")
-        sed -i "s|dm6_bowtie_index: .*|dm6_bowtie_index: \"$expanded_index\"|" "$temp_config"
-        sed -i "s|dm6_chrom_sizes: .*|dm6_chrom_sizes: \"${index_dir}/${index_basename}.chrom.sizes\"|" "$temp_config"
-        echo "Override: Using index path: $expanded_index" >&2
-        echo "Override: Using chrom.sizes path: ${index_dir}/${index_basename}.chrom.sizes" >&2
+        
+        if [[ "$workflow_dir" == "CHIP-seq" ]]; then
+            # For ChIP-seq: INDEX_PATH is dm6 bowtie index
+            sed -i "s|dm6_bowtie_index: .*|dm6_bowtie_index: \"$expanded_index\"|" "$temp_config"
+            sed -i "s|dm6_chrom_sizes: .*|dm6_chrom_sizes: \"${index_dir}/${index_basename}.chrom.sizes\"|" "$temp_config"
+            echo "Override: Using index path: $expanded_index" >&2
+            echo "Override: Using chrom.sizes path: ${index_dir}/${index_basename}.chrom.sizes" >&2
+        else
+            # For totalRNA-seq: INDEX_PATH is rRNA index
+            echo "Override: Using rRNA index path: $expanded_index" >&2
+        fi
     fi
     
     if [[ -n "$DATASET_PATH" ]]; then
