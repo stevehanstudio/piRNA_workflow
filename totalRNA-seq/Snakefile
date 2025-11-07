@@ -4,9 +4,55 @@
 # Configuration
 configfile: "config.yaml"
 
+import os
+
+# ==============================================================================
+# BACKWARD COMPATIBILITY LAYER
+# ==============================================================================
+# Support both old-style and new-style (genome section) configuration formats
+# If 'genome' section exists, use it; otherwise fall back to old config
+# ==============================================================================
+
+if "genome" in config:
+    # New format - genome-agnostic configuration
+    GENOME_VERSION = config["genome"]["version"]
+    GENOME_SPECIES = config["genome"]["species"]
+    RRNA_SPECIES = config["genome"]["rrna_species"]
+    
+    # Expand path templates
+    GENOME_FASTA = config["genome"]["fasta"].format(version=GENOME_VERSION)
+    GENOME_BOWTIE_INDEX = config["genome"]["bowtie_index"].format(version=GENOME_VERSION)
+    GENOME_CHROM_SIZES = config["genome"]["chrom_sizes"].format(version=GENOME_VERSION)
+    GENOME_GTF = config["genome"]["gtf"].format(version=GENOME_VERSION)
+    RRNA_INDEX = config["genome"]["rrna_index"].format(rrna_species=RRNA_SPECIES)
+    RRNA_FASTA = config["genome"]["rrna_fasta"].format(rrna_species=RRNA_SPECIES)
+    
+    # Derive genome directory and harmonized GTF path
+    genome_dir = os.path.dirname(GENOME_FASTA)
+    HARMONIZED_GTF = f"{genome_dir}/annotations/{GENOME_VERSION}_chr_harmonized.gtf"
+    ORIGINAL_GTF = GENOME_GTF
+    
+    # Legacy names for compatibility
+    DM6_REFERENCE = GENOME_FASTA
+    RRNA_REFERENCE = RRNA_FASTA
+else:
+    # Old format - use legacy configuration
+    GENOME_VERSION = "dm6"
+    GENOME_SPECIES = "drosophila"
+    RRNA_SPECIES = "dmel"
+    
+    DM6_REFERENCE = config.get("dm6_fasta", "../Shared/DataFiles/genome/dm6.fa")
+    RRNA_REFERENCE = config.get("rrna_fasta", "../Shared/DataFiles/genome/rrna/dmel_rRNA_unit.fa")
+    RRNA_INDEX = config.get("rrna_index", "../Shared/DataFiles/genome/rrna/dmel_rRNA_unit")
+    
+    genome_dir = os.path.dirname(DM6_REFERENCE)
+    ORIGINAL_GTF = config.get("original_gtf", f"{genome_dir}/annotations/dm6.gtf")
+    HARMONIZED_GTF = config.get("harmonized_gtf", f"{genome_dir}/annotations/dm6_chr_harmonized.gtf")
+    
+    GENOME_FASTA = DM6_REFERENCE
+    GENOME_GTF = ORIGINAL_GTF
+
 # Shared file paths - centralized configuration
-# These variables centralize all shared file paths for easy maintenance
-# If you need to change the location of shared files, update these variables only
 SHARED_SCRIPTS = "../Shared/Scripts"
 SHARED_DATA = "../Shared/DataFiles"
 SHARED_GENOME = f"{SHARED_DATA}/genome"
@@ -18,21 +64,22 @@ TRIMFASTQ_SCRIPT = config.get("trimfastq_script", f"{SHARED_SCRIPTS}/python/trim
 VECTOR_42AB_INDEX = config.get("vector_index", f"{SHARED_GENOME}/YichengVectors/42AB_UBIG")
 VECTOR_42AB_REF = config.get("vector_ref", f"{SHARED_GENOME}/YichengVectors/42AB_UBIG.fa")
 
-# Additional shared files - read from config if available
-DM6_REFERENCE = config.get("dm6_fasta", f"{SHARED_GENOME}/dm6.fa")
-RRNA_REFERENCE = config.get("rrna_fasta", f"{SHARED_GENOME}/rrna/dmel_rRNA_unit.fa")
-
-# GTF files - original and chromosome-harmonized - read from config if available
-# Derive genome directory from dm6_fasta path for consistent annotation location
-import os
-genome_dir = os.path.dirname(DM6_REFERENCE)
-ORIGINAL_GTF = config.get("original_gtf", f"{genome_dir}/annotations/dm6.gtf")
-HARMONIZED_GTF = config.get("harmonized_gtf", f"{genome_dir}/annotations/dm6_chr_harmonized.gtf")
-
 # Define input files
 FASTQ_FILE = config["fastq_file"]
 READ_LENGTH = config["read_length"]
 FASTQC_VERSION = config["fastqc_version"]
+
+# ==============================================================================
+# OUTPUT FILE PREFIX (genome-agnostic)
+# ==============================================================================
+# Construct output prefix from genome version and read length
+# Format: {version}.{read_length}mer (e.g., {OUTPUT_PREFIX}, hg38.75mer)
+# This can be overridden in config.yaml with 'output_prefix' field
+# ==============================================================================
+if "output_prefix" in config:
+    OUTPUT_PREFIX = config["output_prefix"].format(version=GENOME_VERSION, read_length=READ_LENGTH)
+else:
+    OUTPUT_PREFIX = f"{GENOME_VERSION}.{READ_LENGTH}mer"
 
 # Define output directories
 RESULTS_DIR = "results"
@@ -50,16 +97,16 @@ rule all:
     input:
         f"{FASTQC_INITIAL_DIR}/all.50mers_fastqc.html",
         f"{FASTQC_TRIMMED_DIR}/allfastq{READ_LENGTH}_fastqc.html",
-        f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam",
-        f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam.bai",
-        f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.bam",
-        f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.bam.bai",
+        f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.toTranscriptome.out.sorted.bam",
+        f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.toTranscriptome.out.sorted.bam.bai",
+        f"{VECTOR_DIR}/{OUTPUT_PREFIX}.UBIG.vectoronly.dup.bam",
+        f"{VECTOR_DIR}/{OUTPUT_PREFIX}.UBIG.vectoronly.dup.bam.bai",
         # Optional visualization outputs (comment out if having issues)
-        # f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bg.bigWig",
-        # f"{STAR_DIR}/dm6.50merAligned.sortedByCoord.coverage",
+        # f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.sortedByCoordSignal.Unique.str1.out.bg.bigWig",
+        # f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.sortedByCoord.coverage",
         # rules.build_rsem_index.output.rsem_index,
-        f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.rsem.genes.results",
-        f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.10.bg4"
+        f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.toTranscriptome.out.sorted.rsem.genes.results",
+        f"{VECTOR_DIR}/{OUTPUT_PREFIX}.UBIG.vectoronly.dup.10.bg4"
 
 # Index building rules - these generate indexes from source files
 rule build_vector_42AB_index:
@@ -138,11 +185,13 @@ rule build_rsem_index:
 
 rule rsem_quantification:
     input:
-        bam = f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam",
+        bam = f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.toTranscriptome.out.sorted.bam",
         rsem_index = rules.build_rsem_index.output.rsem_index
     output:
-        genes = f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.rsem.genes.results",
-        isoforms = f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.rsem.isoforms.results"
+        genes = f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.toTranscriptome.out.sorted.rsem.genes.results",
+        isoforms = f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.toTranscriptome.out.sorted.rsem.isoforms.results"
+    params:
+        output_prefix = f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.toTranscriptome.out.sorted.rsem"
     conda:
         "envs/rsem.yaml"
     shell:
@@ -156,7 +205,7 @@ rule rsem_quantification:
                                   --temporary-folder {STAR_DIR}/temp \
                                   {input.bam} \
                                   {SHARED_GENOME}/rsem \
-                                  {STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.rsem
+                                  {params.output_prefix}
         """
 
 # Initial FastQC quality check
@@ -230,15 +279,15 @@ rule star_alignment:
         fastq = rules.rrna_removal.output.unmapped,
         star_index = rules.build_star_index.output.index_files
     output:
-        bam = f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.bam",
-        sorted_bam = f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam",
-        sorted_bai = f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam.bai"
+        bam = f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.toTranscriptome.out.bam",
+        sorted_bam = f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.toTranscriptome.out.sorted.bam",
+        sorted_bai = f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.toTranscriptome.out.sorted.bam.bai"
     conda:
         "envs/star.yaml"
     params:
         threads = config.get("threads", 8),
         genome_dir = f"{SHARED_GENOME}/star-index",
-        prefix = "dm6.50mer"
+        prefix = OUTPUT_PREFIX
     shell:
         "mkdir -p {STAR_DIR} && STAR --genomeDir {params.genome_dir} --readFilesIn {input.fastq} --runThreadN {params.threads} --genomeLoad NoSharedMemory --outFilterMultimapNmax 1 --alignSJoverhangMin 8 --alignSJDBoverhangMin 1 --outFilterMismatchNmax 999 --outFilterMismatchNoverReadLmax 0.0 --alignIntronMin 20 --alignIntronMax 1000000 --alignMatesGapMax 1000000 --outSAMheaderCommentFile {STAR_DIR}/COfile.txt --outSAMheaderHD @HD VN:1.4 SO:coordinate --outSAMunmapped Within --outFilterType BySJout --outSAMattributes NH HI AS NM MD --outSAMtype BAM SortedByCoordinate --quantMode TranscriptomeSAM GeneCounts --sjdbScore 1 --limitBAMsortRAM 30000000000 --outFileNamePrefix {STAR_DIR}/{params.prefix} --outSAMstrandField intronMotif && samtools sort -o {output.sorted_bam} {output.bam} && samtools index {output.sorted_bam}"
 
@@ -248,23 +297,24 @@ rule vector_mapping:
         fastq = rules.rrna_removal.output.unmapped,
         vector_index_files = expand(f"{VECTOR_42AB_INDEX}.{{ext}}", ext=["1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt"])
     output:
-        bam = f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.bam",
-        bai = f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.bam.bai"
+        bam = f"{VECTOR_DIR}/{OUTPUT_PREFIX}.UBIG.vectoronly.dup.bam",
+        bai = f"{VECTOR_DIR}/{OUTPUT_PREFIX}.UBIG.vectoronly.dup.bam.bai"
     conda:
         "envs/bowtie.yaml"
     params:
         threads = config.get("threads", 8),
         vector_index = VECTOR_42AB_INDEX,
-        vector_ref = VECTOR_42AB_REF
+        vector_ref = VECTOR_42AB_REF,
+        prefix = OUTPUT_PREFIX
     shell:
-        "mkdir -p {VECTOR_DIR} && bowtie {params.vector_index} -p {params.threads} --chunkmbs 1024 -v 0 -a -m 1 -t -S --best --strata -q {input.fastq} -k 1 --al {VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.fastq | samtools view -F 4 -bT {params.vector_ref} - | samtools sort -o {output.bam} - && samtools index {output.bam}"
+        "mkdir -p {VECTOR_DIR} && bowtie {params.vector_index} -p {params.threads} --chunkmbs 1024 -v 0 -a -m 1 -t -S --best --strata -q {input.fastq} -k 1 --al {VECTOR_DIR}/{params.prefix}.UBIG.vectoronly.fastq | samtools view -F 4 -bT {params.vector_ref} - | samtools sort -o {output.bam} - && samtools index {output.bam}"
 
 rule feature_counts:
     input:
-        bam = f"{STAR_DIR}/dm6.50merAligned.toTranscriptome.out.sorted.bam",
+        bam = f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.toTranscriptome.out.sorted.bam",
         gtf = HARMONIZED_GTF
     output:
-        counts = f"{STAR_DIR}/dm6.50merAligned.counts.txt"
+        counts = f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.counts.txt"
     conda:
         "envs/subread.yaml"  # or "envs/htseq.yaml"
     shell:
@@ -275,10 +325,12 @@ rule feature_counts:
 
 rule generate_bedgraph:
     input:
-        bam = f"{STAR_DIR}/dm6.50merAligned.sortedByCoord.out.bam"
+        bam = f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.sortedByCoord.out.bam"
     output:
-        bg = f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bg",
-        #bgc = f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bgc"
+        bg = f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.sortedByCoordSignal.Unique.str1.out.bg",
+        #bgc = f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.sortedByCoordSignal.Unique.str1.out.bgc"
+    params:
+        prefix = f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.sortedByCoord"
     conda:
         "envs/star.yaml"
     shell:
@@ -287,16 +339,16 @@ rule generate_bedgraph:
              --inputBAMfile {input.bam} \
              --outWigType bedGraph \
              --outWigStrand Unstranded \
-             --outFileNamePrefix {STAR_DIR}/dm6.50merAligned.sortedByCoord
+             --outFileNamePrefix {params.prefix}
         """
 
 rule generate_coverage_profiles:
     input:
         gtf = HARMONIZED_GTF,
-        bedgraph = f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bg"
-        # bedgraph = f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bgc"
+        bedgraph = f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.sortedByCoordSignal.Unique.str1.out.bg"
+        # bedgraph = f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.sortedByCoordSignal.Unique.str1.out.bgc"
     output:
-        coverage = f"{STAR_DIR}/dm6.50merAligned.sortedByCoord.coverage"
+        coverage = f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.sortedByCoord.coverage"
     conda:
         "envs/python.yaml"  # Ensure this environment has Python and the required script
     shell:
@@ -310,10 +362,10 @@ rule generate_coverage_profiles:
 
 rule generate_bigwig:
     input:
-        bedgraph = f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bg",
+        bedgraph = f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.sortedByCoordSignal.Unique.str1.out.bg",
         chrom_sizes = f"{SHARED_GENOME}/bowtie-indexes/dm6.chrom.sizes"
     output:
-        bigwig = f"{STAR_DIR}/dm6.50merAligned.sortedByCoordSignal.Unique.str1.out.bg.bigWig"
+        bigwig = f"{STAR_DIR}/{OUTPUT_PREFIX}Aligned.sortedByCoordSignal.Unique.str1.out.bg.bigWig"
     conda:
         "envs/ucsc.yaml"  # Ensure this environment has wigToBigWig
     shell:
@@ -323,9 +375,9 @@ rule generate_bigwig:
 
 rule bam_coverage:
     input:
-        bam = f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.bam"
+        bam = f"{VECTOR_DIR}/{OUTPUT_PREFIX}.UBIG.vectoronly.dup.bam"
     output:
-        bg4 = f"{VECTOR_DIR}/dm6.50mer.UBIG.vectoronly.dup.10.bg4"
+        bg4 = f"{VECTOR_DIR}/{OUTPUT_PREFIX}.UBIG.vectoronly.dup.10.bg4"
     conda:
         "envs/deeptools.yaml"  # Ensure this environment has bamCoverage
     shell:

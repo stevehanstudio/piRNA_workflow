@@ -5,6 +5,51 @@
 # Load configuration
 configfile: "config.yaml"
 
+# ==============================================================================
+# BACKWARD COMPATIBILITY LAYER
+# ==============================================================================
+# Support both old-style (references section) and new-style (genome section)
+# configuration formats. If 'genome' section exists, use it; otherwise fall
+# back to old 'references' section.
+# ==============================================================================
+
+if "genome" in config:
+    # New format - use genome-agnostic configuration
+    GENOME_VERSION = config["genome"]["version"]
+    GENOME_SPECIES = config["genome"]["species"]
+    
+    # Expand path templates with genome version
+    GENOME_FASTA = config["genome"]["fasta"].format(version=GENOME_VERSION)
+    GENOME_BOWTIE_INDEX = config["genome"]["bowtie_index"].format(version=GENOME_VERSION)
+    GENOME_CHROM_SIZES = config["genome"]["chrom_sizes"].format(version=GENOME_VERSION)
+    
+    # Optional blacklist file (not all genomes have this)
+    if "blacklist" in config["genome"] and config["genome"]["blacklist"]:
+        GENOME_BLACKLIST = config["genome"]["blacklist"].format(version=GENOME_VERSION)
+    else:
+        GENOME_BLACKLIST = None
+    
+    # GTF file for annotations
+    if "gtf" in config["genome"]:
+        GENOME_GTF = config["genome"]["gtf"].format(version=GENOME_VERSION)
+    else:
+        GENOME_GTF = None
+else:
+    # Old format - use legacy dm6-specific configuration
+    GENOME_VERSION = "dm6"
+    GENOME_SPECIES = "drosophila"
+    GENOME_FASTA = config["references"]["dm6_fasta"]
+    GENOME_BLACKLIST = config["references"]["dm6_blacklist"]
+    GENOME_CHROM_SIZES = config["references"]["dm6_chrom_sizes"]
+    GENOME_BOWTIE_INDEX = config["references"]["dm6_bowtie_index"]
+    GENOME_GTF = None
+
+# Legacy variable names for backward compatibility with existing code
+DM6_REFERENCE = GENOME_FASTA
+DM6_BLACKLIST = GENOME_BLACKLIST
+DM6_CHROM_SIZES = GENOME_CHROM_SIZES
+DM6_BOWTIE_INDEX = GENOME_BOWTIE_INDEX
+
 # Extract configuration values
 CHIP_SAMPLE = config["samples"]["chip"]
 INPUT_SAMPLE = config["samples"]["input"]
@@ -17,12 +62,6 @@ INPUT_DATA_DIR = config["input_data"]["data_dir"]
 # Scripts
 TRIMFASTQ_SCRIPT = config["scripts"]["trimfastq"]
 MAKEWIGGLE_SCRIPT = config["scripts"]["makewiggle"]
-
-# Reference files
-DM6_REFERENCE = config["references"]["dm6_fasta"]
-DM6_BLACKLIST = config["references"]["dm6_blacklist"]
-DM6_CHROM_SIZES = config["references"]["dm6_chrom_sizes"]
-DM6_BOWTIE_INDEX = config["references"]["dm6_bowtie_index"]
 
 # Vector files
 VECTOR_42AB_INDEX = config["references"]["vector_42ab_index"]
@@ -123,17 +162,18 @@ rule all:
         # )
 
 # Index building rules - these generate indexes from source files
-rule build_dm6_bowtie_index:
+rule build_genome_bowtie_index:
+    """Build bowtie index for the genome (genome-agnostic)"""
     input:
-        dm6_fa = DM6_REFERENCE
+        genome_fa = GENOME_FASTA
     output:
-        index_files = expand(f"{DM6_BOWTIE_INDEX}.{{ext}}", ext=["1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt"])
+        index_files = expand(f"{GENOME_BOWTIE_INDEX}.{{ext}}", ext=["1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt"])
     conda:
         "envs/bowtie.yaml"
     shell:
         """
-        mkdir -p $(dirname {DM6_BOWTIE_INDEX})
-        bowtie-build {input.dm6_fa} {DM6_BOWTIE_INDEX}
+        mkdir -p $(dirname {GENOME_BOWTIE_INDEX})
+        bowtie-build {input.genome_fa} {GENOME_BOWTIE_INDEX}
         """
 
 rule build_vector_42AB_index:
@@ -163,17 +203,18 @@ rule build_vector_20A_index:
         """
 
 rule generate_chrom_sizes:
+    """Generate chromosome sizes file from genome FASTA (genome-agnostic)"""
     input:
-        dm6_fa = DM6_REFERENCE
+        genome_fa = GENOME_FASTA
     output:
-        chrom_sizes = DM6_CHROM_SIZES
+        chrom_sizes = GENOME_CHROM_SIZES
     conda:
         "envs/samtools-1.16.1.yaml"
     shell:
         """
         mkdir -p $(dirname {output.chrom_sizes})
-        samtools faidx {input.dm6_fa}
-        cut -f1,2 {input.dm6_fa}.fai > {output.chrom_sizes}
+        samtools faidx {input.genome_fa}
+        cut -f1,2 {input.genome_fa}.fai > {output.chrom_sizes}
         """
 
 # Quality control rules
