@@ -459,6 +459,44 @@ select_workflow_and_paths() {
     done
     
     echo "" >&2
+    echo "=== Genome Version Configuration ===" >&2
+    echo "Specify the genome version for this workflow." >&2
+    echo "Common options: dm6, dm3 (Drosophila), hg38, hg19 (Human), mm10, mm9 (Mouse), ce11 (C. elegans)" >&2
+    echo "" >&2
+    
+    # Genome version
+    read -p "Genome version [default: dm6]: " genome_version_input >&2
+    if [[ -n "$genome_version_input" ]]; then
+        GENOME_VERSION="$genome_version_input"
+        echo "Using genome version: $GENOME_VERSION" >&2
+    else
+        GENOME_VERSION="dm6"
+        echo "Using default genome version: dm6" >&2
+    fi
+    echo "" >&2
+    
+    # Determine species from genome version
+    case "$GENOME_VERSION" in
+        dm*|BDGP*)
+            GENOME_SPECIES="drosophila"
+            ;;
+        hg*|GRCh*)
+            GENOME_SPECIES="human"
+            ;;
+        mm*|GRCm*)
+            GENOME_SPECIES="mouse"
+            ;;
+        ce*)
+            GENOME_SPECIES="celegans"
+            ;;
+        *)
+            read -p "Species name for $GENOME_VERSION (e.g., drosophila, human, mouse): " species_input >&2
+            GENOME_SPECIES="${species_input:-drosophila}"
+            echo "Using species: $GENOME_SPECIES" >&2
+            ;;
+    esac
+    
+    echo "" >&2
     echo "=== Path Configuration (optional) ===" >&2
     echo "You can override the default paths from config.yaml files." >&2
     echo "Press Enter to use defaults, or provide custom paths:" >&2
@@ -598,6 +636,9 @@ show_usage() {
     echo "  --cores N     - Number of CPU cores to use (prompts interactively if not specified)"
     echo "  --rerun-incomplete - Re-run incomplete jobs"
     echo ""
+    echo "Genome Configuration Options:"
+    echo "  --genome-version VER  - Specify genome version (e.g., dm6, hg38, mm10, ce11)"
+    echo ""
     echo "Path Override Options (defaults to config.yaml values):"
     echo "  --genome-path PATH    - Override genome FASTA file path"
     echo "  --index-path PATH     - Override bowtie index directory path"
@@ -622,6 +663,11 @@ show_usage() {
     echo "  $0 4 check-inputs         # Validate totalRNA-seq input files"
     echo "  $0                        # Interactive mode - prompts for workflow, paths, and cores"
     echo ""
+    echo "Genome Version Examples:"
+    echo "  $0 1 run --genome-version hg38 --cores 24  # Run CHIP-seq with human genome"
+    echo "  $0 4 run --genome-version mm10 --cores 16  # Run totalRNA-seq with mouse genome"
+    echo "  $0 1 run --genome-version ce11             # Run with C. elegans genome"
+    echo ""
     echo "Path Override Examples:"
     echo "  $0 1 run --dataset-path /path/to/my/data  # Use custom dataset directory"
     echo "  $0 1 run --genome-path /path/to/genome.fa # Use custom genome file"
@@ -639,6 +685,63 @@ create_temp_config() {
     
     # Copy original config
     cp "$original_config" "$temp_config"
+    
+    # ==================================================================
+    # Inject genome section if GENOME_VERSION is specified
+    # ==================================================================
+    if [[ -n "$GENOME_VERSION" ]]; then
+        echo "" >&2
+        echo "Injecting genome configuration for $GENOME_VERSION..." >&2
+        
+        # Determine rRNA species code from genome species
+        local rrna_species
+        case "$GENOME_SPECIES" in
+            drosophila) rrna_species="dmel" ;;
+            human) rrna_species="hsap" ;;
+            mouse) rrna_species="mmus" ;;
+            celegans) rrna_species="cele" ;;
+            *) rrna_species="dmel" ;;  # Default fallback
+        esac
+        
+        # Create genome section if it doesn't exist
+        if ! grep -q "^genome:" "$temp_config"; then
+            # Insert genome section at the beginning (after comments)
+            local temp_file="${temp_config}.tmp"
+            (
+                # Copy any leading comments
+                sed -n '/^#/p; /^$/p; /^[^#]/q' "$temp_config"
+                
+                # Add genome section
+                echo ""
+                echo "# Genome configuration (injected by run_workflow.sh)"
+                echo "genome:"
+                echo "  version: \"$GENOME_VERSION\""
+                echo "  species: \"$GENOME_SPECIES\""
+                echo "  rrna_species: \"$rrna_species\""
+                echo "  fasta: \"../Shared/DataFiles/genome/{version}.fa\""
+                echo "  bowtie_index: \"../Shared/DataFiles/genome/bowtie-indexes/{version}\""
+                echo "  chrom_sizes: \"../Shared/DataFiles/genome/bowtie-indexes/{version}.chrom.sizes\""
+                echo "  blacklist: \"../Shared/DataFiles/genome/{version}-blacklist.v2.bed.gz\""
+                echo "  gtf: \"../Shared/DataFiles/genome/annotations/{version}.gtf\""
+                echo "  rrna_index: \"../Shared/DataFiles/genome/rrna/{rrna_species}_rRNA_unit\""
+                echo "  rrna_fasta: \"../Shared/DataFiles/genome/rrna/{rrna_species}_rRNA_unit.fa\""
+                echo ""
+                
+                # Copy rest of config (skip leading comments already copied)
+                sed -n '/^[^#]/,$ p' "$temp_config"
+            ) > "$temp_file"
+            mv "$temp_file" "$temp_config"
+            
+            echo "✓ Genome section injected for $GENOME_VERSION ($GENOME_SPECIES)" >&2
+        else
+            # Update existing genome section
+            sed -i "s|^  version: .*|  version: \"$GENOME_VERSION\"|" "$temp_config"
+            sed -i "s|^  species: .*|  species: \"$GENOME_SPECIES\"|" "$temp_config"
+            sed -i "s|^  rrna_species: .*|  rrna_species: \"$rrna_species\"|" "$temp_config"
+            
+            echo "✓ Updated genome version to $GENOME_VERSION" >&2
+        fi
+    fi
     
     # Apply path overrides if provided (expand ~ to full paths)
     if [[ -n "$GENOME_PATH" ]]; then
@@ -756,11 +859,11 @@ run_snakemake() {
     echo "Command: ${command}"
     echo ""
 
-    # Create temporary config if path overrides are provided
+    # Create temporary config if path overrides or genome version are provided
     local temp_config=""
-    if [[ -n "$GENOME_PATH" || -n "$INDEX_PATH" || -n "$DATASET_PATH" || -n "$VECTOR_PATH" || -n "$ADAPTER_PATH" ]]; then
+    if [[ -n "$GENOME_PATH" || -n "$INDEX_PATH" || -n "$DATASET_PATH" || -n "$VECTOR_PATH" || -n "$ADAPTER_PATH" || -n "$GENOME_VERSION" ]]; then
         temp_config=$(create_temp_config "$workflow_dir")
-        echo "Using temporary config with path overrides: $temp_config" >&2
+        echo "Using temporary config with overrides: $temp_config" >&2
     fi
 
     # Use conda run with --no-capture-output to show real-time output
@@ -795,6 +898,8 @@ INDEX_PATH=""
 DATASET_PATH=""
 VECTOR_PATH=""
 ADAPTER_PATH=""
+GENOME_VERSION=""
+GENOME_SPECIES=""
 
 # Parse all arguments first - collect positional args separately
 POSITIONAL_ARGS=()
@@ -851,6 +956,14 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             ADAPTER_PATH="$2"
+            shift 2
+            ;;
+        --genome-version)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --genome-version requires a value" >&2
+                exit 1
+            fi
+            GENOME_VERSION="$2"
             shift 2
             ;;
         *)
