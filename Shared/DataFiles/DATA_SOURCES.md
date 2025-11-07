@@ -5,6 +5,31 @@
 
 ---
 
+## Storage Location
+
+**Physical Location:** `/mnt/data/Projects/HeLab/piRNA_workflow/Shared/DataFiles/genome/`  
+**Access Path:** `Shared/DataFiles/genome/` (via symlink)  
+**Migration Date:** November 7, 2025  
+
+**Storage Strategy:**
+- Large genome files stored on `/mnt/data` (3.6TB partition with 2.1TB free)
+- Symbolic link from original location maintains backward compatibility
+- Frees ~8GB from home partition (reducing usage from 92% to 91%)
+
+**Why This Location:**
+- Home partition was at 92% capacity (74GB free)
+- `/mnt/data` has significantly more space for growing genome collection
+- Symlink ensures all existing paths continue to work
+- No config file changes needed
+
+**Symlink:**
+```bash
+/home/steve/Projects/HeLab/piRNA_workflow/Shared/DataFiles/genome
+    -> /mnt/data/Projects/HeLab/piRNA_workflow/Shared/DataFiles/genome/
+```
+
+---
+
 ## Overview
 
 This document tracks all reference genome files, annotations, and related data files used in the piRNA workflow. Each genome version is documented with download sources, dates, and file checksums where applicable.
