@@ -1,10 +1,41 @@
 # Configuration file for totalRNA-seq Snakemake workflow
 
+# ==============================================================================
+# GENOME CONFIGURATION (NEW FORMAT - Recommended)
+# ==============================================================================
+# This section enables multi-species support. Specify your genome version and
+# the workflow will automatically construct paths and output file names.
+#
+# Supported genomes: dm6, dm3 (Drosophila), hg38, hg19 (Human), 
+#                    mm10, mm9 (Mouse), ce11 (C. elegans)
+# ==============================================================================
+genome:
+  version: "dm6"                    # Genome build version
+  species: "drosophila"             # Species name for chromosome mapping
+  rrna_species: "dmel"              # Species code for rRNA files (dmel, hsap, mmus, cele)
+  
+  # Genome reference files (paths use {version} placeholder for dynamic construction)
+  fasta: "../Shared/DataFiles/genome/{version}.fa"
+  bowtie_index: "../Shared/DataFiles/genome/bowtie-indexes/{version}"
+  chrom_sizes: "../Shared/DataFiles/genome/bowtie-indexes/{version}.chrom.sizes"
+  
+  # Annotations - GTF file will be automatically harmonized for chromosome naming
+  gtf: "../Shared/DataFiles/genome/annotations/{version}.gtf"
+  
+  # rRNA index path (uses {rrna_species} placeholder)
+  rrna_index: "../Shared/DataFiles/genome/rrna/{rrna_species}_rRNA_unit"
+  rrna_fasta: "../Shared/DataFiles/genome/rrna/{rrna_species}_rRNA_unit.fa"
+
 # Input file - use totalRNA-seq specific dataset
 fastq_file: "../Shared/DataFiles/datasets/totalrna-seq/all.50mers.fastq"
 
 # Read trimming parameters
 read_length: 50
+
+# Output file prefix (constructed from genome version and read length)
+# Format: {version}.{read_length}mer (e.g., dm6.50mer, hg38.50mer)
+# This will be used for all output file names
+output_prefix: "{version}.{read_length}mer"
 
 # FastQC version (for reference)
 fastqc_version: "0.11.3"
@@ -26,6 +57,14 @@ vector_dir: "results/vector_mapping"
 
 # Mapping parameters
 threads: 8
+
+# ==============================================================================
+# DEPRECATED: Old-style path configuration
+# ==============================================================================
+# These fields are maintained for backward compatibility but will be removed
+# in a future version. Please use the 'genome' section above instead.
+# If both sections exist, the 'genome' section takes precedence.
+# ==============================================================================
 rrna_index: "../Shared/DataFiles/genome/rrna/dmel_rRNA_unit"
 # Note: genome_dir is now automatically managed by the Snakefile
 # GTF file chromosome naming is automatically harmonized in the pipeline

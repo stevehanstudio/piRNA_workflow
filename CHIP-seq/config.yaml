@@ -1,5 +1,31 @@
 # Configuration file for CHIP-seq Snakemake workflow
 
+# ==============================================================================
+# GENOME CONFIGURATION (NEW FORMAT - Recommended)
+# ==============================================================================
+# This section enables multi-species support. Specify your genome version and
+# the workflow will automatically construct paths. For custom paths, override
+# individual fields below.
+#
+# Supported genomes: dm6, dm3 (Drosophila), hg38, hg19 (Human), 
+#                    mm10, mm9 (Mouse), ce11 (C. elegans)
+# ==============================================================================
+genome:
+  version: "dm6"                    # Genome build version
+  species: "drosophila"             # Species name for chromosome mapping
+  rrna_species: "dmel"              # Species code for rRNA files
+  
+  # Genome reference files (paths use {version} placeholder for dynamic construction)
+  fasta: "../Shared/DataFiles/genome/{version}.fa"
+  bowtie_index: "../Shared/DataFiles/genome/bowtie-indexes/{version}"
+  chrom_sizes: "../Shared/DataFiles/genome/bowtie-indexes/{version}.chrom.sizes"
+  
+  # Optional files - set to null if not available for your genome
+  blacklist: "../Shared/DataFiles/genome/{version}-blacklist.v2.bed.gz"
+  
+  # Annotations
+  gtf: "../Shared/DataFiles/genome/annotations/{version}.gtf"
+
 # Sample configuration
 samples:
   # chip: "White_GLKD_ChIP_input_1st_S7_R1_001"    # ChIP sample
@@ -26,7 +52,13 @@ analysis:
   bin_sizes: [10, 100, 1000]
   transposon_bin_sizes: [10, 50, 100, 500, 1000]
 
-# Reference files (automatically constructed from shared paths)
+# ==============================================================================
+# DEPRECATED: Old-style reference configuration
+# ==============================================================================
+# This section is maintained for backward compatibility but will be removed in
+# a future version. Please migrate to the 'genome' section above.
+# If both sections exist, the 'genome' section takes precedence.
+# ==============================================================================
 references:
   # Genome files
   dm6_fasta: "../Shared/DataFiles/genome/dm6.fa"

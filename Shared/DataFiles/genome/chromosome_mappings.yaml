@@ -1,0 +1,215 @@
+# ==============================================================================
+# Chromosome Name Harmonization Mappings
+# ==============================================================================
+# This file defines how chromosome names are converted between different naming
+# conventions (e.g., ENSEMBL to UCSC format).
+#
+# Used by: totalRNA-seq workflow for GTF file harmonization
+# Format: source_chromosome_name -> target_chromosome_name
+# ==============================================================================
+
+# Drosophila melanogaster (fruit fly)
+# Converts FlyBase/ENSEMBL naming to UCSC chr-prefixed format
+drosophila:
+  source_to_ucsc:
+    "2L": "chr2L"
+    "2R": "chr2R"
+    "3L": "chr3L"
+    "3R": "chr3R"
+    "4": "chr4"
+    "X": "chrX"
+    "Y": "chrY"
+    "mitochondrion_genome": "chrM"
+    "Mit": "chrM"        # Alternative mitochondrial naming
+  
+  # Common chromosomes for filtering/validation
+  main_chromosomes:
+    - "chr2L"
+    - "chr2R"
+    - "chr3L"
+    - "chr3R"
+    - "chr4"
+    - "chrX"
+    - "chrY"
+    - "chrM"
+
+# Homo sapiens (human)
+# Converts ENSEMBL numeric naming to UCSC chr-prefixed format
+human:
+  source_to_ucsc:
+    "1": "chr1"
+    "2": "chr2"
+    "3": "chr3"
+    "4": "chr4"
+    "5": "chr5"
+    "6": "chr6"
+    "7": "chr7"
+    "8": "chr8"
+    "9": "chr9"
+    "10": "chr10"
+    "11": "chr11"
+    "12": "chr12"
+    "13": "chr13"
+    "14": "chr14"
+    "15": "chr15"
+    "16": "chr16"
+    "17": "chr17"
+    "18": "chr18"
+    "19": "chr19"
+    "20": "chr20"
+    "21": "chr21"
+    "22": "chr22"
+    "X": "chrX"
+    "Y": "chrY"
+    "MT": "chrM"
+    "M": "chrM"          # Alternative mitochondrial naming
+  
+  main_chromosomes:
+    - "chr1"
+    - "chr2"
+    - "chr3"
+    - "chr4"
+    - "chr5"
+    - "chr6"
+    - "chr7"
+    - "chr8"
+    - "chr9"
+    - "chr10"
+    - "chr11"
+    - "chr12"
+    - "chr13"
+    - "chr14"
+    - "chr15"
+    - "chr16"
+    - "chr17"
+    - "chr18"
+    - "chr19"
+    - "chr20"
+    - "chr21"
+    - "chr22"
+    - "chrX"
+    - "chrY"
+    - "chrM"
+
+# Mus musculus (mouse)
+# Converts ENSEMBL numeric naming to UCSC chr-prefixed format
+mouse:
+  source_to_ucsc:
+    "1": "chr1"
+    "2": "chr2"
+    "3": "chr3"
+    "4": "chr4"
+    "5": "chr5"
+    "6": "chr6"
+    "7": "chr7"
+    "8": "chr8"
+    "9": "chr9"
+    "10": "chr10"
+    "11": "chr11"
+    "12": "chr12"
+    "13": "chr13"
+    "14": "chr14"
+    "15": "chr15"
+    "16": "chr16"
+    "17": "chr17"
+    "18": "chr18"
+    "19": "chr19"
+    "X": "chrX"
+    "Y": "chrY"
+    "MT": "chrM"
+    "M": "chrM"          # Alternative mitochondrial naming
+  
+  main_chromosomes:
+    - "chr1"
+    - "chr2"
+    - "chr3"
+    - "chr4"
+    - "chr5"
+    - "chr6"
+    - "chr7"
+    - "chr8"
+    - "chr9"
+    - "chr10"
+    - "chr11"
+    - "chr12"
+    - "chr13"
+    - "chr14"
+    - "chr15"
+    - "chr16"
+    - "chr17"
+    - "chr18"
+    - "chr19"
+    - "chrX"
+    - "chrY"
+    - "chrM"
+
+# Caenorhabditis elegans (nematode worm)
+# Converts ENSEMBL Roman numeral naming to UCSC format
+celegans:
+  source_to_ucsc:
+    "I": "chrI"
+    "II": "chrII"
+    "III": "chrIII"
+    "IV": "chrIV"
+    "V": "chrV"
+    "X": "chrX"
+    "MtDNA": "chrM"
+    "M": "chrM"          # Alternative mitochondrial naming
+  
+  main_chromosomes:
+    - "chrI"
+    - "chrII"
+    - "chrIII"
+    - "chrIV"
+    - "chrV"
+    - "chrX"
+    - "chrM"
+
+# ==============================================================================
+# Usage Examples
+# ==============================================================================
+# 
+# In Snakefile:
+#   import yaml
+#   
+#   # Load chromosome mappings
+#   with open("chromosome_mappings.yaml") as f:
+#       chr_maps = yaml.safe_load(f)
+#   
+#   # Get species-specific mapping
+#   species = config["genome"]["species"]
+#   mapping = chr_maps[species]["source_to_ucsc"]
+#   
+#   # Apply to chromosome name
+#   chrom = "2L"
+#   if chrom in mapping:
+#       ucsc_chrom = mapping[chrom]  # Returns "chr2L"
+#
+# ==============================================================================
+# Adding New Species
+# ==============================================================================
+# 
+# To add support for a new species:
+# 
+# 1. Add a new section with the species name (lowercase, no spaces)
+# 2. Define source_to_ucsc mappings for all chromosomes
+# 3. List main_chromosomes for validation/filtering
+# 4. Include alternative names (e.g., M vs MT for mitochondria)
+# 5. Test with your GTF file to ensure all chromosomes are mapped
+# 
+# Example for Zebrafish (danio rerio):
+# 
+# zebrafish:
+#   source_to_ucsc:
+#     "1": "chr1"
+#     "2": "chr2"
+#     # ... add all chromosomes
+#     "MT": "chrM"
+#   main_chromosomes:
+#     - "chr1"
+#     - "chr2"
+#     # ... list all main chromosomes
+#     - "chrM"
+#
+# ==============================================================================
+
