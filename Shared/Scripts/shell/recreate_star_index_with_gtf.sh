@@ -12,9 +12,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Define paths relative to project root
-DM6_FA="${PROJECT_ROOT}/Shared/DataFiles/genome/dm6.fa"
+DM6_FA="${PROJECT_ROOT}/Shared/DataFiles/genomes/dm6.fa"
 GTF_FILE="${PROJECT_ROOT}/totalRNA-seq/indexes/annotations/dm6.gtf"
-STAR_INDEX_DIR="${PROJECT_ROOT}/Shared/DataFiles/genome/star-index"
+STAR_INDEX_DIR="${PROJECT_ROOT}/Shared/DataFiles/genomes/star-index"
 
 # Check if GTF file exists
 if [ ! -f "$GTF_FILE" ]; then
@@ -26,7 +26,7 @@ fi
 # Check if dm6.fa exists
 if [ ! -f "$DM6_FA" ]; then
     echo "Error: dm6.fa not found at $DM6_FA"
-    echo "Please ensure the file exists in the Shared/DataFiles/genome directory"
+    echo "Please ensure the file exists in the Shared/DataFiles/genomes directory"
     exit 1
 fi
 

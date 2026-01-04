@@ -12,13 +12,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Define paths relative to project root
-DM6_FA="${PROJECT_ROOT}/Shared/DataFiles/genome/dm6.fa"
+DM6_FA="${PROJECT_ROOT}/Shared/DataFiles/genomes/dm6.fa"
 RRNA_INDEX_DIR="${PROJECT_ROOT}/totalRNA-seq/indexes/rrna"
 
 # Check if dm6.fa exists
 if [ ! -f "$DM6_FA" ]; then
     echo "Error: dm6.fa not found at $DM6_FA"
-    echo "Please ensure the file exists in the Shared/DataFiles/genome directory"
+    echo "Please ensure the file exists in the Shared/DataFiles/genomes directory"
     exit 1
 fi
 

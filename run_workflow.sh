@@ -158,6 +158,21 @@ expand_path() {
     echo "$path"
 }
 
+# Helper function to find existing file path
+find_existing_path() {
+    local candidate_paths=("$@")
+    for path in "${candidate_paths[@]}"; do
+        local expanded=$(expand_path "$path")
+        if [[ -f "$expanded" ]] || [[ -d "$expanded" ]]; then
+            echo "$path"
+            return 0
+        fi
+    done
+    # Return the first candidate if none exist (user will need to provide correct path)
+    echo "${candidate_paths[0]}"
+    return 1
+}
+
 # Function to check required input files
 check_input_files() {
     local workflow_dir=$1
@@ -169,10 +184,10 @@ check_input_files() {
     echo "Checking required input files for $workflow_dir workflow..." >&2
     
     # Use override paths if provided, otherwise use defaults
-    local genome_path="${GENOME_PATH:-Shared/DataFiles/genome/dm6.fa}"
-    local dataset_path="${DATASET_PATH:-Shared/DataFiles/datasets/chip-seq/chip_inputs}"
-    local adapter_path="${ADAPTER_PATH:-Shared/DataFiles/genome/AllAdaptors.fa}"
-    local vector_path="${VECTOR_PATH:-Shared/DataFiles/genome/YichengVectors/42AB_UBIG}"
+    local genome_path="${GENOME_PATH:-./Shared/DataFiles/genomes/dm6.fa}"
+    local dataset_path="${DATASET_PATH:-./Shared/DataFiles/datasets/chip-seq/chip_inputs}"
+    local adapter_path="${ADAPTER_PATH:-./Shared/DataFiles/genomes/AllAdaptors.fa}"
+    local vector_path="${VECTOR_PATH:-./Shared/DataFiles/genomes/YichengVectors/42AB_UBIG}"
     
     # Expand ~ in paths
     genome_path=$(expand_path "$genome_path")
@@ -187,7 +202,7 @@ check_input_files() {
 
     if [[ "$workflow_dir" == "CHIP-seq" ]]; then
         # Determine paths for genome-related files based on custom paths
-        local index_path="${INDEX_PATH:-Shared/DataFiles/genome/bowtie-indexes/dm6}"
+        local index_path="${INDEX_PATH:-./Shared/DataFiles/genomes/bowtie-indexes/dm6}"
         index_path=$(expand_path "$index_path")
         local index_dir=$(dirname "$index_path")
         local index_basename=$(basename "$index_path")
@@ -267,7 +282,7 @@ check_input_files() {
         dataset_path=$(expand_path "$dataset_path")
         
         # For totalRNA-seq, INDEX_PATH refers to rRNA index
-        local rrna_index_path="${INDEX_PATH:-Shared/DataFiles/genome/rrna/dmel_rRNA_unit}"
+        local rrna_index_path="${INDEX_PATH:-./Shared/DataFiles/genomes/rrna/dmel_rRNA_unit}"
         rrna_index_path=$(expand_path "$rrna_index_path")
         local rrna_dir=$(dirname "$rrna_index_path")
         local rrna_basename=$(basename "$rrna_index_path")
@@ -510,13 +525,29 @@ select_workflow_and_paths() {
         config_file="totalRNA-seq/config.yaml"
     fi
     
-    # Genome path
+    # Genome path - check for existence before suggesting
     local default_genome
-    if [[ "$WORKFLOW" == "chip-seq" ]]; then
+    if [[ -n "$GENOME_VERSION" ]]; then
+        # Use genomes/ (plural) directory
+        default_genome="./Shared/DataFiles/genomes/${GENOME_VERSION}.fa"
+        if [[ ! -f "$(expand_path "$default_genome")" ]]; then
+            echo "⚠️  Warning: $default_genome does not exist. You may need to provide the correct path." >&2
+        fi
+    elif [[ "$WORKFLOW" == "chip-seq" ]]; then
         default_genome=$(grep -A 20 "references:" "$config_file" | grep -E '^\s*dm6_fasta\s*:' | sed -E 's/^\s*dm6_fasta\s*:\s*//; s/^"//; s/"$//' | head -1)
+        # Check if the config path exists, use genomes/ if not
+        if [[ -n "$default_genome" ]] && [[ ! -f "$(expand_path "$default_genome")" ]]; then
+            local alt_path="./Shared/DataFiles/genomes/dm6.fa"
+            if [[ -f "$(expand_path "$alt_path")" ]]; then
+                default_genome="$alt_path"
+            fi
+        fi
     else
-        # For totalRNA-seq, genome path is hardcoded in Snakefile, provide sensible default
-        default_genome="../Shared/DataFiles/genome/dm6.fa"
+        # For totalRNA-seq, use genomes/ directory
+        default_genome="./Shared/DataFiles/genomes/dm6.fa"
+        if [[ ! -f "$(expand_path "$default_genome")" ]]; then
+            default_genome=$(grep -E '^\s*dm6_fasta\s*:' "$config_file" | sed -E 's/^\s*dm6_fasta\s*:\s*//; s/^"//; s/"$//' | head -1) || default_genome="./Shared/DataFiles/genomes/dm6.fa"
+        fi
     fi
     read -p "Genome FASTA file path [default: $default_genome]: " genome_input >&2
     if [[ -n "$genome_input" ]]; then
@@ -525,15 +556,53 @@ select_workflow_and_paths() {
     fi
     echo "" >&2
     
-    # Index path
+    # Index path - check for existence before suggesting
     local default_index
-    if [[ "$WORKFLOW" == "chip-seq" ]]; then
+    if [[ -n "$GENOME_VERSION" && "$WORKFLOW" == "chip-seq" ]]; then
+        # Use genomes/ (plural) directory
+        default_index="./Shared/DataFiles/genomes/bowtie-indexes/${GENOME_VERSION}"
+        if [[ ! -d "$(expand_path "$default_index")" ]] && [[ ! -f "$(expand_path "${default_index}.1.ebwt")" ]]; then
+            # Indexes can be built, so just note if they don't exist yet
+            echo "ℹ️  Note: Index directory $default_index not found. Indexes will be built if needed." >&2
+        fi
+    elif [[ "$WORKFLOW" == "chip-seq" ]]; then
         default_index=$(grep -A 20 "references:" "$config_file" | grep -E '^\s*dm6_bowtie_index\s*:' | sed -E 's/^\s*dm6_bowtie_index\s*:\s*//; s/^"//; s/"$//' | head -1)
+        # Convert ../Shared to ./Shared since we're running from project root
+        if [[ -n "$default_index" ]]; then
+            default_index=$(echo "$default_index" | sed 's|^\.\./Shared|./Shared|')
+        fi
+        # Check if the config path exists, use genomes/ if not
+        if [[ -n "$default_index" ]] && [[ ! -d "$(expand_path "$default_index")" ]] && [[ ! -f "$(expand_path "${default_index}.1.ebwt")" ]]; then
+            local alt_path="./Shared/DataFiles/genomes/bowtie-indexes/dm6"
+            if [[ -d "$(expand_path "$alt_path")" ]] || [[ -f "$(expand_path "${alt_path}.1.ebwt")" ]]; then
+                default_index="$alt_path"
+            fi
+        fi
+    elif [[ -n "$GENOME_VERSION" && "$WORKFLOW" == "totalrna-seq" ]]; then
+        # For totalRNA-seq with genome version, determine rRNA species and construct path dynamically
+        local rrna_species
+        case "$GENOME_SPECIES" in
+            drosophila) rrna_species="dmel" ;;
+            human) rrna_species="hsap" ;;
+            mouse) rrna_species="mmus" ;;
+            celegans) rrna_species="cele" ;;
+            *) rrna_species="dmel" ;;  # Default fallback
+        esac
+        default_index="./Shared/DataFiles/genomes/rrna/${rrna_species}_rRNA_unit"
+        if [[ ! -f "$(expand_path "${default_index}.1.ebwt")" ]] && [[ ! -f "$(expand_path "${default_index}.fa")" ]]; then
+            echo "ℹ️  Note: rRNA index ${default_index} not found. Index will be built if source file exists." >&2
+        fi
     else
-        # For totalRNA-seq, get rRNA index from config
+        # For totalRNA-seq without genome version, get rRNA index from config
         default_index=$(grep -E '^\s*rrna_index\s*:' "$config_file" | sed -E 's/^\s*rrna_index\s*:\s*//; s/^"//; s/"$//' | head -1)
-        # Fallback if not found
-        [[ -z "$default_index" ]] && default_index="../Shared/DataFiles/genome/rrna/dmel_rRNA_unit"
+        # Convert ../Shared to ./Shared since we're running from project root
+        if [[ -n "$default_index" ]]; then
+            default_index=$(echo "$default_index" | sed 's|^\.\./Shared|./Shared|')
+        fi
+        # Fallback if not found - use genomes/ directory
+        if [[ -z "$default_index" ]]; then
+            default_index="./Shared/DataFiles/genomes/rrna/dmel_rRNA_unit"
+        fi
     fi
     read -p "Bowtie index directory path [default: $default_index]: " index_input >&2
     if [[ -n "$index_input" ]]; then
@@ -547,11 +616,19 @@ select_workflow_and_paths() {
     if [[ "$WORKFLOW" == "chip-seq" ]]; then
         # For CHIP-seq, get the data_dir under input_data section
         default_dataset=$(grep -A 10 "input_data:" "$config_file" | grep -E '^\s*data_dir\s*:' | sed -E 's/^\s*data_dir\s*:\s*//; s/^"//; s/"$//' | head -1)
-        [[ -z "$default_dataset" ]] && default_dataset="../Shared/DataFiles/datasets/chip-seq/chip_inputs"
+        # Convert ../Shared to ./Shared since we're running from project root
+        if [[ -n "$default_dataset" ]]; then
+            default_dataset=$(echo "$default_dataset" | sed 's|^\.\./Shared|./Shared|')
+        fi
+        [[ -z "$default_dataset" ]] && default_dataset="./Shared/DataFiles/datasets/chip-seq/chip_inputs"
         read -p "Input dataset directory path [default: $default_dataset]: " dataset_input >&2
     else
         default_dataset=$(grep -E '^\s*fastq_file\s*:' "$config_file" | sed -E 's/^\s*fastq_file\s*:\s*//; s/^"//; s/"$//' | head -1)
-        [[ -z "$default_dataset" ]] && default_dataset="../Shared/DataFiles/datasets/totalrna-seq/all.50mers.fastq"
+        # Convert ../Shared to ./Shared since we're running from project root
+        if [[ -n "$default_dataset" ]]; then
+            default_dataset=$(echo "$default_dataset" | sed 's|^\.\./Shared|./Shared|')
+        fi
+        [[ -z "$default_dataset" ]] && default_dataset="./Shared/DataFiles/datasets/totalrna-seq/all.50mers.fastq"
         read -p "Input FASTQ file path [default: $default_dataset]: " dataset_input >&2
     fi
     if [[ -n "$dataset_input" ]]; then
@@ -565,11 +642,19 @@ select_workflow_and_paths() {
     if [[ "$WORKFLOW" == "chip-seq" ]]; then
         # For CHIP-seq, get vector_42ab_index under references section
         default_vector=$(grep -A 20 "references:" "$config_file" | grep -E '^\s*vector_42ab_index\s*:' | sed -E 's/^\s*vector_42ab_index\s*:\s*//; s/^"//; s/"$//' | head -1)
-        [[ -z "$default_vector" ]] && default_vector="../Shared/DataFiles/genome/YichengVectors/42AB_UBIG"
+        # Convert ../Shared to ./Shared since we're running from project root
+        if [[ -n "$default_vector" ]]; then
+            default_vector=$(echo "$default_vector" | sed 's|^\.\./Shared|./Shared|')
+        fi
+        [[ -z "$default_vector" ]] && default_vector="./Shared/DataFiles/genomes/YichengVectors/42AB_UBIG"
     else
         # For totalRNA-seq, check for vector_index
         default_vector=$(grep -E '^\s*vector_index\s*:' "$config_file" | sed -E 's/^\s*vector_index\s*:\s*//; s/^"//; s/"$//' | head -1)
-        [[ -z "$default_vector" ]] && default_vector="../Shared/DataFiles/genome/YichengVectors/42AB_UBIG"
+        # Convert ../Shared to ./Shared since we're running from project root
+        if [[ -n "$default_vector" ]]; then
+            default_vector=$(echo "$default_vector" | sed 's|^\.\./Shared|./Shared|')
+        fi
+        [[ -z "$default_vector" ]] && default_vector="./Shared/DataFiles/genomes/YichengVectors/42AB_UBIG"
     fi
     read -p "Vector index directory path [default: $default_vector]: " vector_input >&2
     if [[ -n "$vector_input" ]]; then
@@ -580,7 +665,11 @@ select_workflow_and_paths() {
     
     # Adapter path
     local default_adapter=$(grep -E '^\s*adapters_file\s*:' "$config_file" | sed -E 's/^\s*adapters_file\s*:\s*//; s/^"//; s/"$//' | head -1)
-    [[ -z "$default_adapter" ]] && default_adapter="../Shared/DataFiles/genome/AllAdaptors.fa"
+    # Convert ../Shared to ./Shared since we're running from project root
+    if [[ -n "$default_adapter" ]]; then
+        default_adapter=$(echo "$default_adapter" | sed 's|^\.\./Shared|./Shared|')
+    fi
+    [[ -z "$default_adapter" ]] && default_adapter="./Shared/DataFiles/genomes/AllAdaptors.fa"
     read -p "Adapter sequences file path [default: $default_adapter]: " adapter_input >&2
     if [[ -n "$adapter_input" ]]; then
         ADAPTER_PATH="$adapter_input"
@@ -718,13 +807,13 @@ create_temp_config() {
                 echo "  version: \"$GENOME_VERSION\""
                 echo "  species: \"$GENOME_SPECIES\""
                 echo "  rrna_species: \"$rrna_species\""
-                echo "  fasta: \"../Shared/DataFiles/genome/{version}.fa\""
-                echo "  bowtie_index: \"../Shared/DataFiles/genome/bowtie-indexes/{version}\""
-                echo "  chrom_sizes: \"../Shared/DataFiles/genome/bowtie-indexes/{version}.chrom.sizes\""
-                echo "  blacklist: \"../Shared/DataFiles/genome/{version}-blacklist.v2.bed.gz\""
-                echo "  gtf: \"../Shared/DataFiles/genome/annotations/{version}.gtf\""
-                echo "  rrna_index: \"../Shared/DataFiles/genome/rrna/{rrna_species}_rRNA_unit\""
-                echo "  rrna_fasta: \"../Shared/DataFiles/genome/rrna/{rrna_species}_rRNA_unit.fa\""
+                echo "  fasta: \"../Shared/DataFiles/genomes/{version}.fa\""
+                echo "  bowtie_index: \"../Shared/DataFiles/genomes/bowtie-indexes/{version}\""
+                echo "  chrom_sizes: \"../Shared/DataFiles/genomes/bowtie-indexes/{version}.chrom.sizes\""
+                echo "  blacklist: \"../Shared/DataFiles/genomes/{version}-blacklist.v2.bed.gz\""
+                echo "  gtf: \"../Shared/DataFiles/genomes/annotations/{version}.gtf\""
+                echo "  rrna_index: \"../Shared/DataFiles/genomes/rrna/{rrna_species}_rRNA_unit\""
+                echo "  rrna_fasta: \"../Shared/DataFiles/genomes/rrna/{rrna_species}_rRNA_unit.fa\""
                 echo ""
                 
                 # Copy rest of config (skip leading comments already copied)

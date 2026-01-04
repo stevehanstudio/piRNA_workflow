@@ -15,16 +15,16 @@ genome:
   rrna_species: "dmel"              # Species code for rRNA files (dmel, hsap, mmus, cele)
   
   # Genome reference files (paths use {version} placeholder for dynamic construction)
-  fasta: "../Shared/DataFiles/genome/{version}.fa"
-  bowtie_index: "../Shared/DataFiles/genome/bowtie-indexes/{version}"
-  chrom_sizes: "../Shared/DataFiles/genome/bowtie-indexes/{version}.chrom.sizes"
+  fasta: "../Shared/DataFiles/genomes/{version}.fa"
+  bowtie_index: "../Shared/DataFiles/genomes/bowtie-indexes/{version}"
+  chrom_sizes: "../Shared/DataFiles/genomes/bowtie-indexes/{version}.chrom.sizes"
   
   # Annotations - GTF file will be automatically harmonized for chromosome naming
-  gtf: "../Shared/DataFiles/genome/annotations/{version}.gtf"
+  gtf: "../Shared/DataFiles/genomes/annotations/{version}.gtf"
   
   # rRNA index path (uses {rrna_species} placeholder)
-  rrna_index: "../Shared/DataFiles/genome/rrna/{rrna_species}_rRNA_unit"
-  rrna_fasta: "../Shared/DataFiles/genome/rrna/{rrna_species}_rRNA_unit.fa"
+  rrna_index: "../Shared/DataFiles/genomes/rrna/{rrna_species}_rRNA_unit"
+  rrna_fasta: "../Shared/DataFiles/genomes/rrna/{rrna_species}_rRNA_unit.fa"
 
 # Input file - use totalRNA-seq specific dataset
 fastq_file: "../Shared/DataFiles/datasets/totalrna-seq/all.50mers.fastq"
@@ -65,8 +65,8 @@ threads: 8
 # in a future version. Please use the 'genome' section above instead.
 # If both sections exist, the 'genome' section takes precedence.
 # ==============================================================================
-rrna_index: "../Shared/DataFiles/genome/rrna/dmel_rRNA_unit"
+rrna_index: "../Shared/DataFiles/genomes/rrna/dmel_rRNA_unit"
 # Note: genome_dir is now automatically managed by the Snakefile
 # GTF file chromosome naming is automatically harmonized in the pipeline
-vector_index: "../Shared/DataFiles/genome/YichengVectors/42AB_UBIG"
-vector_ref: "../Shared/DataFiles/genome/YichengVectors/42AB_UBIG.fa"
+vector_index: "../Shared/DataFiles/genomes/YichengVectors/42AB_UBIG"
+vector_ref: "../Shared/DataFiles/genomes/YichengVectors/42AB_UBIG.fa"

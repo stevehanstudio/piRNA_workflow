@@ -16,8 +16,8 @@ echo "Script directory: $SCRIPT_DIR"
 echo "Project root: $PROJECT_ROOT"
 
 # Define paths relative to project root
-DM6_FA="${PROJECT_ROOT}/Shared/DataFiles/genome/dm6.fa"
-STAR_INDEX_DIR="${PROJECT_ROOT}/Shared/DataFiles/genome/star-index"
+DM6_FA="${PROJECT_ROOT}/Shared/DataFiles/genomes/dm6.fa"
+STAR_INDEX_DIR="${PROJECT_ROOT}/Shared/DataFiles/genomes/star-index"
 
 # Debug: Show the calculated paths
 echo "Calculated dm6.fa path: $DM6_FA"
@@ -26,7 +26,7 @@ echo "Calculated STAR index dir: $STAR_INDEX_DIR"
 # Check if dm6.fa exists
 if [ ! -f "$DM6_FA" ]; then
     echo "Error: dm6.fa not found at $DM6_FA"
-    echo "Please ensure the file exists in the Shared/DataFiles/genome directory"
+    echo "Please ensure the file exists in the Shared/DataFiles/genomes directory"
     exit 1
 fi
 

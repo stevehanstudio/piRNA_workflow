@@ -41,9 +41,9 @@ else:
     GENOME_SPECIES = "drosophila"
     RRNA_SPECIES = "dmel"
     
-    DM6_REFERENCE = config.get("dm6_fasta", "../Shared/DataFiles/genome/dm6.fa")
-    RRNA_REFERENCE = config.get("rrna_fasta", "../Shared/DataFiles/genome/rrna/dmel_rRNA_unit.fa")
-    RRNA_INDEX = config.get("rrna_index", "../Shared/DataFiles/genome/rrna/dmel_rRNA_unit")
+    DM6_REFERENCE = config.get("dm6_fasta", "../Shared/DataFiles/genomes/dm6.fa")
+    RRNA_REFERENCE = config.get("rrna_fasta", "../Shared/DataFiles/genomes/rrna/dmel_rRNA_unit.fa")
+    RRNA_INDEX = config.get("rrna_index", "../Shared/DataFiles/genomes/rrna/dmel_rRNA_unit")
     
     genome_dir = os.path.dirname(DM6_REFERENCE)
     ORIGINAL_GTF = config.get("original_gtf", f"{genome_dir}/annotations/dm6.gtf")

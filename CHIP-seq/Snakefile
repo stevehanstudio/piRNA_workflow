@@ -427,7 +427,7 @@ rule make_bigwig:
     shell:
         """
         python {MAKEWIGGLE_SCRIPT} --- {input.bam} {input.chrom_sizes} {output}.bg4 -notitle -uniqueBAM -RPM
-        wigToBigWig {output}.bg4 {input.chrom_sizes} {output}
+        wigToBigWig -clip {output}.bg4 {input.chrom_sizes} {output}
         """
 
 rule make_enrichment_track:
@@ -449,7 +449,8 @@ rule make_enrichment_track:
 # Coverage analysis rules
 rule bam_coverage:
     input:
-        bam = RESULTS_DIR + "/vector_mapping/{sample}.vectoronly.dup.bam"
+        bam = RESULTS_DIR + "/vector_mapping/{sample}.vectoronly.dup.bam",
+        chrom_sizes = GENOME_CHROM_SIZES
     output:
         total = RESULTS_DIR + "/coverage/{sample}.{binsize}.bg4",
         minus = RESULTS_DIR + "/coverage/{sample}.{binsize}.Minus.bg4",
@@ -459,9 +460,10 @@ rule bam_coverage:
     shell:
         """
         mkdir -p {RESULTS_DIR}/coverage
-        bamCoverage -b {input.bam} -o {output.total} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize 143726002
-        bamCoverage -b {input.bam} -o {output.minus} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize 143726002 --filterRNAstrand forward
-        bamCoverage -b {input.bam} -o {output.plus} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize 143726002 --filterRNAstrand reverse
+        EFFECTIVE_SIZE=$(awk '{{sum += $2}} END {{print sum}}' {input.chrom_sizes})
+        bamCoverage -b {input.bam} -o {output.total} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE
+        bamCoverage -b {input.bam} -o {output.minus} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE --filterRNAstrand forward
+        bamCoverage -b {input.bam} -o {output.plus} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE --filterRNAstrand reverse
         """
 
 rule chop_bedgraph:
@@ -479,7 +481,8 @@ rule chop_bedgraph:
 # Transposon analysis rules
 rule bam_coverage_transposon:
     input:
-        bam = RESULTS_DIR + "/bowtie/{sample}.rmdup.bam"
+        bam = RESULTS_DIR + "/bowtie/{sample}.rmdup.bam",
+        chrom_sizes = GENOME_CHROM_SIZES
     output:
         total = RESULTS_DIR + "/transposon/{sample}.{binsize}.42AB.bg4",
         minus = RESULTS_DIR + "/transposon/{sample}.{binsize}.42AB.Minus.bg4",
@@ -489,9 +492,10 @@ rule bam_coverage_transposon:
     shell:
         """
         mkdir -p {RESULTS_DIR}/transposon
-        bamCoverage -b {input.bam} -o {output.total} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize 143726002
-        bamCoverage -b {input.bam} -o {output.minus} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize 143726002 --filterRNAstrand forward
-        bamCoverage -b {input.bam} -o {output.plus} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize 143726002 --filterRNAstrand reverse
+        EFFECTIVE_SIZE=$(awk '{{sum += $2}} END {{print sum}}' {input.chrom_sizes})
+        bamCoverage -b {input.bam} -o {output.total} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE
+        bamCoverage -b {input.bam} -o {output.minus} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE --filterRNAstrand forward
+        bamCoverage -b {input.bam} -o {output.plus} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE --filterRNAstrand reverse
         """
 
 rule chop_bedgraph_transposon:

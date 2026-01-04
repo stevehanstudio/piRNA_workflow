@@ -16,15 +16,15 @@ genome:
   rrna_species: "dmel"              # Species code for rRNA files
   
   # Genome reference files (paths use {version} placeholder for dynamic construction)
-  fasta: "../Shared/DataFiles/genome/{version}.fa"
-  bowtie_index: "../Shared/DataFiles/genome/bowtie-indexes/{version}"
-  chrom_sizes: "../Shared/DataFiles/genome/bowtie-indexes/{version}.chrom.sizes"
+  fasta: "../Shared/DataFiles/genomes/{version}.fa"
+  bowtie_index: "../Shared/DataFiles/genomes/bowtie-indexes/{version}"
+  chrom_sizes: "../Shared/DataFiles/genomes/bowtie-indexes/{version}.chrom.sizes"
   
   # Optional files - set to null if not available for your genome
-  blacklist: "../Shared/DataFiles/genome/{version}-blacklist.v2.bed.gz"
+  blacklist: "../Shared/DataFiles/genomes/{version}-blacklist.v2.bed.gz"
   
   # Annotations
-  gtf: "../Shared/DataFiles/genome/annotations/{version}.gtf"
+  gtf: "../Shared/DataFiles/genomes/annotations/{version}.gtf"
 
 # Sample configuration
 samples:
@@ -37,7 +37,7 @@ samples:
 shared_paths:
   scripts_dir: "../Shared/Scripts"
   data_dir: "../Shared/DataFiles"
-  genome_dir: "../Shared/DataFiles/genome"
+  genome_dir: "../Shared/DataFiles/genomes"
 
 # Input data
 input_data:
@@ -61,19 +61,19 @@ analysis:
 # ==============================================================================
 references:
   # Genome files
-  dm6_fasta: "../Shared/DataFiles/genome/dm6.fa"
-  dm6_blacklist: "../Shared/DataFiles/genome/dm6-blacklist.v2.bed.gz"
-  dm6_chrom_sizes: "../Shared/DataFiles/genome/bowtie-indexes/dm6.chrom.sizes"
-  dm6_bowtie_index: "../Shared/DataFiles/genome/bowtie-indexes/dm6"
+  dm6_fasta: "../Shared/DataFiles/genomes/dm6.fa"
+  dm6_blacklist: "../Shared/DataFiles/genomes/dm6-blacklist.v2.bed.gz"
+  dm6_chrom_sizes: "../Shared/DataFiles/genomes/bowtie-indexes/dm6.chrom.sizes"
+  dm6_bowtie_index: "../Shared/DataFiles/genomes/bowtie-indexes/dm6"
 
   # Vector files
-  vector_42ab_index: "../Shared/DataFiles/genome/YichengVectors/42AB_UBIG"
-  vector_42ab_fasta: "../Shared/DataFiles/genome/YichengVectors/42AB_UBIG.fa"
-  vector_20a_index: "../Shared/DataFiles/genome/YichengVectors/20A"
-  vector_20a_fasta: "../Shared/DataFiles/genome/YichengVectors/20A.fa"
+  vector_42ab_index: "../Shared/DataFiles/genomes/YichengVectors/42AB_UBIG"
+  vector_42ab_fasta: "../Shared/DataFiles/genomes/YichengVectors/42AB_UBIG.fa"
+  vector_20a_index: "../Shared/DataFiles/genomes/YichengVectors/20A"
+  vector_20a_fasta: "../Shared/DataFiles/genomes/YichengVectors/20A.fa"
 
   # Adapter files
-  adapters_file: "../Shared/DataFiles/genome/AllAdaptors.fa"
+  adapters_file: "../Shared/DataFiles/genomes/AllAdaptors.fa"
 
 # Scripts
 scripts:
