@@ -25,6 +25,17 @@ genome:
   
   # Annotations
   gtf: "../Shared/DataFiles/genomes/annotations/{version}.gtf"
+  
+  # Transposon regions for analysis (genome-specific coordinates)
+  transposon_regions:
+    dm3:
+      "42AB": "chr2R:2144349-2386719"
+      "20A": "chrX:21392175-21431907"
+    dm6:
+      # Note: Coordinates are from dm3 - may need conversion for dm6
+      # TODO: Verify/convert coordinates for dm6 if needed
+      "42AB": "chr2R:2144349-2386719"
+      "20A": "chrX:21392175-21431907"
 
 # Sample configuration
 samples:

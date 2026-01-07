@@ -203,38 +203,25 @@ rule all:
         #     binsize=BIN_SIZES,
         # ),
 
-        # Transposon analysis
+        # Transposon analysis (42AB and 20A)
         expand(
-            f"{RESULTS_DIR}/transposon/{{sample}}.{{binsize}}.42AB.bg4",
+            f"{RESULTS_DIR}/transposon/{{sample}}.{{binsize}}.{{transposon}}.bg4",
             sample=SAMPLES,
             binsize=TRANSPOSON_BIN_SIZES,
+            transposon=["42AB", "20A"],
         ),
         expand(
-            f"{RESULTS_DIR}/transposon/{{sample}}.{{binsize}}.42AB.Minus.bg4",
+            f"{RESULTS_DIR}/transposon/{{sample}}.{{binsize}}.{{transposon}}.Minus.bg4",
             sample=SAMPLES,
             binsize=TRANSPOSON_BIN_SIZES,
+            transposon=["42AB", "20A"],
         ),
         expand(
-            f"{RESULTS_DIR}/transposon/{{sample}}.{{binsize}}.42AB.Plus.bg4",
+            f"{RESULTS_DIR}/transposon/{{sample}}.{{binsize}}.{{transposon}}.Plus.bg4",
             sample=SAMPLES,
             binsize=TRANSPOSON_BIN_SIZES,
+            transposon=["42AB", "20A"],
         ),
-        # 20A transposon analysis temporarily disabled - no generation rules present
-        # expand(
-        #     f"{RESULTS_DIR}/transposon/{{sample}.{{binsize}.20A.bg4",
-        #     sample=SAMPLES,
-        #     binsize=TRANSPOSON_BIN_SIZES,
-        # ),
-        # expand(
-        #     f"{RESULTS_DIR}/transposon/{{sample}.{{binsize}.20A.Minus.bg4",
-        #     sample=SAMPLES,
-        #     binsize=TRANSPOSON_BIN_SIZES,
-        # ),
-        # expand(
-        #     f"{RESULTS_DIR}/transposon/{{sample}.{{binsize}.20A.Plus.bg4",
-        #     sample=SAMPLES,
-        #     binsize=TRANSPOSON_BIN_SIZES,
-        # )
 
 # Index building rules - these generate indexes from source files
 rule build_genome_bowtie_index:
@@ -651,7 +638,13 @@ rule chop_bedgraph:
         "envs/bedops.yaml"
     shell:
         """
-        bedops --chop {input.bg4} > {output.chopped}
+        # Convert bg4 to BED format (add "." as 4th column) for bedmap
+        awk -vOFS="\t" '{{ print $1, $2, $3, ".", $4 }}' {input.bg4} > signal.bed
+        # Chop into uniform bins and interpolate scores from original bedgraph
+        bedops --chop {wildcards.binsize} signal.bed | \
+            bedmap --echo --echo-map-score - signal.bed | \
+            sed -e 's/|/\t/g' > {output.chopped}
+        rm signal.bed
         """
 
 # Transposon analysis rules
@@ -660,28 +653,37 @@ rule bam_coverage_transposon:
         bam = RESULTS_DIR + "/bowtie/{sample}.rmdup.bam",
         chrom_sizes = GENOME_CHROM_SIZES
     output:
-        total = RESULTS_DIR + "/transposon/{sample}.{binsize}.42AB.bg4",
-        minus = RESULTS_DIR + "/transposon/{sample}.{binsize}.42AB.Minus.bg4",
-        plus = RESULTS_DIR + "/transposon/{sample}.{binsize}.42AB.Plus.bg4"
+        total = RESULTS_DIR + "/transposon/{sample}.{binsize}.{transposon}.bg4",
+        minus = RESULTS_DIR + "/transposon/{sample}.{binsize}.{transposon}.Minus.bg4",
+        plus = RESULTS_DIR + "/transposon/{sample}.{binsize}.{transposon}.Plus.bg4"
+    params:
+        region = lambda wildcards, config: config["genome"]["transposon_regions"][config["genome"]["version"]][wildcards.transposon]
     conda:
         "envs/deeptools.yaml"
     shell:
         """
         mkdir -p {RESULTS_DIR}/transposon
         EFFECTIVE_SIZE=$(awk '{{sum += $2}} END {{print sum}}' {input.chrom_sizes})
-        bamCoverage -b {input.bam} -o {output.total} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE
-        bamCoverage -b {input.bam} -o {output.minus} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE --filterRNAstrand forward
-        bamCoverage -b {input.bam} -o {output.plus} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE --filterRNAstrand reverse
+        REGION={params.region}
+        bamCoverage -b {input.bam} -o {output.total} --binSize {wildcards.binsize} --region $REGION --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE
+        bamCoverage -b {input.bam} -o {output.minus} --binSize {wildcards.binsize} --region $REGION --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE --filterRNAstrand forward
+        bamCoverage -b {input.bam} -o {output.plus} --binSize {wildcards.binsize} --region $REGION --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE --filterRNAstrand reverse
         """
 
 rule chop_bedgraph_transposon:
     input:
-        bg4 = RESULTS_DIR + "/transposon/{sample}.{binsize}.42AB.{strand}.bg4"
+        bg4 = RESULTS_DIR + "/transposon/{sample}.{binsize}.{transposon}.{strand}.bg4"
     output:
-        chopped = RESULTS_DIR + "/transposon/{sample}.{binsize}.42AB.{strand}.bg4.chopped.bg4"
+        chopped = RESULTS_DIR + "/transposon/{sample}.{binsize}.{transposon}.{strand}.bg4.chopped.bg4"
     conda:
         "envs/bedops.yaml"
     shell:
         """
-        bedops --chop {input.bg4} > {output.chopped}
+        # Convert bg4 to BED format (add "." as 4th column) for bedmap
+        awk -vOFS="\t" '{{ print $1, $2, $3, ".", $4 }}' {input.bg4} > signal.bed
+        # Chop into uniform bins and interpolate scores from original bedgraph
+        bedops --chop {wildcards.binsize} signal.bed | \
+            bedmap --echo --echo-map-score - signal.bed | \
+            sed -e 's/|/\t/g' > {output.chopped}
+        rm signal.bed
         """
