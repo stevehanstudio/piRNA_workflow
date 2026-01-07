@@ -138,3 +138,9 @@ Thumbs.db
 
 # Presentation files (private/local only)
 PRESENTATION_*.md
+
+# Cloned original repository (for comparison testing)
+Luo_2025_piRNA/
+
+# Samtools source code directories (we only need the built binaries)
+Shared/Scripts/bin/samtools-versions/

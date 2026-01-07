@@ -5,6 +5,81 @@
 # Load configuration
 configfile: "config.yaml"
 
+import os
+import sys
+
+# ==============================================================================
+# PATCHED BOWTIE CONFIGURATION
+# ==============================================================================
+# Use patched Bowtie with --sam-nh flag support (Henry's modified version)
+# If patched bowtie exists in Shared/Scripts/bin/, use it; otherwise fall back to conda bowtie
+
+# Get the directory where this Snakefile is located
+# Snakemake sets __file__ to the Snakefile path when it loads it
+# However, if that doesn't work, we'll use the workflow directory or current working directory
+try:
+    SNAKEFILE_PATH = os.path.abspath(__file__)
+    # Sanity check: if __file__ points to a weird location (like conda env), use fallback
+    if 'site-packages' in SNAKEFILE_PATH or 'lib/python' in SNAKEFILE_PATH:
+        # __file__ is pointing to a conda environment, use fallback
+        raise ValueError("__file__ points to conda environment")
+except (NameError, ValueError):
+    # Fallback: use current working directory (Snakemake runs from CHIP-seq/)
+    # or try to find the Snakefile relative to where we are
+    cwd = os.getcwd()
+    if os.path.exists(os.path.join(cwd, "Snakefile")):
+        SNAKEFILE_PATH = os.path.join(cwd, "Snakefile")
+    else:
+        # Last resort: assume we're in CHIP-seq and Snakefile is here
+        SNAKEFILE_PATH = os.path.abspath("Snakefile")
+
+SNAKEFILE_DIR = os.path.dirname(SNAKEFILE_PATH)
+# Go up one level from CHIP-seq/ to project root
+PROJECT_ROOT = os.path.dirname(SNAKEFILE_DIR)
+PATCHED_BOWTIE_DIR = os.path.join(PROJECT_ROOT, "Shared", "Scripts", "bin")
+PATCHED_BOWTIE = os.path.join(PATCHED_BOWTIE_DIR, "bowtie")
+PATCHED_BOWTIE_BUILD = os.path.join(PATCHED_BOWTIE_DIR, "bowtie-build")
+
+# Check if patched bowtie exists, otherwise use system bowtie (from conda)
+if os.path.exists(PATCHED_BOWTIE) and os.access(PATCHED_BOWTIE, os.X_OK):
+    BOWTIE_CMD = PATCHED_BOWTIE
+    BOWTIE_BUILD_CMD = PATCHED_BOWTIE_BUILD
+    print(f"INFO: Using patched Bowtie: {BOWTIE_CMD}", file=sys.stderr)
+else:
+    BOWTIE_CMD = "bowtie"
+    BOWTIE_BUILD_CMD = "bowtie-build"
+    print(f"WARNING: Patched Bowtie not found at {PATCHED_BOWTIE}, using system bowtie", file=sys.stderr)
+
+# ==============================================================================
+# OLD SAMTOOLS VERSIONS CONFIGURATION
+# ==============================================================================
+# Use exact same samtools versions as original pipeline:
+# - samtools-0.1.8 for 'samtools view' operations
+# - samtools-0.1.16 for 'samtools sort', 'samtools index', 'samtools rmdup'
+SAMTOOLS_018_DIR = os.path.join(PATCHED_BOWTIE_DIR, "samtools-0.1.8")
+SAMTOOLS_016_DIR = os.path.join(PATCHED_BOWTIE_DIR, "samtools-0.1.16")
+SAMTOOLS_018 = os.path.join(SAMTOOLS_018_DIR, "samtools")
+SAMTOOLS_016 = os.path.join(SAMTOOLS_016_DIR, "samtools")
+
+# Check if old samtools versions exist
+if os.path.exists(SAMTOOLS_018) and os.access(SAMTOOLS_018, os.X_OK):
+    SAMTOOLS_VIEW_CMD = SAMTOOLS_018
+    print(f"INFO: Using samtools-0.1.8 for view operations: {SAMTOOLS_VIEW_CMD}", file=sys.stderr)
+else:
+    SAMTOOLS_VIEW_CMD = "samtools"
+    print(f"WARNING: samtools-0.1.8 not found at {SAMTOOLS_018}, using system samtools", file=sys.stderr)
+
+if os.path.exists(SAMTOOLS_016) and os.access(SAMTOOLS_016, os.X_OK):
+    SAMTOOLS_SORT_CMD = SAMTOOLS_016
+    SAMTOOLS_INDEX_CMD = SAMTOOLS_016
+    SAMTOOLS_RMDUP_CMD = SAMTOOLS_016
+    print(f"INFO: Using samtools-0.1.16 for sort/index/rmdup: {SAMTOOLS_SORT_CMD}", file=sys.stderr)
+else:
+    SAMTOOLS_SORT_CMD = "samtools"
+    SAMTOOLS_INDEX_CMD = "samtools"
+    SAMTOOLS_RMDUP_CMD = "samtools"
+    print(f"WARNING: samtools-0.1.16 not found at {SAMTOOLS_016}, using system samtools", file=sys.stderr)
+
 # ==============================================================================
 # BACKWARD COMPATIBILITY LAYER
 # ==============================================================================
@@ -173,7 +248,7 @@ rule build_genome_bowtie_index:
     shell:
         """
         mkdir -p $(dirname {GENOME_BOWTIE_INDEX})
-        bowtie-build {input.genome_fa} {GENOME_BOWTIE_INDEX}
+        {BOWTIE_BUILD_CMD} {input.genome_fa} {GENOME_BOWTIE_INDEX}
         """
 
 rule build_vector_42AB_index:
@@ -186,7 +261,7 @@ rule build_vector_42AB_index:
     shell:
         """
         mkdir -p $(dirname {VECTOR_42AB_INDEX})
-        bowtie-build {input.vector_fa} {VECTOR_42AB_INDEX}
+        {BOWTIE_BUILD_CMD} {input.vector_fa} {VECTOR_42AB_INDEX}
         """
 
 rule build_vector_20A_index:
@@ -199,7 +274,7 @@ rule build_vector_20A_index:
     shell:
         """
         mkdir -p $(dirname {VECTOR_20A_INDEX})
-        bowtie-build {input.vector_fa} {VECTOR_20A_INDEX}
+        {BOWTIE_BUILD_CMD} {input.vector_fa} {VECTOR_20A_INDEX}
         """
 
 rule generate_chrom_sizes:
@@ -213,7 +288,7 @@ rule generate_chrom_sizes:
     shell:
         """
         mkdir -p $(dirname {output.chrom_sizes})
-        samtools faidx {input.genome_fa}
+        {SAMTOOLS_VIEW_CMD} faidx {input.genome_fa}
         cut -f1,2 {input.genome_fa}.fai > {output.chrom_sizes}
         """
 
@@ -301,7 +376,7 @@ rule bowtie_mapping:
     shell:
         """
         mkdir -p {RESULTS_DIR}/bowtie
-        bowtie {DM6_BOWTIE_INDEX} -p {threads} -v 2 -k 1 -m 1 -t --sam --best --strata -y --quiet {input.trimmed_50bp} > {output.sam}
+        {BOWTIE_CMD} {DM6_BOWTIE_INDEX} -p {threads} -v 2 -k 1 -m 1 -t --sam-nh --best --strata -y --quiet {input.trimmed_50bp} > {output.sam}
         """
 
 rule samtools_view:
@@ -310,11 +385,69 @@ rule samtools_view:
         reference = DM6_REFERENCE
     output:
         bam = RESULTS_DIR + "/bowtie/{sample}.bam"
-    conda:
-        "envs/samtools-0.1.12.yaml"
     shell:
         """
-        samtools view -bT {input.reference} {input.sam} > {output.bam}
+        # The patched bowtie with --sam-nh creates SAM files in a simplified format (8 fields instead of 11)
+        # We need to convert to standard SAM format before old samtools-0.1.8 can process it
+        python3 -c "
+import sys
+ref_file = '{input.reference}'
+sam_file = '{input.sam}'
+
+# Generate header
+print('@HD\tVN:1.0\tSO:unsorted')
+with open(ref_file, 'r') as f:
+    lines = f.readlines()
+    current_chr = None
+    current_seq = []
+    for line in lines:
+        if line.startswith('>'):
+            if current_chr:
+                seq_len = sum(len(s.strip()) for s in current_seq)
+                print(f'@SQ\tSN:{{current_chr}}\tLN:{{seq_len}}')
+            current_chr = line[1:].strip().split()[0]
+            current_seq = []
+        else:
+            current_seq.append(line.strip())
+    if current_chr:
+        seq_len = sum(len(s.strip()) for s in current_seq)
+        print(f'@SQ\tSN:{{current_chr}}\tLN:{{seq_len}}')
+
+# Convert patched bowtie format to standard SAM
+# Input format: QNAME, strand, RNAME, POS, SEQ, QUAL, ?, mismatch_info
+# Output format: QNAME, FLAG, RNAME, POS, MAPQ, CIGAR, RNEXT, PNEXT, TLEN, SEQ, QUAL
+try:
+    with open(sam_file, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            fields = line.split('\t')
+            if len(fields) >= 6:
+                qname = fields[0]
+                strand = fields[1]
+                rname = fields[2]
+                pos = fields[3]
+                seq = fields[4]
+                qual = fields[5]
+                
+                # Convert strand to FLAG: '-' = 16 (reverse), '+' = 0 (forward)
+                flag = '16' if strand == '-' else '0'
+                # Calculate CIGAR from sequence length
+                seq_len = len(seq)
+                cigar = f'{{seq_len}}M'
+                # Standard SAM fields
+                mapq = '255'  # Unknown quality
+                rnext = '*'
+                pnext = '0'
+                tlen = '0'
+                
+                # Print standard SAM line
+                print(f'{{qname}}\t{{flag}}\t{{rname}}\t{{pos}}\t{{mapq}}\t{{cigar}}\t{{rnext}}\t{{pnext}}\t{{tlen}}\t{{seq}}\t{{qual}}')
+except BrokenPipeError:
+    # Handle pipe closure gracefully
+    sys.stderr.close()
+" | {SAMTOOLS_VIEW_CMD} view -bT {input.reference} - > {output.bam}
         """
 
 rule samtools_sort_and_index:
@@ -323,12 +456,11 @@ rule samtools_sort_and_index:
     output:
         sorted_bam = RESULTS_DIR + "/bowtie/{sample}.sorted_final.bam",
         bai = RESULTS_DIR + "/bowtie/{sample}.sorted_final.bam.bai"
-    conda:
-        "envs/samtools-1.16.1.yaml"
     shell:
         """
-        samtools sort -o {output.sorted_bam} {input.bam}
-        samtools index {output.sorted_bam}
+        cd {RESULTS_DIR}/bowtie && \
+        {SAMTOOLS_SORT_CMD} sort $(basename {input.bam}) {wildcards.sample}.sorted_final && \
+        {SAMTOOLS_INDEX_CMD} index {wildcards.sample}.sorted_final.bam
         """
 
 rule remove_mitochondrial_reads:
@@ -336,12 +468,10 @@ rule remove_mitochondrial_reads:
         sorted_bam = RESULTS_DIR + "/bowtie/{sample}.sorted_final.bam"
     output:
         no_mito_bam = RESULTS_DIR + "/bowtie/{sample}.mito_removed.bam"
-    conda:
-        "envs/samtools-0.1.16.yaml"
     shell:
         """
-        samtools view {input.sorted_bam} | egrep -v 'chrM' | samtools view -bT {DM6_REFERENCE} - > {output.no_mito_bam}
-        samtools index {output.no_mito_bam}
+        {SAMTOOLS_VIEW_CMD} view {input.sorted_bam} | egrep -v 'chrM' | {SAMTOOLS_VIEW_CMD} view -bT {DM6_REFERENCE} - -o {output.no_mito_bam}
+        {SAMTOOLS_INDEX_CMD} index {output.no_mito_bam}
         """
 
 rule samtools_sort_no_mito:
@@ -350,12 +480,11 @@ rule samtools_sort_no_mito:
     output:
         sorted_bam = RESULTS_DIR + "/bowtie/{sample}.no_mito_sorted.bam",
         bai = RESULTS_DIR + "/bowtie/{sample}.no_mito_sorted.bam.bai"
-    conda:
-        "envs/samtools-1.16.1.yaml"
     shell:
         """
-        samtools sort -o {output.sorted_bam} {input.bam}
-        samtools index {output.sorted_bam}
+        cd {RESULTS_DIR}/bowtie && \
+        {SAMTOOLS_SORT_CMD} sort $(basename {input.bam}) {wildcards.sample}.no_mito_sorted && \
+        {SAMTOOLS_INDEX_CMD} index {wildcards.sample}.no_mito_sorted.bam
         """
 
 rule samtools_rmdup:
@@ -364,12 +493,10 @@ rule samtools_rmdup:
     output:
         rmdup_bam = RESULTS_DIR + "/bowtie/{sample}.rmdup.bam",
         bai = RESULTS_DIR + "/bowtie/{sample}.rmdup.bam.bai"
-    conda:
-        "envs/samtools-1.16.1.yaml"
     shell:
         """
-        samtools markdup {input.bam} {output.rmdup_bam}
-        samtools index {output.rmdup_bam}
+        {SAMTOOLS_RMDUP_CMD} rmdup -s {input.bam} {output.rmdup_bam}
+        {SAMTOOLS_INDEX_CMD} index {output.rmdup_bam}
         """
 
 # Vector mapping rules
@@ -385,7 +512,7 @@ rule bowtie_vector_mapping:
     shell:
         """
         mkdir -p {RESULTS_DIR}/vector_mapping
-        bowtie {VECTOR_42AB_INDEX} -p {threads} --chunkmbs 1024 -v 0 -a -m 1 -t --sam --best --strata -q {input.trimmed_50bp} > {output.sam}
+        {BOWTIE_CMD} {VECTOR_42AB_INDEX} -p {threads} --chunkmbs 1024 -v 2 -k 1 -m 1 -t --sam-nh --best --strata -q {input.trimmed_50bp} > {output.sam}
         """
 
 rule samtools_view_vector:
@@ -394,11 +521,58 @@ rule samtools_view_vector:
         reference = VECTOR_42AB_REF
     output:
         bam = RESULTS_DIR + "/vector_mapping/{sample}.vectoronly.bam"
-    conda:
-        "envs/samtools-0.1.12.yaml"
     shell:
         """
-        samtools view -F 4 -bT {input.reference} {input.sam} > {output.bam}
+        # The patched bowtie with --sam-nh creates SAM files in a simplified format (8 fields instead of 11)
+        # We need to convert to standard SAM format before old samtools-0.1.8 can process it
+        python3 -c "
+import sys
+ref_file = '{input.reference}'
+sam_file = '{input.sam}'
+
+# Generate header
+with open(ref_file, 'r') as f:
+    lines = f.readlines()
+    ref_name = lines[0][1:].strip().split()[0]
+    seq_len = sum(len(line.strip()) for line in lines[1:] if not line.startswith('>'))
+    print('@HD\tVN:1.0\tSO:unsorted')
+    print(f'@SQ\tSN:{{ref_name}}\tLN:{{seq_len}}')
+
+# Convert patched bowtie format to standard SAM
+# Input format: QNAME, strand, RNAME, POS, SEQ, QUAL, ?, mismatch_info
+# Output format: QNAME, FLAG, RNAME, POS, MAPQ, CIGAR, RNEXT, PNEXT, TLEN, SEQ, QUAL
+try:
+    with open(sam_file, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            fields = line.split('\t')
+            if len(fields) >= 6:
+                qname = fields[0]
+                strand = fields[1]
+                rname = fields[2]
+                pos = fields[3]
+                seq = fields[4]
+                qual = fields[5]
+                
+                # Convert strand to FLAG: '-' = 16 (reverse), '+' = 0 (forward)
+                flag = '16' if strand == '-' else '0'
+                # Calculate CIGAR from sequence length
+                seq_len = len(seq)
+                cigar = f'{{seq_len}}M'
+                # Standard SAM fields
+                mapq = '255'  # Unknown quality
+                rnext = '*'
+                pnext = '0'
+                tlen = '0'
+                
+                # Print standard SAM line
+                print(f'{{qname}}\t{{flag}}\t{{rname}}\t{{pos}}\t{{mapq}}\t{{cigar}}\t{{rnext}}\t{{pnext}}\t{{tlen}}\t{{seq}}\t{{qual}}')
+except BrokenPipeError:
+    # Handle pipe closure gracefully
+    sys.stderr.close()
+" | {SAMTOOLS_VIEW_CMD} view -F 4 -bT {input.reference} - > {output.bam}
         """
 
 rule samtools_sort_and_index_vector:
@@ -407,12 +581,11 @@ rule samtools_sort_and_index_vector:
     output:
         sorted_bam = RESULTS_DIR + "/vector_mapping/{sample}.vectoronly.dup.bam",
         bai = RESULTS_DIR + "/vector_mapping/{sample}.vectoronly.dup.bam.bai"
-    conda:
-        "envs/samtools-1.16.1.yaml"
     shell:
         """
-        samtools sort -o {output.sorted_bam} {input.bam}
-        samtools index {output.sorted_bam}
+        cd {RESULTS_DIR}/vector_mapping && \
+        {SAMTOOLS_SORT_CMD} sort $(basename {input.bam}) {wildcards.sample}.vectoronly.dup && \
+        {SAMTOOLS_INDEX_CMD} index {wildcards.sample}.vectoronly.dup.bam
         """
 
 # Signal generation rules
@@ -427,7 +600,10 @@ rule make_bigwig:
     shell:
         """
         python {MAKEWIGGLE_SCRIPT} --- {input.bam} {input.chrom_sizes} {output}.bg4 -notitle -uniqueBAM -RPM
-        wigToBigWig -clip {output}.bg4 {input.chrom_sizes} {output}
+        # Filter out negative coordinates and chromosomes not in chrom.sizes before converting to BigWig
+        awk -F'\t' '{{if (NF >= 3 && $2 >= 0 && $3 >= 0 && $3 > $2) print}}' {output}.bg4 > {output}.bg4.filtered
+        wigToBigWig -clip {output}.bg4.filtered {input.chrom_sizes} {output}
+        rm {output}.bg4.filtered
         """
 
 rule make_enrichment_track:

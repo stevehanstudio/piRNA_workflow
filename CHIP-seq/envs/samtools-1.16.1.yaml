@@ -3,6 +3,8 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
+  # Note: Filename references original pipeline's samtools-1.16.1 version
+  # Using modern samtools (>=1.18) as old versions aren't available in conda
   - samtools>=1.18
   - ncurses
   - zlib

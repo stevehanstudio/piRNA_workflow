@@ -7,34 +7,31 @@
 
 ## Issues Identified and Current Status
 
-### ⚠️ **Issue 1: Bowtie flag `--sam-nh` - Modified Bowtie Required** - **PENDING**
-**Location:** `rule bowtie_mapping` (line 304)
+### ✅ **Issue 1: Bowtie flag `--sam-nh` - Modified Bowtie Required** - **FIXED**
+**Location:** `rule bowtie_mapping` (line 323) and `rule bowtie_vector_mapping` (line 407)
 
 **Original Issue:** The original shell script used `--sam-nh` which exists in a **modified version of Bowtie** created by Henry, but not in standard Bowtie.
 
-**Current Status:** ⚠️ **USING STANDARD BOWTIE (TEMPORARY)**
-- Currently uses `--sam` flag (standard Bowtie flag)
-- Waiting to obtain the modified Bowtie version from Henry
-- Once available, should be updated to use `--sam-nh`
+**Current Status:** ✅ **FIXED - USES PATCHED BOWTIE**
+- Snakefile now detects and uses patched Bowtie from `Shared/Scripts/bin/` if available
+- Updated to use `--sam-nh` flag (original pipeline flag)
+- Falls back to standard Bowtie if patched version not found
 
 **Verification:**
 ```python
-# Line 304 in CHIP-seq/Snakefile
-bowtie {DM6_BOWTIE_INDEX} -p {threads} -v 2 -k 1 -m 1 -t --sam --best --strata -y --quiet
+# Line 323 in CHIP-seq/Snakefile
+{BOWTIE_CMD} {DM6_BOWTIE_INDEX} -p {threads} -v 2 -k 1 -m 1 -t --sam-nh --best --strata -y --quiet
 ```
 
-**Action Required:**
-- Once modified Bowtie is obtained from Henry, update to:
-  ```python
-  bowtie ... --sam-nh --best --strata ...
-  ```
-- This is **not a bug** - it's a dependency on a specialized tool version
-- Current implementation works with standard Bowtie as a temporary solution
+**Setup Required:**
+- Copy built patched bowtie and bowtie-build to: `Shared/Scripts/bin/`
+- Make executable: `chmod +x Shared/Scripts/bin/bowtie*`
+- The Snakefile will automatically detect and use the patched version
 
 ---
 
-### ⚠️ **Issue 2: Vector Mapping Flags** - **STILL PRESENT (INCORRECT)**
-**Location:** `rule bowtie_vector_mapping` (line 388)
+### ✅ **Issue 2: Vector Mapping Flags** - **FIXED**
+**Location:** `rule bowtie_vector_mapping` (line 407)
 
 **Original Issue:** 
 - Original had: `-v 2 -k 1 -m 1` (report 1 best alignment, allow 2 mismatches)
@@ -43,14 +40,15 @@ bowtie {DM6_BOWTIE_INDEX} -p {threads} -v 2 -k 1 -m 1 -t --sam --best --strata -
 - Workaround: `-v 0` (perfect matches only) was used to make it work
 - **Correct fix:** Should be `-v 2 -k 1 -m 1` (report 1 best, allow 2 mismatches)
 
-**Current Status:** ⚠️ **STILL HAS WORKAROUND**
-- Line 388: `bowtie ... -v 0 -a -m 1 ...`
-- Uses workaround (`-v 0`) instead of correct flags (`-v 2 -k 1 -m 1`)
+**Current Status:** ✅ **FIXED**
+- Line 407: `{BOWTIE_CMD} ... -v 2 -k 1 -m 1 -t --sam-nh ...`
+- Now uses correct flags: `-v 2 -k 1 -m 1` (matches original pipeline)
+- Also updated to use `--sam-nh` flag with patched Bowtie
 
 **Current Code:**
 ```python
-# Line 388 in CHIP-seq/Snakefile
-bowtie {VECTOR_42AB_INDEX} -p {threads} --chunkmbs 1024 -v 0 -a -m 1 -t --sam --best --strata -q
+# Line 407 in CHIP-seq/Snakefile
+{BOWTIE_CMD} {VECTOR_42AB_INDEX} -p {threads} --chunkmbs 1024 -v 2 -k 1 -m 1 -t --sam-nh --best --strata -q
 ```
 
 **Should Be:**

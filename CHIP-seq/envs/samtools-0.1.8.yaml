@@ -3,6 +3,9 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
+  # Note: Original pipeline used samtools-0.1.8, but old versions aren't available in conda
+  # Using modern samtools (>=1.18) for compatibility. Modern versions require SAM headers,
+  # which is why we add headers for --sam-nh output in the Snakefile.
   - samtools>=1.18
   - ncurses
   - zlib

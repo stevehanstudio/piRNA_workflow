@@ -3,4 +3,6 @@ channels:
   - bioconda
   - conda-forge
 dependencies:
-  - bowtie=1.1.1
+  # Note: bowtie is no longer installed via conda since we use the patched version
+  # from Shared/Scripts/bin/bowtie (with --sam-nh flag support)
+  # The patched bowtie is detected and used via BOWTIE_CMD variable in the Snakefile
