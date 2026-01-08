@@ -125,6 +125,26 @@ DM6_BLACKLIST = GENOME_BLACKLIST
 DM6_CHROM_SIZES = GENOME_CHROM_SIZES
 DM6_BOWTIE_INDEX = GENOME_BOWTIE_INDEX
 
+# Helper function for transposon region lookup
+def get_transposon_region(wildcards):
+    """Get transposon region string from config based on wildcards.
+    Converts format from chr:start-end to chr:start:end for bamCoverage compatibility.
+    Note: config is accessed from global scope since params functions don't receive it automatically.
+    """
+    genome_version = config["genome"]["version"]
+    transposon = wildcards.transposon
+    region = config["genome"]["transposon_regions"][genome_version][transposon]
+    # Convert chr:start-end format to chr:start:end format for bamCoverage
+    if "-" in region and ":" in region:
+        # Format: chr:start-end -> chr:start:end
+        parts = region.split(":")
+        if len(parts) == 2:
+            chrom, rest = parts
+            if "-" in rest:
+                start, end = rest.split("-")
+                return f"{chrom}:{start}:{end}"
+    return region
+
 # Extract configuration values
 CHIP_SAMPLE = config["samples"]["chip"]
 INPUT_SAMPLE = config["samples"]["input"]
@@ -657,7 +677,7 @@ rule bam_coverage_transposon:
         minus = RESULTS_DIR + "/transposon/{sample}.{binsize}.{transposon}.Minus.bg4",
         plus = RESULTS_DIR + "/transposon/{sample}.{binsize}.{transposon}.Plus.bg4"
     params:
-        region = lambda wildcards, config: config["genome"]["transposon_regions"][config["genome"]["version"]][wildcards.transposon]
+        region = get_transposon_region
     conda:
         "envs/deeptools.yaml"
     shell:
@@ -665,9 +685,9 @@ rule bam_coverage_transposon:
         mkdir -p {RESULTS_DIR}/transposon
         EFFECTIVE_SIZE=$(awk '{{sum += $2}} END {{print sum}}' {input.chrom_sizes})
         REGION={params.region}
-        bamCoverage -b {input.bam} -o {output.total} --binSize {wildcards.binsize} --region $REGION --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE
-        bamCoverage -b {input.bam} -o {output.minus} --binSize {wildcards.binsize} --region $REGION --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE --filterRNAstrand forward
-        bamCoverage -b {input.bam} -o {output.plus} --binSize {wildcards.binsize} --region $REGION --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE --filterRNAstrand reverse
+        bamCoverage -b {input.bam} -o {output.total} -of bedgraph --binSize {wildcards.binsize} --region $REGION --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE
+        bamCoverage -b {input.bam} -o {output.minus} -of bedgraph --binSize {wildcards.binsize} --region $REGION --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE --filterRNAstrand forward
+        bamCoverage -b {input.bam} -o {output.plus} -of bedgraph --binSize {wildcards.binsize} --region $REGION --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE --filterRNAstrand reverse
         """
 
 rule chop_bedgraph_transposon:
