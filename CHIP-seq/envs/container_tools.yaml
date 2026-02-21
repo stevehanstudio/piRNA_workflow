@@ -1,0 +1,4 @@
+# Minimal env when running inside pipeline container.
+# STAR, RSEM, deepTools come from container PATH, not conda.
+name: container_tools
+dependencies: []

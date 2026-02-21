@@ -1,0 +1,53 @@
+Bootstrap: docker
+From: ubuntu:22.04
+
+%labels
+    Maintainer HeLab
+    Version 1.0.1-nh
+    Description Patched Bowtie 1.0.1 with --sam-nh (hamrhein_nh patch) + samtools
+    Url https://github.com/Peng-He-Lab/bowtie-1.0.1-hamrhein_nh_patch
+
+%help
+    Patched Bowtie 1.0.1 with hamrhein_nh patch - adds --sam-nh for NH tag.
+    Used in Luo et al. 2025 piRNA pipeline (Peng He Lab).
+    Includes samtools and python3 for downstream processing.
+    
+    Usage:
+        apptainer exec bowtie_1.0.1_nh.sif bowtie -h
+        apptainer exec bowtie_1.0.1_nh.sif bowtie-build reference.fa index_name
+        apptainer exec bowtie_1.0.1_nh.sif samtools view -h file.bam
+
+%files
+    cpuid_arm64.h /tmp/cpuid_arm64.h
+
+%environment
+    export PATH=/usr/local/bin:/usr/bin:$PATH
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        git \
+        ca-certificates \
+        samtools \
+        python3 \
+        python3-pip \
+        && rm -rf /var/lib/apt/lists/*
+
+    # Clone and build patched Bowtie
+    # Remove -m64/-m32 (x86-only), replace cpuid.h on ARM64, disable POPCNT on ARM
+    cd /tmp
+    git clone --depth 1 https://github.com/Peng-He-Lab/bowtie-1.0.1-hamrhein_nh_patch.git
+    cd bowtie-1.0.1-hamrhein_nh_patch
+    sed -i 's/-m64//g; s/-m32//g' Makefile
+    if [ "$(uname -m)" = "aarch64" ] && [ -f /tmp/cpuid_arm64.h ]; then \
+        cp /tmp/cpuid_arm64.h third_party/cpuid.h; \
+        make POPCNT_CAPABILITY=0; \
+    else make; \
+    fi
+    cp bowtie bowtie-build bowtie-inspect /usr/local/bin/
+    cd /
+    rm -rf /tmp/bowtie-1.0.1-hamrhein_nh_patch
+
+%runscript
+    exec bowtie "$@"

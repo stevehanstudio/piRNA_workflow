@@ -1,0 +1,146 @@
+# Apptainer definition for piRNA pipeline (CHIP-seq + totalRNA-seq)
+# Build from project root: apptainer build containers/pirna_pipeline.sif containers/pipeline.def
+# Contains all tools at original pipeline versions for reproducibility
+
+Bootstrap: docker
+From: ubuntu:22.04
+
+%labels
+    Maintainer HeLab
+    Description Single pipeline container for piRNA workflow with STAR, RSEM, deepTools, Bowtie, FastQC, Cutadapt, samtools
+
+%files
+    CHIP-seq/envs/cpuid_arm64.h /build/cpuid_arm64.h
+
+%environment
+    export DEBIAN_FRONTEND=noninteractive
+    export PATH="/opt/miniconda3/bin:$PATH"
+    export PIPELINE_CONTAINER=1
+    export SAMTOOLS_018=/opt/pipeline/samtools-0.1.8/samtools
+    export SAMTOOLS_016=/opt/pipeline/samtools-0.1.16/samtools
+    export PATH="/opt/pipeline/samtools-0.1.8:/opt/pipeline/samtools-0.1.16:/opt/pipeline/STAR-2.7.9a/bin:/opt/pipeline/rsem-1.3.3/bin:/opt/miniconda3/bin:/opt/FastQC:/usr/local/bin:$PATH"
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+    export PATH="/opt/miniconda3/bin:$PATH"
+
+    # Layer 1: System dependencies
+    apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        gfortran \
+        curl \
+        libcurl4-openssl-dev \
+        wget \
+        unzip \
+        perl \
+        ca-certificates \
+        zlib1g-dev \
+        git \
+        python3 \
+        python3-pip \
+        openjdk-11-jre-headless \
+        r-base \
+        && rm -rf /var/lib/apt/lists/*
+
+    # Layer 2: Miniforge
+    arch=$(uname -m)
+    curl -fsSL "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-${arch}.sh" -o /tmp/miniforge.sh
+    bash /tmp/miniforge.sh -b -p /opt/miniconda3
+    rm /tmp/miniforge.sh
+    /opt/miniconda3/bin/conda config --set auto_update_conda false
+    /opt/miniconda3/bin/conda config --add channels bioconda
+
+    # Layer 3: samtools 0.1.8
+    mkdir -p /opt/pipeline/samtools-0.1.8
+    curl -sL "https://sourceforge.net/projects/samtools/files/samtools/0.1.8/samtools-0.1.8.tar.bz2/download" -o /tmp/samtools-0.1.8.tar.bz2
+    tar -xjf /tmp/samtools-0.1.8.tar.bz2 -C /tmp
+    cd /tmp/samtools-0.1.8
+    sed -i 's/-D_CURSES_LIB=1/-D_CURSES_LIB=0/' Makefile
+    sed -i 's/^LIBCURSES=	-lcurses/LIBCURSES=	# -lcurses/' Makefile
+    make -j$(nproc)
+    cp samtools /opt/pipeline/samtools-0.1.8/
+    cd / && rm -rf /tmp/samtools-0.1.8 /tmp/samtools-0.1.8.tar.bz2
+
+    # Layer 4: samtools 0.1.16
+    mkdir -p /opt/pipeline/samtools-0.1.16
+    curl -sL "https://sourceforge.net/projects/samtools/files/samtools/0.1.16/samtools-0.1.16.tar.bz2/download" -o /tmp/samtools-0.1.16.tar.bz2
+    tar -xjf /tmp/samtools-0.1.16.tar.bz2 -C /tmp
+    cd /tmp/samtools-0.1.16
+    sed -i 's/-D_CURSES_LIB=1/-D_CURSES_LIB=0/' Makefile
+    sed -i 's/^LIBCURSES=	-lcurses/LIBCURSES=	# -lcurses/' Makefile
+    make -j$(nproc)
+    cp samtools /opt/pipeline/samtools-0.1.16/
+    cd / && rm -rf /tmp/samtools-0.1.16 /tmp/samtools-0.1.16.tar.bz2
+
+    # Layer 5: Patched Bowtie 1.0.1 (hamrhein_nh)
+    git clone --depth 1 https://github.com/Peng-He-Lab/bowtie-1.0.1-hamrhein_nh_patch.git /build/bowtie
+    cd /build/bowtie
+    sed -i 's/-m64//g; s/-m32//g' Makefile
+    if [ "$(uname -m)" = "aarch64" ]; then
+        cp /build/cpuid_arm64.h third_party/cpuid.h
+        make POPCNT_CAPABILITY=0
+    else
+        make
+    fi
+    cp bowtie bowtie-build bowtie-inspect /usr/local/bin/
+    cd / && rm -rf /build
+
+    # Layer 6: FastQC 0.11.3
+    wget -q https://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v0.11.3.zip -O /tmp/fastqc.zip
+    unzip -q /tmp/fastqc.zip -d /opt
+    chmod +x /opt/FastQC/fastqc
+    ln -sf /opt/FastQC/fastqc /usr/local/bin/fastqc
+    rm /tmp/fastqc.zip
+
+    # Layer 7: Cutadapt 1.8.3 (matches original Luo pipeline)
+    /opt/miniconda3/bin/conda create -y -n cutadapt python=3.6
+    . /opt/miniconda3/etc/profile.d/conda.sh
+    conda activate cutadapt
+    pip install --no-cache-dir cutadapt==1.8.3
+    ln -sf /opt/miniconda3/envs/cutadapt/bin/cutadapt /usr/local/bin/cutadapt
+
+    # Layer 8: STAR 2.7.9a
+    curl -sL https://github.com/alexdobin/STAR/archive/refs/tags/2.7.9a.tar.gz -o /tmp/STAR.tar.gz
+    tar -xzf /tmp/STAR.tar.gz -C /tmp
+    cd /tmp/STAR-2.7.9a/source
+    if [ "$(uname -m)" = "aarch64" ]; then
+        make STAR CXXFLAGS_SIMD=""
+    else
+        make STAR
+    fi
+    mkdir -p /opt/pipeline/STAR-2.7.9a/bin
+    cp STAR /opt/pipeline/STAR-2.7.9a/bin/
+    ln -sf /opt/pipeline/STAR-2.7.9a/bin/STAR /usr/local/bin/STAR
+    cd / && rm -rf /tmp/STAR-2.7.9a /tmp/STAR.tar.gz
+
+    # Layer 9: RSEM 1.3.3
+    curl -sL https://github.com/deweylab/RSEM/archive/refs/tags/v1.3.3.tar.gz -o /tmp/RSEM.tar.gz
+    tar -xzf /tmp/RSEM.tar.gz -C /tmp
+    cd /tmp/RSEM-1.3.3
+    make
+    make ebseq
+    make install prefix=/opt/pipeline/rsem-1.3.3
+    cd / && rm -rf /tmp/RSEM-1.3.3 /tmp/RSEM.tar.gz
+
+    # Layer 10: deepTools 2.4.2
+    /opt/miniconda3/bin/conda create -y -n deeptools python=3.6
+    . /opt/miniconda3/etc/profile.d/conda.sh
+    conda activate deeptools
+    pip install --no-cache-dir deeptools==2.4.2
+    ln -sf /opt/miniconda3/envs/deeptools/bin/bamCompare /usr/local/bin/
+    ln -sf /opt/miniconda3/envs/deeptools/bin/bamCoverage /usr/local/bin/
+    ln -sf /opt/miniconda3/envs/deeptools/bin/plotFingerprint /usr/local/bin/
+    ln -sf /opt/miniconda3/envs/deeptools/bin/plotCoverage /usr/local/bin/
+    ln -sf /opt/miniconda3/envs/deeptools/bin/multiBamSummary /usr/local/bin/
+    ln -sf /opt/miniconda3/envs/deeptools/bin/plotCorrelation /usr/local/bin/
+    ln -sf /opt/miniconda3/envs/deeptools/bin/plotProfile /usr/local/bin/
+    ln -sf /opt/miniconda3/envs/deeptools/bin/plotHeatmap /usr/local/bin/
+    ln -sf /opt/miniconda3/envs/deeptools/bin/computeMatrix /usr/local/bin/
+
+    # Layer 11: Snakemake + mamba
+    /opt/miniconda3/bin/conda install -y -n base mamba snakemake
+
+    mkdir -p /work
+
+%runscript
+    exec snakemake "$@"

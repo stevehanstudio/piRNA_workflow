@@ -1,8 +1,10 @@
 name: rsem
 channels:
+  - conda-forge  # conda-forge first for R/Bioconductor ARM64 builds
   - bioconda
-  - conda-forge
 dependencies:
+  - r-base >=4.4,<4.6       # Pin to R 4.4+ for linux-aarch64 (R 3.5 has no ARM64)
+  - bioconductor-ebseq >=2.0 # ebseq 2.x works with R 4.4+
   - rsem
   - star        # RSEM uses STAR for transcriptome alignment
   - samtools    # required for BAM handling

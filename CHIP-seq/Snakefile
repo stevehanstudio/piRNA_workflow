@@ -11,74 +11,122 @@ import sys
 # ==============================================================================
 # PATCHED BOWTIE CONFIGURATION
 # ==============================================================================
-# Use patched Bowtie with --sam-nh flag support (Henry's modified version)
-# If patched bowtie exists in Shared/Scripts/bin/, use it; otherwise fall back to conda bowtie
+# When PIPELINE_CONTAINER=1: all tools are in the container, use container paths
+# Otherwise: use patched Bowtie from Shared/Scripts/bin/, container, or conda
+PIPELINE_CONTAINER = os.environ.get("PIPELINE_CONTAINER") == "1"
 
-# Get the directory where this Snakefile is located
-# Snakemake sets __file__ to the Snakefile path when it loads it
-# However, if that doesn't work, we'll use the workflow directory or current working directory
-try:
-    SNAKEFILE_PATH = os.path.abspath(__file__)
-    # Sanity check: if __file__ points to a weird location (like conda env), use fallback
-    if 'site-packages' in SNAKEFILE_PATH or 'lib/python' in SNAKEFILE_PATH:
-        # __file__ is pointing to a conda environment, use fallback
-        raise ValueError("__file__ points to conda environment")
-except (NameError, ValueError):
-    # Fallback: use current working directory (Snakemake runs from CHIP-seq/)
-    # or try to find the Snakefile relative to where we are
-    cwd = os.getcwd()
-    if os.path.exists(os.path.join(cwd, "Snakefile")):
-        SNAKEFILE_PATH = os.path.join(cwd, "Snakefile")
-    else:
-        # Last resort: assume we're in CHIP-seq and Snakefile is here
-        SNAKEFILE_PATH = os.path.abspath("Snakefile")
-
-SNAKEFILE_DIR = os.path.dirname(SNAKEFILE_PATH)
-# Go up one level from CHIP-seq/ to project root
-PROJECT_ROOT = os.path.dirname(SNAKEFILE_DIR)
-PATCHED_BOWTIE_DIR = os.path.join(PROJECT_ROOT, "Shared", "Scripts", "bin")
-PATCHED_BOWTIE = os.path.join(PATCHED_BOWTIE_DIR, "bowtie")
-PATCHED_BOWTIE_BUILD = os.path.join(PATCHED_BOWTIE_DIR, "bowtie-build")
-
-# Check if patched bowtie exists, otherwise use system bowtie (from conda)
-if os.path.exists(PATCHED_BOWTIE) and os.access(PATCHED_BOWTIE, os.X_OK):
-    BOWTIE_CMD = PATCHED_BOWTIE
-    BOWTIE_BUILD_CMD = PATCHED_BOWTIE_BUILD
-    print(f"INFO: Using patched Bowtie: {BOWTIE_CMD}", file=sys.stderr)
-else:
+# When running in pipeline container: use container-provided tools
+if PIPELINE_CONTAINER:
+    SAMTOOLS_018 = os.environ.get("SAMTOOLS_018", "/opt/pipeline/samtools-0.1.8/samtools")
+    SAMTOOLS_016 = os.environ.get("SAMTOOLS_016", "/opt/pipeline/samtools-0.1.16/samtools")
     BOWTIE_CMD = "bowtie"
     BOWTIE_BUILD_CMD = "bowtie-build"
-    print(f"WARNING: Patched Bowtie not found at {PATCHED_BOWTIE}, using system bowtie", file=sys.stderr)
-
-# ==============================================================================
-# OLD SAMTOOLS VERSIONS CONFIGURATION
-# ==============================================================================
-# Use exact same samtools versions as original pipeline:
-# - samtools-0.1.8 for 'samtools view' operations
-# - samtools-0.1.16 for 'samtools sort', 'samtools index', 'samtools rmdup'
-SAMTOOLS_018_DIR = os.path.join(PATCHED_BOWTIE_DIR, "samtools-0.1.8")
-SAMTOOLS_016_DIR = os.path.join(PATCHED_BOWTIE_DIR, "samtools-0.1.16")
-SAMTOOLS_018 = os.path.join(SAMTOOLS_018_DIR, "samtools")
-SAMTOOLS_016 = os.path.join(SAMTOOLS_016_DIR, "samtools")
-
-# Check if old samtools versions exist
-if os.path.exists(SAMTOOLS_018) and os.access(SAMTOOLS_018, os.X_OK):
     SAMTOOLS_VIEW_CMD = SAMTOOLS_018
-    print(f"INFO: Using samtools-0.1.8 for view operations: {SAMTOOLS_VIEW_CMD}", file=sys.stderr)
-else:
-    SAMTOOLS_VIEW_CMD = "samtools"
-    print(f"WARNING: samtools-0.1.8 not found at {SAMTOOLS_018}, using system samtools", file=sys.stderr)
-
-if os.path.exists(SAMTOOLS_016) and os.access(SAMTOOLS_016, os.X_OK):
     SAMTOOLS_SORT_CMD = SAMTOOLS_016
     SAMTOOLS_INDEX_CMD = SAMTOOLS_016
     SAMTOOLS_RMDUP_CMD = SAMTOOLS_016
-    print(f"INFO: Using samtools-0.1.16 for sort/index/rmdup: {SAMTOOLS_SORT_CMD}", file=sys.stderr)
+    USE_BOWTIE_CONTAINER = False
+    BOWTIE_CONTAINER = None
+    SAMTOOLS_FOR_BOWTIE_RULES = SAMTOOLS_018
+    SAMTOOLS_SORT_FOR_BOWTIE = SAMTOOLS_016
+    SAMTOOLS_INDEX_FOR_BOWTIE = SAMTOOLS_016
+    USE_MODERN_SAMTOOLS_SORT = False  # Pipeline container has samtools 0.1.16
+    CUTADAPT_USE_CONTAINER = False
+    FASTQC_SIF = None
+    CUTADAPT_SIF = None
+    CUTADAPT_CMD = "cutadapt"
+    FASTQC_CMD = "fastqc"
+    DEEPTOOLS_ENV = "envs/container_tools.yaml"  # Use built-in deepTools 2.4.2
+    BAMCOVERAGE_NORM = "--normalizeTo1x"  # deepTools 2.4.2 syntax (same as RPGC)
+    print("INFO: Running in pipeline container - using container tools", file=sys.stderr)
 else:
-    SAMTOOLS_SORT_CMD = "samtools"
-    SAMTOOLS_INDEX_CMD = "samtools"
-    SAMTOOLS_RMDUP_CMD = "samtools"
-    print(f"WARNING: samtools-0.1.16 not found at {SAMTOOLS_016}, using system samtools", file=sys.stderr)
+    # Get the directory where this Snakefile is located
+    try:
+        SNAKEFILE_PATH = os.path.abspath(__file__)
+        if 'site-packages' in SNAKEFILE_PATH or 'lib/python' in SNAKEFILE_PATH:
+            raise ValueError("__file__ points to conda environment")
+    except (NameError, ValueError):
+        cwd = os.getcwd()
+        if os.path.exists(os.path.join(cwd, "Snakefile")):
+            SNAKEFILE_PATH = os.path.join(cwd, "Snakefile")
+        else:
+            SNAKEFILE_PATH = os.path.abspath("Snakefile")
+
+    SNAKEFILE_DIR = os.path.dirname(SNAKEFILE_PATH)
+    # Go up one level from CHIP-seq/ to project root
+    PROJECT_ROOT = os.path.dirname(SNAKEFILE_DIR)
+    PATCHED_BOWTIE_DIR = os.path.join(PROJECT_ROOT, "Shared", "Scripts", "bin")
+    PATCHED_BOWTIE = os.path.join(PATCHED_BOWTIE_DIR, "bowtie")
+    PATCHED_BOWTIE_BUILD = os.path.join(PATCHED_BOWTIE_DIR, "bowtie-build")
+    BOWTIE_SIF = os.path.join(PROJECT_ROOT, "CHIP-seq", "envs", "bowtie_1.0.1_nh.sif")
+    ABS_PROJECT_ROOT = os.path.abspath(PROJECT_ROOT)
+    ABS_SNAKEFILE_DIR = os.path.abspath(SNAKEFILE_DIR)
+
+    if os.path.exists(BOWTIE_SIF) and os.path.isfile(BOWTIE_SIF):
+        BOWTIE_CMD = "bowtie"
+        BOWTIE_BUILD_CMD = "bowtie-build"
+        print("INFO: Using Bowtie 1.0.1-nh via Apptainer container", file=sys.stderr)
+    elif os.path.exists(PATCHED_BOWTIE) and os.access(PATCHED_BOWTIE, os.X_OK):
+        BOWTIE_CMD = PATCHED_BOWTIE
+        BOWTIE_BUILD_CMD = PATCHED_BOWTIE_BUILD
+        print(f"INFO: Using patched Bowtie: {BOWTIE_CMD}", file=sys.stderr)
+    else:
+        BOWTIE_CMD = "bowtie"
+        BOWTIE_BUILD_CMD = "bowtie-build"
+        print(f"WARNING: Patched Bowtie not found at {PATCHED_BOWTIE}, using conda bowtie", file=sys.stderr)
+
+    SAMTOOLS_018_DIR = os.path.join(PATCHED_BOWTIE_DIR, "samtools-0.1.8")
+    SAMTOOLS_016_DIR = os.path.join(PATCHED_BOWTIE_DIR, "samtools-0.1.16")
+    SAMTOOLS_018 = os.path.join(SAMTOOLS_018_DIR, "samtools")
+    SAMTOOLS_016 = os.path.join(SAMTOOLS_016_DIR, "samtools")
+
+    if os.path.exists(SAMTOOLS_018) and os.access(SAMTOOLS_018, os.X_OK):
+        SAMTOOLS_VIEW_CMD = SAMTOOLS_018
+        print(f"INFO: Using samtools-0.1.8 for view operations: {SAMTOOLS_VIEW_CMD}", file=sys.stderr)
+    else:
+        SAMTOOLS_VIEW_CMD = "samtools"
+        print(f"WARNING: samtools-0.1.8 not found at {SAMTOOLS_018}, using system samtools", file=sys.stderr)
+
+    if os.path.exists(SAMTOOLS_016) and os.access(SAMTOOLS_016, os.X_OK):
+        SAMTOOLS_SORT_CMD = SAMTOOLS_016
+        SAMTOOLS_INDEX_CMD = SAMTOOLS_016
+        SAMTOOLS_RMDUP_CMD = SAMTOOLS_016
+        print(f"INFO: Using samtools-0.1.16 for sort/index/rmdup: {SAMTOOLS_SORT_CMD}", file=sys.stderr)
+    else:
+        SAMTOOLS_SORT_CMD = "samtools"
+        SAMTOOLS_INDEX_CMD = "samtools"
+        SAMTOOLS_RMDUP_CMD = "samtools"
+        print(f"WARNING: samtools-0.1.16 not found at {SAMTOOLS_016}, using system samtools", file=sys.stderr)
+
+    USE_BOWTIE_CONTAINER = os.path.exists(BOWTIE_SIF) and os.path.isfile(BOWTIE_SIF)
+    BOWTIE_CONTAINER = BOWTIE_SIF if USE_BOWTIE_CONTAINER else None
+    # Use "samtools" from container or from bowtie conda env (rules have conda: bowtie.yaml)
+    SAMTOOLS_FOR_BOWTIE_RULES = "samtools" if (USE_BOWTIE_CONTAINER or not BOWTIE_CONTAINER) else SAMTOOLS_VIEW_CMD
+    SAMTOOLS_SORT_FOR_BOWTIE = "samtools" if (USE_BOWTIE_CONTAINER or not BOWTIE_CONTAINER) else SAMTOOLS_SORT_CMD
+    SAMTOOLS_INDEX_FOR_BOWTIE = "samtools" if (USE_BOWTIE_CONTAINER or not BOWTIE_CONTAINER) else SAMTOOLS_INDEX_CMD
+    # Modern samtools uses -o out.bam; old samtools 0.1.16 uses "sort in.bam prefix"
+    USE_MODERN_SAMTOOLS_SORT = (SAMTOOLS_SORT_FOR_BOWTIE == "samtools")
+
+    FASTQC_SIF = os.path.join(PROJECT_ROOT, "CHIP-seq", "envs", "fastqc_0.11.3.sif")
+    FASTQC_CMD = "fastqc"
+    CUTADAPT_SIF = os.path.join(PROJECT_ROOT, "CHIP-seq", "envs", "cutadapt_1.8.3.sif")
+    CUTADAPT_USE_CONTAINER = os.path.exists(CUTADAPT_SIF) and os.path.isfile(CUTADAPT_SIF)
+    CUTADAPT_CMD = "cutadapt"
+    DEEPTOOLS_ENV = "envs/deeptools.yaml"
+    BAMCOVERAGE_NORM = "--normalizeUsing RPGC --effectiveGenomeSize"  # deepTools 3.x syntax
+
+# When PIPELINE_CONTAINER: SNAKEFILE_DIR, PROJECT_ROOT etc. are needed for paths - set minimal values
+if PIPELINE_CONTAINER:
+    try:
+        SNAKEFILE_PATH = os.path.abspath(__file__)
+        if 'site-packages' in SNAKEFILE_PATH or 'lib/python' in SNAKEFILE_PATH:
+            raise ValueError("__file__ points to conda environment")
+    except (NameError, ValueError):
+        SNAKEFILE_PATH = os.path.join(os.getcwd(), "Snakefile")
+    SNAKEFILE_DIR = os.path.dirname(SNAKEFILE_PATH)
+    PROJECT_ROOT = os.path.dirname(SNAKEFILE_DIR)
+    ABS_PROJECT_ROOT = os.path.abspath(PROJECT_ROOT)
+    ABS_SNAKEFILE_DIR = os.path.abspath(SNAKEFILE_DIR)
 
 # ==============================================================================
 # BACKWARD COMPATIBILITY LAYER
@@ -250,6 +298,8 @@ rule build_genome_bowtie_index:
         genome_fa = GENOME_FASTA
     output:
         index_files = expand(f"{GENOME_BOWTIE_INDEX}.{{ext}}", ext=["1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt"])
+    container:
+        BOWTIE_CONTAINER
     conda:
         "envs/bowtie.yaml"
     shell:
@@ -263,6 +313,8 @@ rule build_vector_42AB_index:
         vector_fa = VECTOR_42AB_REF
     output:
         index_files = expand(f"{VECTOR_42AB_INDEX}.{{ext}}", ext=["1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt"])
+    container:
+        BOWTIE_CONTAINER
     conda:
         "envs/bowtie.yaml"
     shell:
@@ -276,6 +328,8 @@ rule build_vector_20A_index:
         vector_fa = VECTOR_20A_REF
     output:
         index_files = expand(f"{VECTOR_20A_INDEX}.{{ext}}", ext=["1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt"])
+    container:
+        BOWTIE_CONTAINER
     conda:
         "envs/bowtie.yaml"
     shell:
@@ -299,34 +353,81 @@ rule generate_chrom_sizes:
         cut -f1,2 {input.genome_fa}.fai > {output.chrom_sizes}
         """
 
-# Quality control rules
-rule fastqc_raw:
-    input:
-        fastq = f"{INPUT_DATA_DIR}/{{sample}}.fastq"
-    output:
-        html = RESULTS_DIR + "/fastqc_raw/{{sample}}_fastqc.html",
-        zip = RESULTS_DIR + "/fastqc_raw/{{sample}}_fastqc.zip"
-    conda:
-        "envs/fastqc.yaml"
-    shell:
-        """
-        mkdir -p {RESULTS_DIR}/fastqc_raw
-        fastqc {input.fastq} -o {RESULTS_DIR}/fastqc_raw
-        """
+# Quality control rules - when not PIPELINE_CONTAINER, use Apptainer SIF or conda
+if not PIPELINE_CONTAINER:
+    FASTQC_SIF = os.path.join(PROJECT_ROOT, "CHIP-seq", "envs", "fastqc_0.11.3.sif")
+    CUTADAPT_SIF = os.path.join(PROJECT_ROOT, "CHIP-seq", "envs", "cutadapt_1.8.3.sif")
+    CUTADAPT_USE_CONTAINER = os.path.exists(CUTADAPT_SIF) and os.path.isfile(CUTADAPT_SIF)
 
-rule trim_adapters:
-    input:
-        fastq = f"{INPUT_DATA_DIR}/{{sample}}.fastq",
-        adapters = ADAPTERS_FILE
-    output:
-        trimmed = RESULTS_DIR + "/trimmed/{sample}.trimmed.fastq"
-    conda:
-        "envs/cutadapt.yaml"
-    shell:
-        """
-        mkdir -p {RESULTS_DIR}/trimmed
-        cutadapt -a file:{input.adapters} -o {output.trimmed} {input.fastq}
-        """
+if PIPELINE_CONTAINER:
+    rule fastqc_raw:
+        input:
+            fastq = f"{INPUT_DATA_DIR}/{{sample}}.fastq"
+        output:
+            html = RESULTS_DIR + "/fastqc_raw/{{sample}}_fastqc.html",
+            zip = RESULTS_DIR + "/fastqc_raw/{{sample}}_fastqc.zip"
+        shell:
+            """
+            mkdir -p {RESULTS_DIR}/fastqc_raw
+            fastqc {input.fastq} -o {RESULTS_DIR}/fastqc_raw
+            """
+else:
+    rule fastqc_raw:
+        input:
+            fastq = f"{INPUT_DATA_DIR}/{{sample}}.fastq"
+        output:
+            html = RESULTS_DIR + "/fastqc_raw/{{sample}}_fastqc.html",
+            zip = RESULTS_DIR + "/fastqc_raw/{{sample}}_fastqc.zip"
+        container:
+            FASTQC_SIF
+        conda:
+            "envs/fastqc.yaml"
+        shell:
+            """
+            mkdir -p {RESULTS_DIR}/fastqc_raw
+            fastqc {input.fastq} -o {RESULTS_DIR}/fastqc_raw
+            """
+
+if PIPELINE_CONTAINER:
+    rule trim_adapters:
+        input:
+            fastq = f"{INPUT_DATA_DIR}/{{sample}}.fastq",
+            adapters = ADAPTERS_FILE
+        output:
+            trimmed = RESULTS_DIR + "/trimmed/{sample}.trimmed.fastq"
+        shell:
+            """
+            mkdir -p {RESULTS_DIR}/trimmed
+            cutadapt -a file:{input.adapters} -o {output.trimmed} {input.fastq}
+            """
+elif CUTADAPT_USE_CONTAINER:
+    rule trim_adapters:
+        input:
+            fastq = f"{INPUT_DATA_DIR}/{{sample}}.fastq",
+            adapters = ADAPTERS_FILE
+        output:
+            trimmed = RESULTS_DIR + "/trimmed/{sample}.trimmed.fastq"
+        container:
+            CUTADAPT_SIF
+        shell:
+            """
+            mkdir -p {RESULTS_DIR}/trimmed
+            cutadapt -a file:{input.adapters} -o {output.trimmed} {input.fastq}
+            """
+else:
+    rule trim_adapters:
+        input:
+            fastq = f"{INPUT_DATA_DIR}/{{sample}}.fastq",
+            adapters = ADAPTERS_FILE
+        output:
+            trimmed = RESULTS_DIR + "/trimmed/{sample}.trimmed.fastq"
+        conda:
+            "envs/cutadapt.yaml"
+        shell:
+            """
+            mkdir -p {RESULTS_DIR}/trimmed
+            cutadapt -a file:{input.adapters} -o {output.trimmed} {input.fastq}
+            """
 
 rule trimmomatic:
     input:
@@ -343,19 +444,34 @@ rule trimmomatic:
             LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:50
         """
 
-rule fastqc_trimmed:
-    input:
-        fastq = RESULTS_DIR + "/trimmomatic/{sample}.alltrimmed.fastq"
-    output:
-        html = RESULTS_DIR + "/fastqc_trimmed/{sample}.alltrimmed_fastqc.html",
-        zip = RESULTS_DIR + "/fastqc_trimmed/{sample}.alltrimmed_fastqc.zip"
-    conda:
-        "envs/fastqc.yaml"
-    shell:
-        """
-        mkdir -p {RESULTS_DIR}/fastqc_trimmed
-        fastqc {input.fastq} -o {RESULTS_DIR}/fastqc_trimmed
-        """
+if PIPELINE_CONTAINER:
+    rule fastqc_trimmed:
+        input:
+            fastq = RESULTS_DIR + "/trimmomatic/{sample}.alltrimmed.fastq"
+        output:
+            html = RESULTS_DIR + "/fastqc_trimmed/{sample}.alltrimmed_fastqc.html",
+            zip = RESULTS_DIR + "/fastqc_trimmed/{sample}.alltrimmed_fastqc.zip"
+        shell:
+            """
+            mkdir -p {RESULTS_DIR}/fastqc_trimmed
+            fastqc {input.fastq} -o {RESULTS_DIR}/fastqc_trimmed
+            """
+else:
+    rule fastqc_trimmed:
+        input:
+            fastq = RESULTS_DIR + "/trimmomatic/{sample}.alltrimmed.fastq"
+        output:
+            html = RESULTS_DIR + "/fastqc_trimmed/{sample}.alltrimmed_fastqc.html",
+            zip = RESULTS_DIR + "/fastqc_trimmed/{sample}.alltrimmed_fastqc.zip"
+        container:
+            FASTQC_SIF
+        conda:
+            "envs/fastqc.yaml"
+        shell:
+            """
+            mkdir -p {RESULTS_DIR}/fastqc_trimmed
+            fastqc {input.fastq} -o {RESULTS_DIR}/fastqc_trimmed
+            """
 
 rule trim_to_50bp:
     input:
@@ -377,6 +493,8 @@ rule bowtie_mapping:
         index_files = expand(f"{DM6_BOWTIE_INDEX}.{{ext}}", ext=["1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt"])
     output:
         sam = RESULTS_DIR + "/bowtie/{sample}.sam"
+    container:
+        BOWTIE_CONTAINER
     conda:
         "envs/bowtie.yaml"
     threads: config["processing"]["threads"]
@@ -392,6 +510,10 @@ rule samtools_view:
         reference = DM6_REFERENCE
     output:
         bam = RESULTS_DIR + "/bowtie/{sample}.bam"
+    container:
+        BOWTIE_CONTAINER
+    conda:
+        "envs/bowtie.yaml"
     shell:
         """
         # The patched bowtie with --sam-nh creates SAM files in a simplified format (8 fields instead of 11)
@@ -454,7 +576,7 @@ try:
 except BrokenPipeError:
     # Handle pipe closure gracefully
     sys.stderr.close()
-" | {SAMTOOLS_VIEW_CMD} view -bT {input.reference} - > {output.bam}
+" | {SAMTOOLS_FOR_BOWTIE_RULES} view -bT {input.reference} - > {output.bam}
         """
 
 rule samtools_sort_and_index:
@@ -463,11 +585,17 @@ rule samtools_sort_and_index:
     output:
         sorted_bam = RESULTS_DIR + "/bowtie/{sample}.sorted_final.bam",
         bai = RESULTS_DIR + "/bowtie/{sample}.sorted_final.bam.bai"
+    container:
+        BOWTIE_CONTAINER
+    conda:
+        "envs/bowtie.yaml"
+    params:
+        sort_cmd = lambda wildcards, input, **kw: (f"-o {wildcards.sample}.sorted_final.bam {os.path.basename(input.bam)}" if USE_MODERN_SAMTOOLS_SORT else f"{os.path.basename(input.bam)} {wildcards.sample}.sorted_final")
     shell:
         """
         cd {RESULTS_DIR}/bowtie && \
-        {SAMTOOLS_SORT_CMD} sort $(basename {input.bam}) {wildcards.sample}.sorted_final && \
-        {SAMTOOLS_INDEX_CMD} index {wildcards.sample}.sorted_final.bam
+        {SAMTOOLS_SORT_FOR_BOWTIE} sort {params.sort_cmd} && \
+        {SAMTOOLS_INDEX_FOR_BOWTIE} index {wildcards.sample}.sorted_final.bam
         """
 
 rule remove_mitochondrial_reads:
@@ -475,10 +603,14 @@ rule remove_mitochondrial_reads:
         sorted_bam = RESULTS_DIR + "/bowtie/{sample}.sorted_final.bam"
     output:
         no_mito_bam = RESULTS_DIR + "/bowtie/{sample}.mito_removed.bam"
+    container:
+        BOWTIE_CONTAINER
+    conda:
+        "envs/bowtie.yaml"
     shell:
         """
-        {SAMTOOLS_VIEW_CMD} view {input.sorted_bam} | egrep -v 'chrM' | {SAMTOOLS_VIEW_CMD} view -bT {DM6_REFERENCE} - -o {output.no_mito_bam}
-        {SAMTOOLS_INDEX_CMD} index {output.no_mito_bam}
+        {SAMTOOLS_FOR_BOWTIE_RULES} view {input.sorted_bam} | egrep -v 'chrM' | {SAMTOOLS_FOR_BOWTIE_RULES} view -bT {DM6_REFERENCE} - -o {output.no_mito_bam}
+        {SAMTOOLS_INDEX_FOR_BOWTIE} index {output.no_mito_bam}
         """
 
 rule samtools_sort_no_mito:
@@ -487,11 +619,17 @@ rule samtools_sort_no_mito:
     output:
         sorted_bam = RESULTS_DIR + "/bowtie/{sample}.no_mito_sorted.bam",
         bai = RESULTS_DIR + "/bowtie/{sample}.no_mito_sorted.bam.bai"
+    container:
+        BOWTIE_CONTAINER
+    conda:
+        "envs/bowtie.yaml"
+    params:
+        sort_cmd = lambda wildcards, input, **kw: (f"-o {wildcards.sample}.no_mito_sorted.bam {os.path.basename(input.bam)}" if USE_MODERN_SAMTOOLS_SORT else f"{os.path.basename(input.bam)} {wildcards.sample}.no_mito_sorted")
     shell:
         """
         cd {RESULTS_DIR}/bowtie && \
-        {SAMTOOLS_SORT_CMD} sort $(basename {input.bam}) {wildcards.sample}.no_mito_sorted && \
-        {SAMTOOLS_INDEX_CMD} index {wildcards.sample}.no_mito_sorted.bam
+        {SAMTOOLS_SORT_FOR_BOWTIE} sort {params.sort_cmd} && \
+        {SAMTOOLS_INDEX_FOR_BOWTIE} index {wildcards.sample}.no_mito_sorted.bam
         """
 
 rule samtools_rmdup:
@@ -513,6 +651,8 @@ rule bowtie_vector_mapping:
         index_files = expand(f"{VECTOR_42AB_INDEX}.{{ext}}", ext=["1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt"])
     output:
         sam = RESULTS_DIR + "/vector_mapping/{sample}.vectoronly.sam"
+    container:
+        BOWTIE_CONTAINER
     conda:
         "envs/bowtie.yaml"
     threads: config["processing"]["threads"]
@@ -528,6 +668,10 @@ rule samtools_view_vector:
         reference = VECTOR_42AB_REF
     output:
         bam = RESULTS_DIR + "/vector_mapping/{sample}.vectoronly.bam"
+    container:
+        BOWTIE_CONTAINER
+    conda:
+        "envs/bowtie.yaml"
     shell:
         """
         # The patched bowtie with --sam-nh creates SAM files in a simplified format (8 fields instead of 11)
@@ -579,7 +723,7 @@ try:
 except BrokenPipeError:
     # Handle pipe closure gracefully
     sys.stderr.close()
-" | {SAMTOOLS_VIEW_CMD} view -F 4 -bT {input.reference} - > {output.bam}
+" | {SAMTOOLS_FOR_BOWTIE_RULES} view -F 4 -bT {input.reference} - > {output.bam}
         """
 
 rule samtools_sort_and_index_vector:
@@ -588,11 +732,17 @@ rule samtools_sort_and_index_vector:
     output:
         sorted_bam = RESULTS_DIR + "/vector_mapping/{sample}.vectoronly.dup.bam",
         bai = RESULTS_DIR + "/vector_mapping/{sample}.vectoronly.dup.bam.bai"
+    container:
+        BOWTIE_CONTAINER
+    conda:
+        "envs/bowtie.yaml"
+    params:
+        sort_cmd = lambda wildcards, input, **kw: (f"-o {wildcards.sample}.vectoronly.dup.bam {os.path.basename(input.bam)}" if USE_MODERN_SAMTOOLS_SORT else f"{os.path.basename(input.bam)} {wildcards.sample}.vectoronly.dup")
     shell:
         """
         cd {RESULTS_DIR}/vector_mapping && \
-        {SAMTOOLS_SORT_CMD} sort $(basename {input.bam}) {wildcards.sample}.vectoronly.dup && \
-        {SAMTOOLS_INDEX_CMD} index {wildcards.sample}.vectoronly.dup.bam
+        {SAMTOOLS_SORT_FOR_BOWTIE} sort {params.sort_cmd} && \
+        {SAMTOOLS_INDEX_FOR_BOWTIE} index {wildcards.sample}.vectoronly.dup.bam
         """
 
 # Signal generation rules
@@ -621,7 +771,7 @@ rule make_enrichment_track:
     output:
         enrichment_bigwig = f"{RESULTS_DIR}/enrichment/Panx_GLKD_ChIP_input_1st_S1_R1_001_vs_Panx_GLKD_ChIP_input_2nd_S4_R1_001.enrichment.bigwig"
     conda:
-        "envs/deeptools.yaml"
+        DEEPTOOLS_ENV
     threads: config["processing"]["threads"]
     shell:
         """
@@ -639,14 +789,14 @@ rule bam_coverage:
         minus = RESULTS_DIR + "/coverage/{sample}.{binsize}.Minus.bg4",
         plus = RESULTS_DIR + "/coverage/{sample}.{binsize}.Plus.bg4"
     conda:
-        "envs/deeptools.yaml"
+        DEEPTOOLS_ENV
     shell:
         """
         mkdir -p {RESULTS_DIR}/coverage
         EFFECTIVE_SIZE=$(awk '{{sum += $2}} END {{print sum}}' {input.chrom_sizes})
-        bamCoverage -b {input.bam} -o {output.total} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE
-        bamCoverage -b {input.bam} -o {output.minus} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE --filterRNAstrand forward
-        bamCoverage -b {input.bam} -o {output.plus} --binSize {wildcards.binsize} --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE --filterRNAstrand reverse
+        bamCoverage -b {input.bam} -o {output.total} --binSize {wildcards.binsize} {BAMCOVERAGE_NORM} $EFFECTIVE_SIZE
+        bamCoverage -b {input.bam} -o {output.minus} --binSize {wildcards.binsize} {BAMCOVERAGE_NORM} $EFFECTIVE_SIZE --filterRNAstrand forward
+        bamCoverage -b {input.bam} -o {output.plus} --binSize {wildcards.binsize} {BAMCOVERAGE_NORM} $EFFECTIVE_SIZE --filterRNAstrand reverse
         """
 
 rule chop_bedgraph:
@@ -679,15 +829,15 @@ rule bam_coverage_transposon:
     params:
         region = get_transposon_region
     conda:
-        "envs/deeptools.yaml"
+        DEEPTOOLS_ENV
     shell:
         """
         mkdir -p {RESULTS_DIR}/transposon
         EFFECTIVE_SIZE=$(awk '{{sum += $2}} END {{print sum}}' {input.chrom_sizes})
         REGION={params.region}
-        bamCoverage -b {input.bam} -o {output.total} -of bedgraph --binSize {wildcards.binsize} --region $REGION --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE
-        bamCoverage -b {input.bam} -o {output.minus} -of bedgraph --binSize {wildcards.binsize} --region $REGION --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE --filterRNAstrand forward
-        bamCoverage -b {input.bam} -o {output.plus} -of bedgraph --binSize {wildcards.binsize} --region $REGION --normalizeUsing RPGC --effectiveGenomeSize $EFFECTIVE_SIZE --filterRNAstrand reverse
+        bamCoverage -b {input.bam} -o {output.total} -of bedgraph --binSize {wildcards.binsize} --region $REGION {BAMCOVERAGE_NORM} $EFFECTIVE_SIZE
+        bamCoverage -b {input.bam} -o {output.minus} -of bedgraph --binSize {wildcards.binsize} --region $REGION {BAMCOVERAGE_NORM} $EFFECTIVE_SIZE --filterRNAstrand forward
+        bamCoverage -b {input.bam} -o {output.plus} -of bedgraph --binSize {wildcards.binsize} --region $REGION {BAMCOVERAGE_NORM} $EFFECTIVE_SIZE --filterRNAstrand reverse
         """
 
 rule chop_bedgraph_transposon:

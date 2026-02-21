@@ -53,17 +53,17 @@ This project **builds upon and enhances** the original work by [Luo et al. 2025]
 ## 📁 Project Structure
 
 ```
-piRNA_workflow/
+ piRNA_workflow/
 ├── CHIP-seq/                 # ✅ ChIP-seq analysis pipeline (Production Ready)
 │   ├── Snakefile            # Main workflow definition
 │   ├── config.yaml          # Configuration file
-│   ├── envs/                # Conda environment definitions (13 files)
+│   ├── envs/                # Conda environment definitions + Apptainer .def files
 │   ├── results/             # Analysis outputs
 │   └── README.md            # Detailed ChIP-seq documentation
 ├── totalRNA-seq/            # ✅ Total RNA-seq processing pipeline (Production Ready)
 │   ├── Snakefile            # Main workflow definition
 │   ├── config.yaml          # Configuration file
-│   ├── envs/                # Conda environment definitions (9 files)
+│   ├── envs/                # Conda environment definitions
 │   ├── results/             # Analysis outputs
 │   └── README.md            # Detailed RNA-seq documentation
 ├── Shared/                  # Common resources for all workflows
@@ -72,6 +72,9 @@ piRNA_workflow/
 │   │   ├── genome/          # Reference genomes and indexes
 │   │   └── datasets/        # Input FASTQ files
 │   └── README.md            # Shared resources documentation
+├── containers/              # Apptainer definition files (build with apptainer build)
+│   ├── pipeline.def         # Unified pipeline container (Bowtie, FastQC, Cutadapt, etc.)
+│   └── CONTAINER_KNOWN_ISSUES.md
 ├── run_workflow.sh          # Unified workflow manager script
 ├── WORKFLOW_MANAGER.md      # Workflow manager documentation
 └── README.md                # This file
@@ -82,6 +85,7 @@ piRNA_workflow/
 ### **Reproducibility**
 - **Snakemake workflows** for reproducible analysis
 - **Conda environments** for dependency management
+- **Apptainer containers** (optional): unified pipeline image with pinned tool versions (Bowtie 1.0.1-nh, FastQC 0.11.3, Cutadapt 1.8.3, etc.)
 - **Version-controlled** configurations and parameters
 
 ### **Scalability**
@@ -140,14 +144,20 @@ piRNA_workflow/
    conda create -n snakemake_env -c bioconda -c conda-forge snakemake
    ```
 
-3. **Run a workflow**:
+3. **Optional – Apptainer container**: For best reproducibility, build the pipeline container. The workflow will use it automatically when available:
+   ```bash
+   apptainer build containers/pirna_pipeline.sif containers/pipeline.def
+   ```
+   Or run with `--use-apptainer` to let the workflow manager build individual tool containers.
+
+4. **Run a workflow**:
    ```bash
    ./run_workflow.sh
    ```
 
 The script will guide you through workflow selection, path configuration, and resource allocation.
 
-📖 **For platform requirements, detailed commands, and troubleshooting**, see [WORKFLOW_MANAGER.md](WORKFLOW_MANAGER.md)
+📖 **For platform requirements, container setup, detailed commands, and troubleshooting**, see [WORKFLOW_MANAGER.md](WORKFLOW_MANAGER.md)
 
 ## 🔧 Configuration
 
@@ -166,8 +176,9 @@ The script will guide you through workflow selection, path configuration, and re
 - **[CHIP-seq README](CHIP-seq/README.md)**: Comprehensive ChIP-seq pipeline documentation
 - **[TotalRNA-seq README](totalRNA-seq/README.md)**: RNA-seq processing documentation
 - **[Shared Resources README](Shared/README.md)**: Common resources and scripts
+- **[Workflow Manager Guide](WORKFLOW_MANAGER.md)**: Detailed usage, container setup, and troubleshooting
+- **[Container Known Issues](containers/CONTAINER_KNOWN_ISSUES.md)**: Known build/runtime issues for the shared pipeline container (EBSeq, unprivileged exec, etc.)
 - **[Dataset Recommendations](CHIP-seq/DATASET_RECOMMENDATIONS.md)**: Data quality guidelines
-- **[Workflow Manager Guide](WORKFLOW_MANAGER.md)**: Detailed usage and troubleshooting
 
 ## 📄 License
 

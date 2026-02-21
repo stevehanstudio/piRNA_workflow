@@ -2,8 +2,8 @@ name: bowtie
 channels:
   - bioconda
   - conda-forge
-  - defaults
 dependencies:
+  # Patched Bowtie from Shared/Scripts/bin/ preferred (BOWTIE_CMD); bowtie here for fallback
   - bowtie
-  - samtools
+  - samtools  # used in vector_mapping pipe (view, sort, index)
   - python=3.8

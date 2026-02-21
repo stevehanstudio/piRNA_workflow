@@ -723,7 +723,10 @@ show_usage() {
     echo ""
     echo "Options:"
     echo "  --cores N     - Number of CPU cores to use (prompts interactively if not specified)"
-    echo "  --rerun-incomplete - Re-run incomplete jobs"
+    echo "  --defaults    - Use default paths and cores without prompting"
+    echo "  --rerun-incomplete  - Re-run incomplete jobs"
+    echo "  --use-apptainer    - Use Apptainer containers for FastQC and Bowtie (ensures 0.11.3 and 1.0.1-nh)"
+    echo "  --use-sudo         - Use sudo for Apptainer exec (when unprivileged execution fails)"
     echo ""
     echo "Genome Configuration Options:"
     echo "  --genome-version VER  - Specify genome version (e.g., dm6, hg38, mm10, ce11)"
@@ -756,6 +759,13 @@ show_usage() {
     echo "  $0 1 run --genome-version hg38 --cores 24  # Run CHIP-seq with human genome"
     echo "  $0 4 run --genome-version mm10 --cores 16  # Run totalRNA-seq with mouse genome"
     echo "  $0 1 run --genome-version ce11             # Run with C. elegans genome"
+    echo ""
+    echo "Apptainer Examples:"
+    echo "  $0 1 run --use-apptainer --cores 8         # Run CHIP-seq with FastQC in Apptainer"
+    echo "  $0 4 run --use-apptainer                   # Run totalRNA-seq with Apptainer"
+    echo "  $0 1 run --use-apptainer --use-sudo        # Run with sudo (when unprivileged exec fails)"
+    echo ""
+    echo "  $0 4 run --defaults                        # Run totalRNA-seq with defaults, no prompts"
     echo ""
     echo "Path Override Examples:"
     echo "  $0 1 run --dataset-path /path/to/my/data  # Use custom dataset directory"
@@ -937,16 +947,85 @@ create_temp_config() {
     echo "$temp_config"
 }
 
-# Function to activate snakemake environment and run command
+# Function to ensure FastQC 0.11.3 Apptainer image is built (when using Apptainer)
+ensure_fastqc_container() {
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local ensure_script="$script_dir/Shared/Scripts/shell/ensure_fastqc.sh"
+    if [[ -x "$ensure_script" ]]; then
+        "$ensure_script"
+    else
+        echo "Warning: ensure_fastqc.sh not found at $ensure_script, FastQC container may not be available" >&2
+    fi
+}
+
+# Function to ensure Cutadapt 1.8.3 Apptainer image is built (original version, for ARM64)
+ensure_cutadapt_container() {
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local ensure_script="$script_dir/Shared/Scripts/shell/ensure_cutadapt.sh"
+    if [[ -x "$ensure_script" ]]; then
+        "$ensure_script"
+    else
+        echo "Warning: ensure_cutadapt.sh not found at $ensure_script, Cutadapt container may not be available" >&2
+    fi
+}
+
+# Function to ensure single pipeline container is built
+ensure_pipeline_container() {
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local ensure_script="$script_dir/Shared/Scripts/shell/ensure_pipeline_container.sh"
+    if [[ -x "$ensure_script" ]]; then
+        "$ensure_script"
+    else
+        echo "Warning: ensure_pipeline_container.sh not found at $ensure_script" >&2
+    fi
+}
+
+# Function to ensure patched Bowtie 1.0.1-nh Apptainer image is built (when using Apptainer)
+ensure_bowtie_container() {
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local ensure_script="$script_dir/Shared/Scripts/shell/ensure_bowtie.sh"
+    if [[ -x "$ensure_script" ]]; then
+        "$ensure_script"
+    else
+        echo "Warning: ensure_bowtie.sh not found at $ensure_script, Bowtie container may not be available" >&2
+    fi
+}
+
+# Function to build samtools 0.1.8 from source (original pipeline version)
+# Needed when pre-built x86 binary segfaults on ARM64; keeps version fidelity
+ensure_samtools_018() {
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local ensure_script="$script_dir/Shared/Scripts/shell/ensure_samtools_018.sh"
+    if [[ -x "$ensure_script" ]]; then
+        "$ensure_script"
+    else
+        echo "Warning: ensure_samtools_018.sh not found at $ensure_script" >&2
+    fi
+}
+
+# Function to build samtools 0.1.16 from source (for rmdup - removed in modern samtools)
+# Needed when pre-built x86 binary segfaults on ARM64 (e.g. under Box64)
+ensure_samtools_016() {
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local ensure_script="$script_dir/Shared/Scripts/shell/ensure_samtools_016.sh"
+    if [[ -x "$ensure_script" ]]; then
+        "$ensure_script"
+    else
+        echo "Warning: ensure_samtools_016.sh not found at $ensure_script" >&2
+    fi
+}
+
+# Function to run snakemake (in pipeline container or host conda)
 run_snakemake() {
     local workflow_dir=$1
     local command=$2
     shift 2
-
-    echo "Activating snakemake_env..."
-    echo "Running in directory: ${workflow_dir}"
-    echo "Command: ${command}"
-    echo ""
 
     # Create temporary config if path overrides or genome version are provided
     local temp_config=""
@@ -955,21 +1034,50 @@ run_snakemake() {
         echo "Using temporary config with overrides: $temp_config" >&2
     fi
 
-    # Use conda run with --no-capture-output to show real-time output
-    # Pass the temp config file if it exists
     local config_override=""
     if [[ -n "$temp_config" && -f "$temp_config" ]]; then
         config_override="--configfile $(basename "$temp_config")"
     fi
-    
-    conda run --no-capture-output -n snakemake_env bash -c "
-        cd '${workflow_dir}'
-        # Set up sm alias
-        alias sm='snakemake'
-        ${command} ${config_override}
-    "
-    
-    # Clean up temporary config
+
+    # Use pipeline container when available (Apptainer only)
+    SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    PIPELINE_SIF="${SCRIPT_ROOT}/containers/pirna_pipeline.sif"
+    APPTAINER_CMD="apptainer"
+    [[ "${APPTAINER_SUDO:-0}" == "1" ]] && APPTAINER_CMD="sudo apptainer"
+    USE_PIPELINE_CONTAINER=false
+    if [[ -f "$PIPELINE_SIF" ]] && $APPTAINER_CMD exec "$PIPELINE_SIF" snakemake --version &>/dev/null; then
+        USE_PIPELINE_CONTAINER=true
+    fi
+
+    if [[ "$USE_PIPELINE_CONTAINER" == "true" ]]; then
+        echo "Running in pipeline container..."
+        [[ "${APPTAINER_SUDO:-0}" == "1" ]] && echo "(using sudo for Apptainer)"
+        echo "Directory: ${workflow_dir}"
+        echo "Command: ${command}"
+        echo ""
+        local abs_project="$(cd "$SCRIPT_ROOT" && pwd)"
+        local abs_workflow="$(cd "$abs_project/$workflow_dir" 2>/dev/null && pwd || echo "$abs_project/$workflow_dir")"
+        # Use APPTAINERENV_ to pass env vars (avoids -e parsing issues that can confuse Snakemake/Apptainer)
+        export APPTAINERENV_PIPELINE_CONTAINER=1
+        export APPTAINERENV_SAMTOOLS_018=/opt/pipeline/samtools-0.1.8/samtools
+        export APPTAINERENV_SAMTOOLS_016=/opt/pipeline/samtools-0.1.16/samtools
+        $APPTAINER_CMD exec \
+                -B "$abs_project:/work" \
+                "$PIPELINE_SIF" \
+                bash -c "cd /work/${workflow_dir} && ${command} ${config_override}"
+    else
+        echo "Activating snakemake_env..."
+        echo "Running in directory: ${workflow_dir}"
+        echo "Command: ${command}"
+        echo ""
+
+        conda run --no-capture-output -n snakemake_env bash -c "
+            cd '${workflow_dir}'
+            alias sm='snakemake'
+            ${command} ${config_override}
+        "
+    fi
+
     if [[ -n "$temp_config" && -f "$temp_config" ]]; then
         rm -f "$temp_config"
         echo "Cleaned up temporary config file" >&2
@@ -980,6 +1088,9 @@ run_snakemake() {
 CORES=""
 EXTRA_FLAGS=""
 CORES_SPECIFIED=false
+USE_APPTAINER=false
+USE_APPTAINER_SUDO=false
+USE_DEFAULTS=false
 
 # Path override variables
 GENOME_PATH=""
@@ -1055,6 +1166,18 @@ while [[ $# -gt 0 ]]; do
             GENOME_VERSION="$2"
             shift 2
             ;;
+        --use-apptainer)
+            USE_APPTAINER=true
+            shift
+            ;;
+        --use-sudo)
+            USE_APPTAINER_SUDO=true
+            shift
+            ;;
+        --defaults)
+            USE_DEFAULTS=true
+            shift
+            ;;
         *)
             POSITIONAL_ARGS+=("$1")
             shift
@@ -1066,12 +1189,12 @@ done
 WORKFLOW=${POSITIONAL_ARGS[0]:-}
 COMMAND=${POSITIONAL_ARGS[1]:-run}
 
-# Convert numeric workflow options first
+# Convert numeric workflow options and aliases
 case "$WORKFLOW" in
-    1)
+    1|chip)
         WORKFLOW="chip-seq"
         ;;
-    4)
+    4|totalrna|totalrna-seq)
         WORKFLOW="totalrna-seq"
         ;;
 esac
@@ -1081,8 +1204,15 @@ if [[ -z "$WORKFLOW" ]]; then
     select_workflow_and_paths
     COMMAND="run"  # Default to run when interactively selected
 elif [[ -z "$GENOME_VERSION" && -z "$GENOME_PATH" && -z "$INDEX_PATH" && -z "$DATASET_PATH" && -z "$VECTOR_PATH" && -z "$ADAPTER_PATH" ]]; then
-    # Workflow specified but no paths/config provided - prompt for genome version and paths
-    # First, set the workflow name temporarily for the prompt function
+    # Workflow specified but no paths/config provided
+    if [[ "$USE_DEFAULTS" == "true" ]]; then
+        # Use defaults: dm6 genome, config.yaml paths, no prompting
+        GENOME_VERSION="dm6"
+        GENOME_SPECIES="drosophila"
+        echo "Using defaults: genome=dm6, paths from config.yaml" >&2
+        echo "" >&2
+    else
+    # Prompt for genome version and paths
     WORKFLOW_SAVED="$WORKFLOW"
     # Call just the path configuration part (genome version + paths)
     echo "=== Genome Version Configuration ===" >&2
@@ -1272,6 +1402,7 @@ elif [[ -z "$GENOME_VERSION" && -z "$GENOME_PATH" && -z "$INDEX_PATH" && -z "$DA
         echo "Using custom adapter path: $ADAPTER_PATH" >&2
     fi
     echo "" >&2
+    fi  # end else (non-defaults path prompt)
 fi
 
 # Validate workflow
@@ -1307,9 +1438,15 @@ fi
 
 # Prompt for cores if not specified and running interactive commands
 if [[ "$CORES_SPECIFIED" == "false" && ("$COMMAND" == "run" || "$COMMAND" == "run-force" || "$COMMAND" == "dryrun") ]]; then
-    CORES=$(prompt_cores)
-    echo "Using $CORES cores for execution." >&2
-    echo "" >&2
+    if [[ "$USE_DEFAULTS" == "true" ]]; then
+        CORES=$(get_optimal_cores)
+        echo "Using $CORES cores (default for system load)." >&2
+        echo "" >&2
+    else
+        CORES=$(prompt_cores)
+        echo "Using $CORES cores for execution." >&2
+        echo "" >&2
+    fi
 elif [[ -z "$CORES" ]]; then
     CORES=8  # Default fallback
 fi
@@ -1317,6 +1454,49 @@ fi
 # Check input files before running workflows (unless it's help, status, clean, unlock, or check-inputs)
 if [[ "$COMMAND" != "help" && "$COMMAND" != "status" && "$COMMAND" != "clean" && "$COMMAND" != "unlock" && "$COMMAND" != "check-inputs" ]]; then
     check_input_files "$WORKFLOW_DIR"
+fi
+
+# Build samtools 0.1.8 from source for CHIP-seq (needed when no containers;
+# x86 pre-built binary segfaults on ARM64)
+if [[ "$WORKFLOW" == "chip" && ("$COMMAND" == "run" || "$COMMAND" == "run-force" || "$COMMAND" == "fix-incomplete" || "$COMMAND" == "setup" || "$COMMAND" == "dryrun") ]]; then
+    ensure_samtools_018
+    ensure_samtools_016
+fi
+
+# When using Apptainer, build pipeline container first so ensure_cutadapt can skip (Cutadapt is built-in)
+if [[ "$USE_APPTAINER" == "true" && ("$COMMAND" == "run" || "$COMMAND" == "run-force" || "$COMMAND" == "fix-incomplete" || "$COMMAND" == "setup" || "$COMMAND" == "dryrun") ]]; then
+    [[ "$USE_APPTAINER_SUDO" == "true" ]] && export APPTAINER_SUDO=1
+    ensure_pipeline_container
+fi
+
+# Ensure cutadapt container for CHIP-seq (Python 2.7, original pipeline version)
+# When pipeline container exists (Apptainer), Cutadapt is built-in and this will skip
+if [[ "$WORKFLOW" == "chip" && ("$COMMAND" == "run" || "$COMMAND" == "run-force" || "$COMMAND" == "fix-incomplete" || "$COMMAND" == "setup" || "$COMMAND" == "dryrun") ]]; then
+    ensure_cutadapt_container
+fi
+
+# Build container flags (Apptainer only)
+CONTAINER_FLAGS=""
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "$USE_APPTAINER" == "true" ]]; then
+    [[ "$USE_APPTAINER_SUDO" == "true" ]] && export APPTAINER_SUDO=1
+    # Pipeline container already ensured above (before ensure_cutadapt); no duplicate call
+    # Fallback: individual containers when pipeline container unavailable
+    if [[ "$COMMAND" == "run" || "$COMMAND" == "run-force" || "$COMMAND" == "fix-incomplete" || "$COMMAND" == "setup" || "$COMMAND" == "dryrun" ]]; then
+        ensure_fastqc_container
+        ensure_cutadapt_container
+        ensure_bowtie_container
+    fi
+    # When running inside pipeline container, do NOT pass --use-apptainer to Snakemake
+    # (all tools are already in the container; rules with container: None would trigger Snakemake to spawn sub-containers incorrectly)
+    PIPELINE_SIF="${SCRIPT_ROOT}/containers/pirna_pipeline.sif"
+    APPTAINER_CMD="apptainer"
+    [[ "${APPTAINER_SUDO:-0}" == "1" ]] && APPTAINER_CMD="sudo apptainer"
+    if [[ -f "$PIPELINE_SIF" ]] && $APPTAINER_CMD exec "$PIPELINE_SIF" snakemake --version &>/dev/null; then
+        CONTAINER_FLAGS=""   # Inside pipeline container: no per-rule containers
+    else
+        CONTAINER_FLAGS="--use-apptainer"   # Outside: Snakemake runs rules in individual containers
+    fi
 fi
 
 # Auto-unlock if there's a stale lock (before any run commands)
@@ -1339,25 +1519,25 @@ fi
 case "$COMMAND" in
     setup)
         echo "Setting up conda environments for $WORKFLOW..."
-        run_snakemake "$WORKFLOW_DIR" "snakemake --use-conda --conda-frontend mamba --conda-create-envs-only all"
+        run_snakemake "$WORKFLOW_DIR" "snakemake --use-conda --conda-frontend mamba --conda-create-envs-only all $CONTAINER_FLAGS"
         echo "Setup completed successfully!"
         ;;
     dryrun)
         echo "Performing dry run for $WORKFLOW..."
-        run_snakemake "$WORKFLOW_DIR" "snakemake all --use-conda --conda-frontend mamba --cores $CORES --dry-run"
+        run_snakemake "$WORKFLOW_DIR" "snakemake all --use-conda --conda-frontend mamba --cores $CORES --dry-run $CONTAINER_FLAGS"
         ;;
     run)
         if [[ "$FORCE_RERUN" == "true" ]]; then
             echo "Force running $WORKFLOW workflow (all steps)..."
             echo "Note: Cleaning up any incomplete file metadata first..."
-            run_snakemake "$WORKFLOW_DIR" "snakemake --cleanup-metadata --use-conda --conda-frontend mamba" 2>/dev/null || true
+            run_snakemake "$WORKFLOW_DIR" "snakemake --cleanup-metadata --use-conda --conda-frontend mamba $CONTAINER_FLAGS" 2>/dev/null || true
             START_TIME=$(date +%s)
-            run_snakemake "$WORKFLOW_DIR" "snakemake all --forceall --rerun-incomplete --use-conda --conda-frontend mamba --cores $CORES $EXTRA_FLAGS"
+            run_snakemake "$WORKFLOW_DIR" "snakemake all --forceall --rerun-incomplete --use-conda --conda-frontend mamba --cores $CORES $CONTAINER_FLAGS $EXTRA_FLAGS"
         else
             echo "Running $WORKFLOW workflow..."
             START_TIME=$(date +%s)
             # Try regular run first, if it fails with incomplete files, suggest fix-incomplete
-            if ! run_snakemake "$WORKFLOW_DIR" "snakemake all --use-conda --conda-frontend mamba --cores $CORES $EXTRA_FLAGS"; then
+            if ! run_snakemake "$WORKFLOW_DIR" "snakemake all --use-conda --conda-frontend mamba --cores $CORES $CONTAINER_FLAGS $EXTRA_FLAGS"; then
                 echo ""
                 echo "❌ Workflow failed. This might be due to incomplete files from a previous run."
                 echo "💡 Try running: $0 $WORKFLOW fix-incomplete"
@@ -1376,9 +1556,9 @@ case "$COMMAND" in
     run-force)
         echo "Force running $WORKFLOW workflow (all steps)..."
         echo "Note: Cleaning up any incomplete file metadata first..."
-        run_snakemake "$WORKFLOW_DIR" "snakemake --cleanup-metadata --use-conda --conda-frontend mamba" 2>/dev/null || true
+        run_snakemake "$WORKFLOW_DIR" "snakemake --cleanup-metadata --use-conda --conda-frontend mamba $CONTAINER_FLAGS" 2>/dev/null || true
         START_TIME=$(date +%s)
-        run_snakemake "$WORKFLOW_DIR" "snakemake all --forceall --rerun-incomplete --use-conda --conda-frontend mamba --cores $CORES $EXTRA_FLAGS"
+        run_snakemake "$WORKFLOW_DIR" "snakemake all --forceall --rerun-incomplete --use-conda --conda-frontend mamba --cores $CORES $CONTAINER_FLAGS $EXTRA_FLAGS"
         END_TIME=$(date +%s)
         DURATION=$((END_TIME - START_TIME))
         echo ""
@@ -1391,11 +1571,11 @@ case "$COMMAND" in
         echo "Fixing incomplete files for $WORKFLOW workflow..."
         echo "Step 1: Attempting to clean up metadata for incomplete files..."
         # Try to cleanup metadata - this might fail if no specific files are provided, that's OK
-        run_snakemake "$WORKFLOW_DIR" "snakemake --cleanup-metadata --use-conda --conda-frontend mamba || true" 2>/dev/null || true
+        run_snakemake "$WORKFLOW_DIR" "snakemake --cleanup-metadata --use-conda --conda-frontend mamba $CONTAINER_FLAGS || true" 2>/dev/null || true
         echo ""
         echo "Step 2: Re-running workflow with incomplete file recovery..."
         START_TIME=$(date +%s)
-        run_snakemake "$WORKFLOW_DIR" "snakemake all --rerun-incomplete --use-conda --conda-frontend mamba --cores $CORES $EXTRA_FLAGS"
+        run_snakemake "$WORKFLOW_DIR" "snakemake all --rerun-incomplete --use-conda --conda-frontend mamba --cores $CORES $CONTAINER_FLAGS $EXTRA_FLAGS"
         END_TIME=$(date +%s)
         DURATION=$((END_TIME - START_TIME))
         echo ""
@@ -1411,12 +1591,12 @@ case "$COMMAND" in
         ;;
     unlock)
         echo "Unlocking $WORKFLOW workflow directory..."
-        run_snakemake "$WORKFLOW_DIR" "snakemake --unlock --use-conda --conda-frontend mamba"
+        run_snakemake "$WORKFLOW_DIR" "snakemake --unlock --use-conda --conda-frontend mamba $CONTAINER_FLAGS"
         echo "Workflow directory unlocked successfully!"
         ;;
     status)
         echo "Checking $WORKFLOW workflow status..."
-        run_snakemake "$WORKFLOW_DIR" "snakemake all --use-conda --conda-frontend mamba --dry-run --quiet"
+        run_snakemake "$WORKFLOW_DIR" "snakemake all --use-conda --conda-frontend mamba --dry-run --quiet $CONTAINER_FLAGS"
         if [[ -d "$WORKFLOW_DIR/results" ]]; then
             echo ""
             echo "Results directory contents:"

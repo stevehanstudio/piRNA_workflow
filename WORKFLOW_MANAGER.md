@@ -48,6 +48,27 @@ The workflow manager (`run_workflow.sh`) is designed for **Linux/macOS** and req
 
 3. **Workflow directories**: Ensure both `CHIP-seq/` and `totalRNA-seq/` directories exist with valid Snakefiles.
 
+### Apptainer Container Support (Optional)
+
+For reproducible runs with pinned tool versions (Bowtie 1.0.1-nh, FastQC 0.11.3, Cutadapt 1.8.3, etc.):
+
+1. **Install Apptainer**: https://apptainer.org/docs/admin/latest/installation.html
+
+2. **Unified pipeline container** (recommended): Build once, used by all pipelines:
+   ```bash
+   apptainer build containers/pirna_pipeline.sif containers/pipeline.def
+   ```
+   When `pirna_pipeline.sif` exists, the workflow runs Snakemake inside it automatically.
+
+3. **Individual tool containers** (fallback): Run with `--use-apptainer`; the workflow manager builds FastQC, Cutadapt, and Bowtie containers from `CHIP-seq/envs/*.def` when the pipeline container is not available.
+
+4. **Unprivileged execution issues**: If `apptainer exec` fails with permission errors, use:
+   ```bash
+   ./run_workflow.sh 1 run --use-apptainer --use-sudo
+   ```
+
+See [containers/CONTAINER_KNOWN_ISSUES.md](containers/CONTAINER_KNOWN_ISSUES.md) for known build and runtime issues.
+
 ## Usage
 
 ### Basic Syntax
@@ -82,6 +103,8 @@ The workflow manager (`run_workflow.sh`) is designed for **Linux/macOS** and req
 |--------|-------------|
 | `--cores N` | Number of CPU cores to use (prompts interactively if not specified) |
 | `--rerun-incomplete` | Re-run incomplete jobs |
+| `--use-apptainer` | Use Apptainer containers (builds pipeline or individual tool containers; ensures pinned tool versions) |
+| `--use-sudo` | Use sudo for Apptainer exec (when unprivileged execution fails on some systems) |
 
 ### Path Override Options
 
@@ -321,6 +344,14 @@ If workflows fail due to missing files:
 # Then validate again
 ./run_workflow.sh [workflow] check-inputs
 ```
+
+### Container Build Failures
+If Apptainer build fails (e.g., "mount namespace requires privileges"):
+- **Option 1**: Build with sudo: `sudo apptainer build containers/pirna_pipeline.sif containers/pipeline.def`
+- **Option 2**: Use remote builder: `apptainer remote login` (create account at https://cloud.sylabs.io/), then retry
+- **Option 3**: Run without containers (conda-only): omit `--use-apptainer`
+
+See [containers/CONTAINER_KNOWN_ISSUES.md](containers/CONTAINER_KNOWN_ISSUES.md) for details.
 
 ### Lock and Incomplete File Issues
 If workflows are interrupted (e.g., SSH disconnects):

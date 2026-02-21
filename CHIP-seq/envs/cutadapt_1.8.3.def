@@ -1,0 +1,18 @@
+Bootstrap: docker
+From: python:2.7-slim
+
+%labels
+    Maintainer HeLab
+    Version 1.8.3
+    Description Cutadapt 1.8.3 - original pipeline version (Python 2.7)
+
+%post
+    # Debian Buster is EOL - point apt to archive.debian.org
+    echo "deb http://archive.debian.org/debian/ buster main" > /etc/apt/sources.list
+    echo "deb http://archive.debian.org/debian-security buster/updates main" >> /etc/apt/sources.list
+    apt-get update && apt-get install -y --no-install-recommends gcc python-dev && \
+    pip install --no-cache-dir cutadapt==1.8.3 && \
+    apt-get purge -y gcc python-dev && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+
+%runscript
+    exec cutadapt "$@"

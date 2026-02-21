@@ -34,6 +34,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+*.conda
 .snakemake/
 
 # Snakemake
@@ -44,8 +45,22 @@ results_*/
 *.log.*
 CHIP-seq/Panx_White_GLKD/
 
+# Legacy/orphaned marker files (Docker removed from workflow)
+*_use_docker
+
 # Workflow manager temporary files
 **/config_override.yaml
+**/config_container.yaml
+Shared/Scripts/bin/.samtools_018_src
+Shared/Scripts/bin/.samtools_016_src
+
+# Apptainer/Singularity container images (built locally from .def files)
+containers/pirna_pipeline.sif
+*.sif
+*.sif_sav
+
+# Java font cache (created by FastQC, Picard, etc. at runtime)
+\?/
 
 # Large data files
 *.fastq

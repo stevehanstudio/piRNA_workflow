@@ -237,8 +237,6 @@ The pipeline uses conda environments defined in `envs/`:
 - `envs/fastqc.yaml`: FastQC for quality control
 - `envs/cutadapt.yaml`: Cutadapt for adapter trimming
 - `envs/bedops.yaml`: BEDOPS for genomic operations
-- `envs/macs2-2.1.0.yaml`: MACS2 for peak calling
-
 ## Performance Optimization
 
 ### Recommended System Requirements
@@ -290,7 +288,6 @@ The pipeline generates BigWig files for visualization in genome browsers:
 The enrichment track shows regions where ChIP signal is significantly higher than Input:
 - **Positive values**: Regions enriched in ChIP sample
 - **Negative values**: Regions depleted in ChIP sample
-- **Peak calling**: Use MACS2 or similar tools for formal peak detection
 
 ### Coverage Analysis
 
