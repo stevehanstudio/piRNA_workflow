@@ -1,6 +1,14 @@
 # Apptainer definition for piRNA pipeline (CHIP-seq + totalRNA-seq)
 # Build from project root: apptainer build containers/pirna_pipeline.sif containers/pipeline.def
 # Contains all tools at original pipeline versions for reproducibility
+#
+# Build flowchart: Shared/Scripts/mermaid/pipeline_container_build.mmd
+#
+# Architecture-specific install strategy:
+#   x86_64:  STAR uses pre-built binary from release; RSEM from bioconda; samtools/Bowtie from source
+#   aarch64: STAR compiles from source; RSEM from bioconda; samtools/Bowtie from source (Bowtie uses cpuid_arm64.h)
+#   Bowtie:  Always compiled (patched 1.0.1-hamrhein_nh from Peng-He-Lab)
+#   Samtools 0.1.8/0.1.16: Always compiled (exact versions not in bioconda)
 
 Bootstrap: docker
 From: ubuntu:22.04
@@ -99,28 +107,30 @@ From: ubuntu:22.04
     pip install --no-cache-dir cutadapt==1.8.3
     ln -sf /opt/miniconda3/envs/cutadapt/bin/cutadapt /usr/local/bin/cutadapt
 
-    # Layer 8: STAR 2.7.9a
+    # Layer 8: STAR 2.7.9a (x86_64: pre-built binary; aarch64: compile from source)
     curl -sL https://github.com/alexdobin/STAR/archive/refs/tags/2.7.9a.tar.gz -o /tmp/STAR.tar.gz
     tar -xzf /tmp/STAR.tar.gz -C /tmp
-    cd /tmp/STAR-2.7.9a/source
-    if [ "$(uname -m)" = "aarch64" ]; then
-        make STAR CXXFLAGS_SIMD=""
-    else
-        make STAR
-    fi
     mkdir -p /opt/pipeline/STAR-2.7.9a/bin
-    cp STAR /opt/pipeline/STAR-2.7.9a/bin/
+    if [ "$(uname -m)" = "x86_64" ]; then
+        cp /tmp/STAR-2.7.9a/bin/Linux_x86_64/STAR /opt/pipeline/STAR-2.7.9a/bin/
+    else
+        cd /tmp/STAR-2.7.9a/source
+        if [ "$(uname -m)" = "aarch64" ]; then
+            make STAR CXXFLAGS_SIMD=""
+        else
+            make STAR
+        fi
+        cp STAR /opt/pipeline/STAR-2.7.9a/bin/
+        cd /
+    fi
+    chmod +x /opt/pipeline/STAR-2.7.9a/bin/STAR
     ln -sf /opt/pipeline/STAR-2.7.9a/bin/STAR /usr/local/bin/STAR
-    cd / && rm -rf /tmp/STAR-2.7.9a /tmp/STAR.tar.gz
+    rm -rf /tmp/STAR-2.7.9a /tmp/STAR.tar.gz
 
-    # Layer 9: RSEM 1.3.3
-    curl -sL https://github.com/deweylab/RSEM/archive/refs/tags/v1.3.3.tar.gz -o /tmp/RSEM.tar.gz
-    tar -xzf /tmp/RSEM.tar.gz -C /tmp
-    cd /tmp/RSEM-1.3.3
-    make
-    make ebseq
-    make install prefix=/opt/pipeline/rsem-1.3.3
-    cd / && rm -rf /tmp/RSEM-1.3.3 /tmp/RSEM.tar.gz
+    # Layer 9: RSEM 1.3.3 (bioconda pre-built for linux-64 and linux-aarch64)
+    /opt/miniconda3/bin/conda create -y -n rsem rsem=1.3.3 -c bioconda -c conda-forge
+    mkdir -p /opt/pipeline/rsem-1.3.3/bin
+    for f in /opt/miniconda3/envs/rsem/bin/*; do ln -sf "$f" /opt/pipeline/rsem-1.3.3/bin/; done
 
     # Layer 10: deepTools 2.4.2
     /opt/miniconda3/bin/conda create -y -n deeptools python=3.6

@@ -23,6 +23,10 @@ ABS_SNAKEFILE_DIR = os.path.abspath(SNAKEFILE_DIR)
 # PATCHED BOWTIE CONFIGURATION (same as original Luo_2025_piRNA pipeline)
 # ==============================================================================
 if PIPELINE_CONTAINER:
+    SAMTOOLS_018 = os.environ.get("SAMTOOLS_018", "/opt/pipeline/samtools-0.1.8/samtools")
+    SAMTOOLS_016 = os.environ.get("SAMTOOLS_016", "/opt/pipeline/samtools-0.1.16/samtools")
+    SAMTOOLS_SORT_CMD = SAMTOOLS_016
+    SAMTOOLS_INDEX_CMD = SAMTOOLS_016
     BOWTIE_CMD = "bowtie"
     BOWTIE_BUILD_CMD = "bowtie-build"
     BOWTIE_CONTAINER = None
@@ -62,6 +66,8 @@ else:
     USE_BOWTIE_CONTAINER = os.path.exists(BOWTIE_SIF) and os.path.isfile(BOWTIE_SIF)
     BOWTIE_CONTAINER = BOWTIE_SIF if USE_BOWTIE_CONTAINER else None
     BOWTIE_ENV = "envs/bowtie.yaml"  # used when not using bowtie container
+    SAMTOOLS_SORT_CMD = "samtools"
+    SAMTOOLS_INDEX_CMD = "samtools"
 
     FASTQC_SIF = os.path.join(PROJECT_ROOT, "CHIP-seq", "envs", "fastqc_0.11.3.sif")
     FASTQC_CMD = "fastqc"
@@ -481,7 +487,7 @@ rule samtools_sort_index_vector:
     conda:
         BOWTIE_ENV
     shell:
-        "mkdir -p {VECTOR_DIR} && samtools sort {input.bam} {params.sort_prefix} && samtools index {output.sorted_bam}"
+        "mkdir -p {VECTOR_DIR} && {SAMTOOLS_SORT_CMD} sort {input.bam} {params.sort_prefix} && {SAMTOOLS_INDEX_CMD} index {output.sorted_bam}"
 
 rule feature_counts:
     input:

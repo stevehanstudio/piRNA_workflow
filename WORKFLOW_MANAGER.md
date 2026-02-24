@@ -10,6 +10,12 @@ The `run_workflow.sh` script provides a unified interface for managing both work
 
 ## Prerequisites
 
+### **Platform Support**
+
+- **Linux (Ubuntu)**: Fully supported on x86_64 and ARM64 (aarch64). Tested on both architectures.
+- **macOS**: Supported for conda-only runs. Apptainer requires Linux.
+- **Windows**: Use [WSL2](https://docs.microsoft.com/en-us/windows/wsl/install) for full compatibility.
+
 ### **Platform Requirements**
 
 The workflow manager (`run_workflow.sh`) is designed for **Linux/macOS** and requires the following Unix utilities:
@@ -48,24 +54,31 @@ The workflow manager (`run_workflow.sh`) is designed for **Linux/macOS** and req
 
 3. **Workflow directories**: Ensure both `CHIP-seq/` and `totalRNA-seq/` directories exist with valid Snakefiles.
 
-### Apptainer Container Support (Optional)
+### Apptainer Container Support (Recommended)
 
-For reproducible runs with pinned tool versions (Bowtie 1.0.1-nh, FastQC 0.11.3, Cutadapt 1.8.3, etc.):
+**Easiest option**—avoids compiling tools from source. Without Apptainer, users must build the patched Bowtie, samtools 0.1.8/0.1.16, and other tools themselves. The container provides all pinned versions (Bowtie 1.0.1-nh, FastQC 0.11.3, Cutadapt 1.8.3, etc.):
 
-1. **Install Apptainer**: https://apptainer.org/docs/admin/latest/installation.html
+1. **Install Apptainer** (Linux only; supports x86_64 and ARM64):
+   ```bash
+   # Ubuntu/Debian
+   sudo add-apt-repository -y ppa:apptainer/ppa
+   sudo apt-get update && sudo apt-get install -y apptainer
+   ```
+   For other distributions or manual install: https://apptainer.org/docs/admin/latest/installation.html
 
 2. **Unified pipeline container** (recommended): Build once, used by all pipelines:
    ```bash
    apptainer build containers/pirna_pipeline.sif containers/pipeline.def
    ```
-   When `pirna_pipeline.sif` exists, the workflow runs Snakemake inside it automatically.
+   If the build fails (e.g. "mount namespace requires privileges"), use `sudo apptainer build ...` or the remote builder (see [CONTAINER_KNOWN_ISSUES.md](containers/CONTAINER_KNOWN_ISSUES.md)). **Note:** SIF images are architecture-specific—build on x86_64 for x86 machines, on ARM64 for ARM machines. When `pirna_pipeline.sif` exists, the workflow runs Snakemake inside it automatically.
 
 3. **Individual tool containers** (fallback): Run with `--use-apptainer`; the workflow manager builds FastQC, Cutadapt, and Bowtie containers from `CHIP-seq/envs/*.def` when the pipeline container is not available.
 
-4. **Unprivileged execution issues**: If `apptainer exec` fails with permission errors, use:
-   ```bash
-   ./run_workflow.sh 1 run --use-apptainer --use-sudo
-   ```
+4. **Sudo** is only needed when *building* the container if unprivileged build fails. Running the workflow (`apptainer exec`) typically does not require sudo. On rare systems, if you see permission errors when running, try `--use-sudo`; see [CONTAINER_KNOWN_ISSUES.md](containers/CONTAINER_KNOWN_ISSUES.md).
+
+5. **External data (symlinks)**: If `Shared/DataFiles/genomes` is a symlink to data on another drive or path (e.g. to save space on the primary disk), the workflow manager automatically bind-mounts the symlink target into the container so the path resolves correctly. This works on any machine—the target path can be `/mnt/data/...`, `/data/...`, or elsewhere. No extra configuration is needed.
+
+**Path convention:** `genomes/` holds reference data (FASTA, annotations, Bowtie indexes). The totalRNA-seq pipeline also writes STAR/RSEM indexes to `genome/` (singular) under Shared/DataFiles; that directory is workflow-generated and stays in the project.
 
 See [containers/CONTAINER_KNOWN_ISSUES.md](containers/CONTAINER_KNOWN_ISSUES.md) for known build and runtime issues.
 
@@ -102,9 +115,10 @@ See [containers/CONTAINER_KNOWN_ISSUES.md](containers/CONTAINER_KNOWN_ISSUES.md)
 | Option | Description |
 |--------|-------------|
 | `--cores N` | Number of CPU cores to use (prompts interactively if not specified) |
+| `--defaults` | Use default genome/paths from config; skip interactive prompts. **Recommended** when data is in standard locations (`Shared/DataFiles/genomes`, etc.) |
 | `--rerun-incomplete` | Re-run incomplete jobs |
 | `--use-apptainer` | Use Apptainer containers (builds pipeline or individual tool containers; ensures pinned tool versions) |
-| `--use-sudo` | Use sudo for Apptainer exec (when unprivileged execution fails on some systems) |
+| `--use-sudo` | Use sudo for Apptainer exec (rarely needed; only when unprivileged exec fails on some systems) |
 
 ### Path Override Options
 

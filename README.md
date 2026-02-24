@@ -19,6 +19,10 @@ This repository contains a bioinformatics workflow system that is **converting a
 ## 🎯 Quick Start
 
 ```bash
+# Recommended (when data is in Shared/DataFiles/genomes, etc.)
+./run_workflow.sh 1 run --use-apptainer --defaults   # ChIP-seq
+./run_workflow.sh 4 run --use-apptainer --defaults   # totalRNA-seq
+
 # Interactive mode - guided setup with smart resource detection
 ./run_workflow.sh
 
@@ -69,7 +73,7 @@ This project **builds upon and enhances** the original work by [Luo et al. 2025]
 ├── Shared/                  # Common resources for all workflows
 │   ├── Scripts/             # Shared Python, shell, and Mermaid diagrams
 │   ├── DataFiles/           # Common genome files and datasets
-│   │   ├── genome/          # Reference genomes and indexes
+│   │   ├── genomes/         # Reference genomes, annotations, indexes (can be symlinked)
 │   │   └── datasets/        # Input FASTQ files
 │   └── README.md            # Shared resources documentation
 ├── containers/              # Apptainer definition files (build with apptainer build)
@@ -85,7 +89,7 @@ This project **builds upon and enhances** the original work by [Luo et al. 2025]
 ### **Reproducibility**
 - **Snakemake workflows** for reproducible analysis
 - **Conda environments** for dependency management
-- **Apptainer containers** (optional): unified pipeline image with pinned tool versions (Bowtie 1.0.1-nh, FastQC 0.11.3, Cutadapt 1.8.3, etc.)
+- **Apptainer containers** (recommended): unified pipeline image with pinned tool versions (Bowtie 1.0.1-nh, FastQC 0.11.3, Cutadapt 1.8.3, etc.). This is the easiest option—without it, users must compile several tools (patched Bowtie, samtools 0.1.8/0.1.16) themselves.
 - **Version-controlled** configurations and parameters
 
 ### **Scalability**
@@ -113,13 +117,25 @@ This project **builds upon and enhances** the original work by [Luo et al. 2025]
 
 ## 🚀 Setup
 
+### Platform Support
+
+The workflows are tested on **Ubuntu Linux** for:
+- **x86_64 (amd64)** — e.g. lab servers, most PCs
+- **ARM64 (aarch64)** — e.g. Apple Silicon Macs (via Linux/VM), ARM dev boards
+
+Conda-only mode also runs on macOS. Apptainer containers require Linux.
+
 ### Prerequisites
 
 1. **Install Miniconda** (if not already installed):
    ```bash
-   # Linux
+   # Linux x86_64
    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
    bash Miniconda3-latest-Linux-x86_64.sh
+
+   # Linux ARM64
+   wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh
+   bash Miniconda3-latest-Linux-aarch64.sh
 
    # macOS
    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh
@@ -144,11 +160,19 @@ This project **builds upon and enhances** the original work by [Luo et al. 2025]
    conda create -n snakemake_env -c bioconda -c conda-forge snakemake
    ```
 
-3. **Optional – Apptainer container**: For best reproducibility, build the pipeline container. The workflow will use it automatically when available:
+3. **Recommended – Apptainer container**: The easiest way to run the pipelines—no manual compilation. Several tools (patched Bowtie, samtools 0.1.8/0.1.16) require building from source otherwise. Install Apptainer and build the pipeline container:
+   ```bash
+   # Ubuntu: install Apptainer
+   sudo add-apt-repository -y ppa:apptainer/ppa
+   sudo apt-get update && sudo apt-get install -y apptainer
+
+   # Or see https://apptainer.org/docs/admin/latest/installation.html for other distros
+   ```
+   Then build the container (run from project root):
    ```bash
    apptainer build containers/pirna_pipeline.sif containers/pipeline.def
    ```
-   Or run with `--use-apptainer` to let the workflow manager build individual tool containers.
+   The workflow will use it automatically when available. Or run with `--use-apptainer` to let the workflow manager build individual tool containers.
 
 4. **Run a workflow**:
    ```bash

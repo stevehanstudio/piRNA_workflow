@@ -7,8 +7,8 @@
 
 ## Storage Location
 
-**Physical Location:** `/mnt/data/Projects/HeLab/piRNA_workflow/Shared/DataFiles/genome/`  
-**Access Path:** `Shared/DataFiles/genome/` (via symlink)  
+**Physical Location:** `/mnt/data/Projects/HeLab/piRNA_workflow/Shared/DataFiles/genomes/`  
+**Access Path:** `Shared/DataFiles/genomes/` (via symlink)  
 **Migration Date:** November 7, 2025  
 
 **Storage Strategy:**
@@ -24,9 +24,11 @@
 
 **Symlink:**
 ```bash
-/home/steve/Projects/HeLab/piRNA_workflow/Shared/DataFiles/genome
-    -> /mnt/data/Projects/HeLab/piRNA_workflow/Shared/DataFiles/genome/
+/home/steve/Projects/HeLab/piRNA_workflow/Shared/DataFiles/genomes
+    -> /mnt/data/Projects/HeLab/piRNA_workflow/Shared/DataFiles/genomes/
 ```
+
+When using Apptainer, the workflow manager automatically bind-mounts the symlink target so paths resolve inside the container (see WORKFLOW_MANAGER.md).
 
 ---
 
@@ -281,7 +283,7 @@ RSEM indexes for transcript quantification:
 ## File Organization
 
 ```
-Shared/DataFiles/genome/
+Shared/DataFiles/genomes/
 ├── {genome}.fa                          # Main genome FASTA
 ├── {genome}-blacklist.v2.bed.gz        # Blacklist regions (if available)
 ├── {genome}.fa.fai                     # FASTA index (auto-generated)

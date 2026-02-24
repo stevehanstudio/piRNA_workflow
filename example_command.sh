@@ -25,14 +25,13 @@
 #   - Choose optimal core count based on system resources
 #
 # OPTION B: Command-line Mode (Recommended for automation/batch processing)
-# Specify all parameters directly on the command line:
-
+# Replace /path/to/piRNA_workflow with your project root (e.g. /mnt/data/.../piRNA_workflow)
 ./run_workflow.sh 1 run \
-  --genome-path /mnt/dev0/hans/piRNA_workflow/Shared/DataFiles/genome/dm6.fa \
-  --index-path /mnt/dev0/hans/piRNA_workflow/Shared/DataFiles/genome/bowtie-indexes/dm6 \
-  --dataset-path /mnt/dev0/hans/piRNA_workflow/Shared/DataFiles/datasets/chip-seq/chip_inputs \
-  --vector-path /mnt/dev0/hans/piRNA_workflow/Shared/DataFiles/genome/YichengVectors/42AB_UBIG \
-  --adapter-path /mnt/dev0/hans/piRNA_workflow/Shared/DataFiles/genome/AllAdaptors.fa \
+  --genome-path /path/to/piRNA_workflow/Shared/DataFiles/genomes/dm6.fa \
+  --index-path /path/to/piRNA_workflow/Shared/DataFiles/genomes/bowtie-indexes/dm6 \
+  --dataset-path /path/to/piRNA_workflow/Shared/DataFiles/datasets/chip-seq/chip_inputs \
+  --vector-path /path/to/piRNA_workflow/Shared/DataFiles/genomes/YichengVectors/42AB_UBIG \
+  --adapter-path /path/to/piRNA_workflow/Shared/DataFiles/genomes/AllAdaptors.fa \
   --cores 24
 
 # NOTES:

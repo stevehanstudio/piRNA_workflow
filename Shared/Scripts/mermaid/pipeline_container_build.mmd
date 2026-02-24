@@ -1,0 +1,40 @@
+flowchart TD
+    Start([Bootstrap: ubuntu:22.04])
+
+    Start --> SysDeps[Layer 1: System deps<br/>apt: build-essential, gfortran,<br/>curl, zlib, python3, java, r-base]
+    SysDeps --> Miniforge[Layer 2: Miniforge<br/>conda-forge, arch-aware]
+    Miniforge --> Samtools018[Layer 3: samtools 0.1.8<br/>compile from source<br/>SourceForge]
+    Samtools018 --> Samtools016[Layer 4: samtools 0.1.16<br/>compile from source<br/>SourceForge]
+    Samtools016 --> Bowtie{Bowtie 1.0.1-nh<br/>Layer 5}
+    Bowtie -->|x86_64| BowtieX86[compile, Peng-He-Lab<br/>patched repo]
+    Bowtie -->|aarch64| BowtieARM[compile with cpuid_arm64.h<br/>POPCNT_CAPABILITY=0]
+    BowtieX86 --> FastQC
+    BowtieARM --> FastQC[Layer 6: FastQC 0.11.3<br/>pre-built .zip]
+    FastQC --> Cutadapt[Layer 7: Cutadapt 1.8.3<br/>conda + pip]
+    Cutadapt --> STAR{STAR 2.7.9a<br/>Layer 8}
+    STAR -->|x86_64| STARPrebuilt[copy pre-built binary<br/>bin/Linux_x86_64/STAR]
+    STAR -->|aarch64| STARCompile[compile from source<br/>CXXFLAGS_SIMD=""]
+    STARPrebuilt --> RSEM
+    STARCompile --> RSEM[Layer 9: RSEM 1.3.3<br/>bioconda]
+    RSEM --> DeepTools[Layer 10: deepTools 2.4.2<br/>conda + pip]
+    DeepTools --> Snakemake[Layer 11: Snakemake + mamba<br/>conda base]
+    Snakemake --> End([pirna_pipeline.sif<br/>ready])
+
+    %% Styling
+    style Start fill:#e1f5ff
+    style End fill:#e1f5ff
+    style Bowtie fill:#ffebee
+    style STAR fill:#ffebee
+    style SysDeps fill:#f5f5f5
+    style Miniforge fill:#e3f2fd
+    style Samtools018 fill:#fff4e6
+    style Samtools016 fill:#fff4e6
+    style BowtieX86 fill:#fff4e6
+    style BowtieARM fill:#fff4e6
+    style STARPrebuilt fill:#e8f5e9
+    style STARCompile fill:#fff4e6
+    style FastQC fill:#e8f5e9
+    style Cutadapt fill:#f3e5f5
+    style RSEM fill:#e8f5e9
+    style DeepTools fill:#f3e5f5
+    style Snakemake fill:#e3f2fd

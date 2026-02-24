@@ -1057,12 +1057,33 @@ run_snakemake() {
         echo ""
         local abs_project="$(cd "$SCRIPT_ROOT" && pwd)"
         local abs_workflow="$(cd "$abs_project/$workflow_dir" 2>/dev/null && pwd || echo "$abs_project/$workflow_dir")"
+        # Bind-mount project. If Shared/DataFiles/genomes is a symlink outside the project (e.g. to
+        # /mnt/data/...), bind the symlink's mount root so the path resolves inside the container.
+        local bind_opts="-B $abs_project:/work"
+        local genomes_path="$abs_project/Shared/DataFiles/genomes"
+        if [[ -L "$genomes_path" ]]; then
+            local target
+            target=$(readlink -f "$genomes_path" 2>/dev/null || true)
+            if [[ -n "$target" && -d "$target" && "$target" != "$abs_project"/* ]]; then
+                # Extract mount root (e.g. /mnt/data from /mnt/data/Projects/.../genomes)
+                local mount_root
+                case "$target" in
+                    /mnt/*) mount_root="$(echo "$target" | cut -d/ -f1-3)" ;;  # /mnt/data
+                    /data|/data/*) mount_root="/data" ;;
+                    /home|/home/*) mount_root="/home" ;;
+                    *) mount_root="$(echo "$target" | cut -d/ -f1-3)" ;;  # /media/disk etc.
+                esac
+                if [[ -d "$mount_root" ]]; then
+                    bind_opts="$bind_opts -B $mount_root:$mount_root"
+                fi
+            fi
+        fi
         # Use APPTAINERENV_ to pass env vars (avoids -e parsing issues that can confuse Snakemake/Apptainer)
         export APPTAINERENV_PIPELINE_CONTAINER=1
         export APPTAINERENV_SAMTOOLS_018=/opt/pipeline/samtools-0.1.8/samtools
         export APPTAINERENV_SAMTOOLS_016=/opt/pipeline/samtools-0.1.16/samtools
         $APPTAINER_CMD exec \
-                -B "$abs_project:/work" \
+                $bind_opts \
                 "$PIPELINE_SIF" \
                 bash -c "cd /work/${workflow_dir} && ${command} ${config_override}"
     else

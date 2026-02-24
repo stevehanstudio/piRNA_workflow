@@ -73,8 +73,8 @@ read_length: 50
 adapters: ""  # Leave empty if no adapter trimming needed
 
 # Mapping parameters
-rrna_index: "../Shared/DataFiles/genome/rrna/dmel_rRNA_unit"
-vector_index: "../Shared/DataFiles/genome/YichengVectors/42AB_UBIG"
+rrna_index: "../Shared/DataFiles/genomes/rrna/dmel_rRNA_unit"
+vector_index: "../Shared/DataFiles/genomes/YichengVectors/42AB_UBIG"
 ```
 
 ## Version Fidelity and Log Comparison
@@ -83,7 +83,7 @@ This pipeline maintains **the same tool versions** as the [original Luo totalRNA
 
 **Log comparison:** When comparing our workflow logs to logs from the original pipeline, you should see the same behavior, messages, and tool output at each stage—including any errors or warnings. We do not substitute newer tool versions to work around known issues; this ensures reproducibility and direct comparability with the original methodology.
 
-**Known issue:** The `samtools_sort_index_vector` rule uses `samtools` (0.1.8 in the pipeline container). On some inputs, samtools 0.1.8 may report `[bam_index_core] the alignment is not sorted` or similar. This matches the original pipeline behavior at this stage; we do not switch to samtools 0.1.16 for this step in order to preserve version fidelity.
+**Note:** The `samtools_sort_index_vector` rule uses samtools 0.1.16 for sort/index when running in the pipeline container (matching the original pipeline, which uses samtools-0.1.16 for these operations).
 
 ## Direct Snakemake Usage
 

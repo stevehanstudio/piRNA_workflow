@@ -27,7 +27,7 @@ This folder contains resources shared between the CHIP-seq and totalRNA-seq work
 - **Usage**: Symbolically linked from both workflow directories
 - **Contents**: Ignores common bioinformatics file types, results, and temporary files
 
-### genome/
+### genomes/
 - **dm6.fa**: Drosophila melanogaster reference genome (dm6 assembly)
 - **dm6.fa.fai**: Genome index file for samtools
 - **dm6-blacklist.v2.bed.gz**: Blacklist regions for dm6 genome

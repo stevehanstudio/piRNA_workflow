@@ -5,6 +5,8 @@
 
 **Current implementation:** This project uses Apptainer `.def` files only. Dockerfiles are not maintained; the Docker examples below are for reference.
 
+**Build flowchart:** See [Shared/Scripts/mermaid/pipeline_container_build.mmd](Shared/Scripts/mermaid/pipeline_container_build.mmd) for a diagram of the pipeline container build stages and architecture-specific branches (x86_64 vs ARM64).
+
 ---
 
 ## Executive Summary
