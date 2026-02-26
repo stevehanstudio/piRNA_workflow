@@ -1027,6 +1027,12 @@ run_snakemake() {
     local command=$2
     shift 2
 
+    local script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    # Use project-local temp dir so tools (bamCompare, deepTools, etc.) avoid filling root /tmp
+    local project_tmp="$script_root/.tmp"
+    mkdir -p "$project_tmp"
+    export TMPDIR="$project_tmp"
+
     # Create temporary config if path overrides or genome version are provided
     local temp_config=""
     if [[ -n "$GENOME_PATH" || -n "$INDEX_PATH" || -n "$DATASET_PATH" || -n "$VECTOR_PATH" || -n "$ADAPTER_PATH" || -n "$GENOME_VERSION" ]]; then
@@ -1057,6 +1063,8 @@ run_snakemake() {
         echo ""
         local abs_project="$(cd "$SCRIPT_ROOT" && pwd)"
         local abs_workflow="$(cd "$abs_project/$workflow_dir" 2>/dev/null && pwd || echo "$abs_project/$workflow_dir")"
+        # Container uses project temp dir (project/.tmp bind-mounted as /work/.tmp)
+        export APPTAINERENV_TMPDIR=/work/.tmp
         # Bind-mount project. If Shared/DataFiles/genomes is a symlink outside the project (e.g. to
         # /mnt/data/...), bind the symlink's mount root so the path resolves inside the container.
         local bind_opts="-B $abs_project:/work"

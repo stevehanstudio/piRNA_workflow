@@ -49,6 +49,7 @@ CHIP-seq/Panx_White_GLKD/
 *_use_docker
 
 # Workflow manager temporary files
+.tmp/
 **/config_override.yaml
 **/config_container.yaml
 Shared/Scripts/bin/.samtools_018_src
