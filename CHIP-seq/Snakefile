@@ -369,7 +369,7 @@ if PIPELINE_CONTAINER:
         shell:
             """
             mkdir -p {RESULTS_DIR}/fastqc_raw
-            fastqc {input.fastq} -o {RESULTS_DIR}/fastqc_raw
+            JAVA_TOOL_OPTIONS=-Djava.awt.headless=true fastqc {input.fastq} -o {RESULTS_DIR}/fastqc_raw
             """
 else:
     rule fastqc_raw:
@@ -385,7 +385,7 @@ else:
         shell:
             """
             mkdir -p {RESULTS_DIR}/fastqc_raw
-            fastqc {input.fastq} -o {RESULTS_DIR}/fastqc_raw
+            JAVA_TOOL_OPTIONS=-Djava.awt.headless=true fastqc {input.fastq} -o {RESULTS_DIR}/fastqc_raw
             """
 
 if PIPELINE_CONTAINER:
@@ -454,7 +454,7 @@ if PIPELINE_CONTAINER:
         shell:
             """
             mkdir -p {RESULTS_DIR}/fastqc_trimmed
-            fastqc {input.fastq} -o {RESULTS_DIR}/fastqc_trimmed
+            JAVA_TOOL_OPTIONS=-Djava.awt.headless=true fastqc {input.fastq} -o {RESULTS_DIR}/fastqc_trimmed
             """
 else:
     rule fastqc_trimmed:
@@ -470,7 +470,7 @@ else:
         shell:
             """
             mkdir -p {RESULTS_DIR}/fastqc_trimmed
-            fastqc {input.fastq} -o {RESULTS_DIR}/fastqc_trimmed
+            JAVA_TOOL_OPTIONS=-Djava.awt.headless=true fastqc {input.fastq} -o {RESULTS_DIR}/fastqc_trimmed
             """
 
 rule trim_to_50bp:

@@ -299,7 +299,7 @@ rule fastqc_initial:
     conda:
         FASTQC_ENV
     shell:
-        "mkdir -p {FASTQC_INITIAL_DIR} && fastqc {input.fastq} -o {FASTQC_INITIAL_DIR} -k 6"
+        "mkdir -p {FASTQC_INITIAL_DIR} && JAVA_TOOL_OPTIONS=-Djava.awt.headless=true fastqc {input.fastq} -o {FASTQC_INITIAL_DIR} -k 6"
 
 # Optional: Adapter trimming with cutadapt (if adapters are known)
 if CUTADAPT_USE_CONTAINER:
@@ -367,7 +367,7 @@ else:
         conda:
             FASTQC_ENV
         shell:
-            "mkdir -p {FASTQC_TRIMMED_DIR} && fastqc {input.fastq} -o {FASTQC_TRIMMED_DIR} -k 6"
+            "mkdir -p {FASTQC_TRIMMED_DIR} && JAVA_TOOL_OPTIONS=-Djava.awt.headless=true fastqc {input.fastq} -o {FASTQC_TRIMMED_DIR} -k 6"
 
 # Ribosomal RNA removal using bowtie
 rule rrna_removal:
