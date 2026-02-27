@@ -23,6 +23,12 @@ This repository contains a bioinformatics workflow system that is **converting a
 ./run_workflow.sh 1 run --use-apptainer --defaults   # ChIP-seq
 ./run_workflow.sh 4 run --use-apptainer --defaults   # totalRNA-seq
 
+# Non-interactive clean restart (remove old results first; skips overwrite prompt)
+./run_workflow.sh 1 run --use-apptainer --defaults --clean
+
+# Resume interrupted runs without deleting existing good outputs
+./run_workflow.sh 1 run --use-apptainer --defaults --rerun-incomplete
+
 # Interactive mode - guided setup with smart resource detection
 ./run_workflow.sh
 
@@ -36,6 +42,10 @@ This repository contains a bioinformatics workflow system that is **converting a
 - ✅ Smart resource detection and optimization
 - ✅ Automatic error recovery and lock management
 - ✅ Input validation and overwrite protection
+
+**`--clean` vs `--rerun-incomplete`:**
+- `--clean`: deletes `results/` before run (fresh restart, non-interactive)
+- `--rerun-incomplete`: keeps existing outputs and only retries incomplete/failed jobs
 
 > **Advanced Users**: You can also run workflows directly with Snakemake. See the individual workflow READMEs ([CHIP-seq](CHIP-seq/README.md) or [totalRNA-seq](totalRNA-seq/README.md)) for direct Snakemake usage examples.
 

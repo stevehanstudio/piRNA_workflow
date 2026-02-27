@@ -116,6 +116,7 @@ See [containers/CONTAINER_KNOWN_ISSUES.md](containers/CONTAINER_KNOWN_ISSUES.md)
 |--------|-------------|
 | `--cores N` | Number of CPU cores to use (prompts interactively if not specified) |
 | `--defaults` | Use default genome/paths from config; skip interactive prompts. **Recommended** when data is in standard locations (`Shared/DataFiles/genomes`, etc.) |
+| `--clean` | Remove `results/` before `run`/`run-force` (non-interactive, bypasses overwrite prompt) |
 | `--rerun-incomplete` | Re-run incomplete jobs |
 | `--use-apptainer` | Use Apptainer containers (builds pipeline or individual tool containers; ensures pinned tool versions) |
 | `--use-sudo` | Use sudo for Apptainer exec (rarely needed; only when unprivileged exec fails on some systems) |
@@ -191,6 +192,7 @@ The script now includes several interactive features to improve user experience:
    - Shows preview of existing files and prompts for confirmation
    - Prevents accidental overwriting of valuable results
    - Auto-applies `--forceall --rerun-incomplete` when user confirms
+   - Use `--clean` for non-interactive runs when you want to remove old results first
 
 6. **Execution Timing**:
    - Tracks total execution time for `run` and `run-force` commands
@@ -281,6 +283,9 @@ The script now includes several interactive features to improve user experience:
 
 # Run with incomplete job recovery
 ./run_workflow.sh 4 run --rerun-incomplete
+
+# Non-interactive clean restart (skips overwrite prompt)
+./run_workflow.sh 1 run --use-apptainer --defaults --clean
 
 # Check workflow status
 ./run_workflow.sh totalrna-seq status

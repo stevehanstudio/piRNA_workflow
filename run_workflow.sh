@@ -725,6 +725,7 @@ show_usage() {
     echo "  --cores N     - Number of CPU cores to use (prompts interactively if not specified)"
     echo "  --defaults    - Use default paths and cores without prompting"
     echo "  --rerun-incomplete  - Re-run incomplete jobs"
+    echo "  --clean            - Remove workflow results before run/run-force (non-interactive)"
     echo "  --use-apptainer    - Use Apptainer containers for FastQC and Bowtie (ensures 0.11.3 and 1.0.1-nh)"
     echo "  --use-sudo         - Use sudo for Apptainer exec (when unprivileged execution fails)"
     echo ""
@@ -1125,6 +1126,7 @@ CORES_SPECIFIED=false
 USE_APPTAINER=false
 USE_APPTAINER_SUDO=false
 USE_DEFAULTS=false
+CLEAN_BEFORE_RUN=false
 
 # Path override variables
 GENOME_PATH=""
@@ -1150,6 +1152,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --rerun-incomplete)
             EXTRA_FLAGS="${EXTRA_FLAGS} --rerun-incomplete"
+            shift
+            ;;
+        --clean)
+            CLEAN_BEFORE_RUN=true
             shift
             ;;
         --genome-path)
@@ -1538,9 +1544,16 @@ if [[ "$COMMAND" == "run" || "$COMMAND" == "run-force" || "$COMMAND" == "dryrun"
     auto_unlock_if_safe "$WORKFLOW_DIR"
 fi
 
+# Optional non-interactive cleanup before run commands
+if [[ "$CLEAN_BEFORE_RUN" == "true" && ( "$COMMAND" == "run" || "$COMMAND" == "run-force" ) ]]; then
+    echo "Pre-run cleanup enabled (--clean): removing $WORKFLOW_DIR/results" >&2
+    rm -rf "$WORKFLOW_DIR/results"
+    echo "" >&2
+fi
+
 # Check for existing outputs before running destructive commands
 FORCE_RERUN=false
-if [[ "$COMMAND" == "run" || "$COMMAND" == "run-force" ]]; then
+if [[ "$COMMAND" == "run" || "$COMMAND" == "run-force" ]] && [[ "$CLEAN_BEFORE_RUN" != "true" ]]; then
     OUTPUT_CHECK_RESULT=$(check_existing_outputs "$WORKFLOW_DIR")
     if [[ "$OUTPUT_CHECK_RESULT" == "FORCE_OVERWRITE" && "$COMMAND" == "run" ]]; then
         FORCE_RERUN=true
