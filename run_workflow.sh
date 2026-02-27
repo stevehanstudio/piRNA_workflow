@@ -1090,7 +1090,11 @@ run_snakemake() {
         export APPTAINERENV_PIPELINE_CONTAINER=1
         export APPTAINERENV_SAMTOOLS_018=/opt/pipeline/samtools-0.1.8/samtools
         export APPTAINERENV_SAMTOOLS_016=/opt/pipeline/samtools-0.1.16/samtools
-        export APPTAINERENV_JAVA_TOOL_OPTIONS=-Djava.awt.headless=true
+        # Java defaults for headless servers; keep user overrides if already set
+        : "${APPTAINERENV_JAVA_TOOL_OPTIONS:=-Djava.awt.headless=true}"
+        : "${APPTAINERENV__JAVA_OPTIONS:=-Xshare:off -Djava.io.tmpdir=/work/.tmp -Djava.awt.headless=true}"
+        export APPTAINERENV_JAVA_TOOL_OPTIONS
+        export APPTAINERENV__JAVA_OPTIONS
         $APPTAINER_CMD exec \
                 $bind_opts \
                 "$PIPELINE_SIF" \
