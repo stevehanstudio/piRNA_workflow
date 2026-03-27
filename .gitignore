@@ -35,9 +35,8 @@ ENV/
 env.bak/
 venv.bak/
 *.conda
-.snakemake/
 
-# Snakemake
+# Snakemake (per-workflow: CHIP-seq/results, totalRNA-seq/results, piRNA-seq/results, …)
 .snakemake/
 results/
 results_*/

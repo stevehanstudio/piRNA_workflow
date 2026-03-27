@@ -1,11 +1,12 @@
 # piRNA Workflow Manager
 
-This document describes the unified workflow management script for running ChIP-seq and totalRNA-seq workflows.
+This document describes the unified workflow management script for running ChIP-seq, piRNA-seq, and totalRNA-seq workflows.
 
 ## Overview
 
 The `run_workflow.sh` script provides a unified interface for managing both workflows in this project:
 - **ChIP-seq workflow** (`CHIP-seq/`)
+- **piRNA-seq workflow** (`piRNA-seq/`)
 - **totalRNA-seq workflow** (`totalRNA-seq/`)
 
 ## Prerequisites
@@ -52,7 +53,7 @@ The workflow manager (`run_workflow.sh`) is designed for **Linux/macOS** and req
    sudo apt-get install bc
    ```
 
-3. **Workflow directories**: Ensure both `CHIP-seq/` and `totalRNA-seq/` directories exist with valid Snakefiles.
+3. **Workflow directories**: Ensure `CHIP-seq/`, `piRNA-seq/`, and `totalRNA-seq/` directories exist with valid Snakefiles.
 
 ### Apptainer Container Support (Recommended)
 
@@ -91,6 +92,7 @@ See [containers/CONTAINER_KNOWN_ISSUES.md](containers/CONTAINER_KNOWN_ISSUES.md)
 
 ### Available Workflows
 - `1` or `chip-seq` - ChIP-seq analysis workflow
+- `2` or `pirna-seq` - piRNA-seq analysis workflow
 - `4` or `totalrna-seq` - Total RNA-seq analysis workflow
 
 **Interactive Selection**: If no workflow is specified, the script will prompt you to select one interactively.
@@ -216,6 +218,9 @@ The script now includes several interactive features to improve user experience:
 # Run ChIP-seq workflow (uses default 'run' command)
 ./run_workflow.sh 1
 
+# Run piRNA-seq workflow
+./run_workflow.sh 2
+
 # Run totalRNA-seq workflow
 ./run_workflow.sh 4
 
@@ -230,8 +235,8 @@ The script now includes several interactive features to improve user experience:
 ```bash
 # No workflow specified - interactive prompt
 ./run_workflow.sh
-# Output: "Please select a workflow (1 or 4):"
-# Enter: 1 (for ChIP-seq) or 4 (for totalRNA-seq)
+# Output: "Please select a workflow (1, 2, or 4):"
+# Enter: 1 (ChIP-seq), 2 (piRNA-seq), or 4 (totalRNA-seq)
 # Then shows system resources and prompts for cores
 ```
 
@@ -265,6 +270,7 @@ The script now includes several interactive features to improve user experience:
 ```bash
 # Validate all required input files before running
 ./run_workflow.sh 1 check-inputs
+./run_workflow.sh 2 check-inputs
 ./run_workflow.sh 4 check-inputs
 
 # Fix common workflow issues
@@ -316,7 +322,7 @@ The script now includes several interactive features to improve user experience:
 ## Features
 
 - **Unified Interface**: Single script for both workflows
-- **Numeric Shortcuts**: Use `1` for ChIP-seq, `4` for totalRNA-seq
+- **Numeric Shortcuts**: Use `1` for ChIP-seq, `2` for piRNA-seq, `4` for totalRNA-seq
 - **Interactive Selection**: Prompts for workflow selection when none specified
 - **Smart Resource Detection**: Auto-detects system resources and suggests optimal core count
 - **Auto-Unlock Stale Locks**: Automatically fixes locks from interrupted runs

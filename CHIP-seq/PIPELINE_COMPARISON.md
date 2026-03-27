@@ -6,6 +6,20 @@
 
 ---
 
+## 2026-02 Reconciliation Note
+
+This comparison was written against an earlier conversion snapshot. Some table entries below are now outdated relative to the current `CHIP-seq/Snakefile`.
+
+### Verified current-state corrections
+
+- Duplicate removal currently uses old-samtools-compatible `rmdup -s`.
+- Bedmap interpolation is restored (`bedops --chop | bedmap --echo --echo-map-score`).
+- Transposon coverage supports both `42AB` and `20A` with `--region` flags.
+
+Use this document as historical context, and treat `CHIP-seq/Snakefile` + `FIXES_IMPLEMENTED.md` as source of truth for current behavior.
+
+---
+
 ## Executive Summary
 
 | Component | Original | Snakemake | Status | Notes |

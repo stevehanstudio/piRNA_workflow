@@ -1,0 +1,225 @@
+configfile: "config.yaml"
+
+import os
+
+GENOME_VERSION = config["genome"]["version"]
+SAMPLE_NAME = config["sample"]["name"]
+THREADS = int(config["analysis"]["threads"])
+RESULTS_DIR = config["output"]["results_dir"]
+
+CONFIG_FASTQ = config["sample"]["fastq"]
+ADAPTER = config["references"]["adapter_sequence"]
+GENOME_INDEX = config["genome"]["bowtie_index"].format(version=GENOME_VERSION)
+CHROM_SIZES = config["genome"]["chrom_sizes"].format(version=GENOME_VERSION)
+VECTOR_INDEX = config["references"]["vector_index"]
+
+MIN_LEN = int(config["analysis"]["min_read_length"])
+MAX_LEN = int(config["analysis"]["max_read_length"])
+
+QC_RAW_DIR = f"{RESULTS_DIR}/fastqc_raw"
+QC_FILTERED_DIR = f"{RESULTS_DIR}/fastqc_filtered"
+TRIMMED_FASTQ = f"{RESULTS_DIR}/trimmed/{SAMPLE_NAME}.adapter_trimmed.fastq"
+SIZE_SELECTED_FASTQ = f"{RESULTS_DIR}/trimmed/{SAMPLE_NAME}.pirna_sized.fastq"
+GENOME_BAM = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{GENOME_VERSION}.genome.bam"
+NON_GENOME_FASTQ = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.non_genome.fastq"
+VECTOR_BAM = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.vector.bam"
+UNIQUE_BAM = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{GENOME_VERSION}.genome.unique.bam"
+COVERAGE_BG = f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.10bp.bg4"
+SUMMARY_TXT = f"{RESULTS_DIR}/reports/{SAMPLE_NAME}.summary.txt"
+BOOTSTRAP_FASTQ = f"{RESULTS_DIR}/bootstrap/{SAMPLE_NAME}.fastq"
+
+if os.path.exists(CONFIG_FASTQ):
+    RAW_FASTQ = CONFIG_FASTQ
+else:
+    RAW_FASTQ = BOOTSTRAP_FASTQ
+
+rule bootstrap_example_fastq:
+    output:
+        BOOTSTRAP_FASTQ
+    shell:
+        """
+        mkdir -p {RESULTS_DIR}/bootstrap
+        printf '@read1\\nTGGAATTCTCGGGTGCCAAGG\\n+\\nIIIIIIIIIIIIIIIIIIIIII\\n@read2\\nACGTACGTACGTACGTACGTAC\\n+\\nIIIIIIIIIIIIIIIIIIIIII\\n' > {output}
+        """
+
+rule all:
+    default_target: True
+    input:
+        f"{QC_RAW_DIR}/{SAMPLE_NAME}_fastqc.html",
+        f"{QC_FILTERED_DIR}/{SAMPLE_NAME}.pirna_sized_fastqc.html",
+        TRIMMED_FASTQ,
+        SIZE_SELECTED_FASTQ,
+        GENOME_BAM,
+        f"{GENOME_BAM}.bai",
+        VECTOR_BAM,
+        f"{VECTOR_BAM}.bai",
+        UNIQUE_BAM,
+        f"{UNIQUE_BAM}.bai",
+        COVERAGE_BG,
+        SUMMARY_TXT
+
+rule fastqc_raw:
+    input:
+        RAW_FASTQ
+    output:
+        html=f"{QC_RAW_DIR}/{SAMPLE_NAME}_fastqc.html",
+        zip=f"{QC_RAW_DIR}/{SAMPLE_NAME}_fastqc.zip"
+    conda:
+        "envs/core.yaml"
+    shell:
+        """
+        mkdir -p {QC_RAW_DIR}
+        fastqc -o {QC_RAW_DIR} {input}
+        """
+
+rule trim_adapters:
+    input:
+        RAW_FASTQ
+    output:
+        TRIMMED_FASTQ
+    params:
+        adapter=ADAPTER
+    conda:
+        "envs/core.yaml"
+    shell:
+        """
+        mkdir -p {RESULTS_DIR}/trimmed
+        cutadapt -a {params.adapter} -o {output} {input}
+        """
+
+rule size_select_pirna:
+    input:
+        TRIMMED_FASTQ
+    output:
+        SIZE_SELECTED_FASTQ
+    params:
+        min_len=MIN_LEN,
+        max_len=MAX_LEN
+    conda:
+        "envs/core.yaml"
+    shell:
+        """
+        cutadapt -m {params.min_len} -M {params.max_len} -o {output} {input}
+        """
+
+rule fastqc_filtered:
+    input:
+        SIZE_SELECTED_FASTQ
+    output:
+        html=f"{QC_FILTERED_DIR}/{SAMPLE_NAME}.pirna_sized_fastqc.html",
+        zip=f"{QC_FILTERED_DIR}/{SAMPLE_NAME}.pirna_sized_fastqc.zip"
+    conda:
+        "envs/core.yaml"
+    shell:
+        """
+        mkdir -p {QC_FILTERED_DIR}
+        fastqc -o {QC_FILTERED_DIR} {input}
+        """
+
+rule map_genome:
+    input:
+        fq=SIZE_SELECTED_FASTQ
+    output:
+        bam=GENOME_BAM,
+        bai=f"{GENOME_BAM}.bai"
+    params:
+        index=GENOME_INDEX
+    threads:
+        THREADS
+    conda:
+        "envs/core.yaml"
+    shell:
+        """
+        mkdir -p {RESULTS_DIR}/mapping
+        bowtie -p {threads} -q -v 2 -k 1 -m 1 --best --strata -S {params.index} {input.fq} \
+          | samtools view -bS - \
+          | samtools sort -o {output.bam}
+        samtools index {output.bam}
+        """
+
+rule filter_unique_genome_reads:
+    input:
+        GENOME_BAM
+    output:
+        bam=UNIQUE_BAM,
+        bai=f"{UNIQUE_BAM}.bai"
+    conda:
+        "envs/core.yaml"
+    shell:
+        """
+        samtools view -b -q 1 {input} > {output.bam}
+        samtools index {output.bam}
+        """
+
+rule extract_non_genome_reads:
+    input:
+        GENOME_BAM
+    output:
+        NON_GENOME_FASTQ
+    conda:
+        "envs/core.yaml"
+    shell:
+        """
+        samtools fastq -f 4 {input} > {output}
+        """
+
+rule map_vectors:
+    input:
+        NON_GENOME_FASTQ
+    output:
+        bam=VECTOR_BAM,
+        bai=f"{VECTOR_BAM}.bai"
+    params:
+        index=VECTOR_INDEX
+    threads:
+        THREADS
+    conda:
+        "envs/core.yaml"
+    shell:
+        """
+        bowtie -p {threads} -q -v 2 -k 1 -m 1 --best --strata -S {params.index} {input} \
+          | samtools view -bS - \
+          | samtools sort -o {output.bam}
+        samtools index {output.bam}
+        """
+
+rule coverage:
+    input:
+        UNIQUE_BAM
+    output:
+        COVERAGE_BG
+    params:
+        chrom_sizes=CHROM_SIZES
+    conda:
+        "envs/core.yaml"
+    shell:
+        """
+        mkdir -p {RESULTS_DIR}/coverage
+        bamCoverage --binSize 10 --outFileFormat bedgraph --bam {input} -o {output}
+        """
+
+rule summary_report:
+    input:
+        genome_bam=GENOME_BAM,
+        unique_bam=UNIQUE_BAM,
+        vector_bam=VECTOR_BAM,
+        coverage=COVERAGE_BG
+    output:
+        SUMMARY_TXT
+    conda:
+        "envs/core.yaml"
+    shell:
+        """
+        mkdir -p {RESULTS_DIR}/reports
+        {{
+          echo "piRNA-seq MVP summary"
+          echo "sample: {SAMPLE_NAME}"
+          echo "genome: {GENOME_VERSION}"
+          echo "raw_fastq: {RAW_FASTQ}"
+          echo "sized_fastq: {SIZE_SELECTED_FASTQ}"
+          echo "genome_bam: {input.genome_bam}"
+          echo "unique_bam: {input.unique_bam}"
+          echo "vector_bam: {input.vector_bam}"
+          echo "coverage_bedgraph: {input.coverage}"
+        }} > {output}
+        """

@@ -1,0 +1,24 @@
+# Configuration file for piRNA-seq Snakemake workflow
+
+genome:
+  version: "dm6"
+  species: "drosophila"
+  fasta: "../Shared/DataFiles/genomes/{version}.fa"
+  bowtie_index: "../Shared/DataFiles/genomes/bowtie-indexes/{version}"
+  chrom_sizes: "../Shared/DataFiles/genomes/bowtie-indexes/{version}.chrom.sizes"
+
+sample:
+  name: "pirna_sample"
+  fastq: "../Shared/DataFiles/datasets/pirna-seq/pirna_sample.fastq"
+
+references:
+  vector_index: "../Shared/DataFiles/genomes/YichengVectors/42AB_UBIG"
+  adapter_sequence: "TGGAATTCTCGGGTGCCAAGG"
+
+output:
+  results_dir: "results"
+
+analysis:
+  min_read_length: 18
+  max_read_length: 32
+  threads: 8

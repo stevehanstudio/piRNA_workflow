@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-02 Reconciliation Note
+
+This file is a historical verification snapshot. Current `CHIP-seq/Snakefile` behavior has moved beyond some statuses below.
+
+### Current source-of-truth updates
+
+- Bedmap interpolation: restored in workflow rules.
+- Transposon region flags: implemented, with support for both `42AB` and `20A`.
+- `wigToBigWig -clip`: present in current workflow.
+
+For the maintained fix record, refer to `FIXES_IMPLEMENTED.md`.
+
+---
+
 ## Summary: Issues Status After Latest Fixes
 
 | Issue | Status | Verified | Notes |

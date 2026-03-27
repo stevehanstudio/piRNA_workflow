@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-02 Validation Note
+
+This document remains the maintained record for these fixes. One follow-up item is still open:
+
+- `CHIP-seq/config.yaml` still includes a TODO to verify/convert dm6 transposon coordinates.
+
+All other items in this document should be interpreted as implemented in current workflow code.
+
+---
+
 ## Summary
 
 Fixed two critical deviations identified in the comparison with the original ChIP-seq pipeline:

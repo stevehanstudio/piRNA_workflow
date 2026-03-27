@@ -358,6 +358,70 @@ check_input_files() {
             # Vector .fa is already in required_files, so we're good - Snakemake will build indexes
             echo "ℹ️  Note: Vector bowtie indexes will be built from $(basename "$vector_path").fa" >&2
         fi
+    elif [[ "$workflow_dir" == "piRNA-seq" ]]; then
+        # piRNA-seq - defaults and required files for MVP pipeline
+        dataset_path="${DATASET_PATH:-./Shared/DataFiles/datasets/pirna-seq/pirna_sample.fastq}"
+        dataset_path=$(expand_path "$dataset_path")
+
+        local index_path="${INDEX_PATH:-./Shared/DataFiles/genomes/bowtie-indexes/dm6}"
+        index_path=$(expand_path "$index_path")
+        local index_dir=$(dirname "$index_path")
+        local index_basename=$(basename "$index_path")
+
+        local genome_dir=$(dirname "$genome_path")
+
+        local required_files=(
+            "$dataset_path"
+            "$genome_path"
+            "${index_dir}/${index_basename}.chrom.sizes"
+            "${vector_path}.fa"
+        )
+
+        local required_dirs=(
+            "$(dirname "$dataset_path")"
+            "$index_dir"
+            "$(dirname "$vector_path")"
+        )
+
+        local genome_index_files=(
+            "${index_path}.1.ebwt"
+            "${index_path}.2.ebwt"
+            "${index_path}.3.ebwt"
+            "${index_path}.4.ebwt"
+            "${index_path}.rev.1.ebwt"
+            "${index_path}.rev.2.ebwt"
+        )
+
+        local all_genome_indexes_exist=true
+        for index_file in "${genome_index_files[@]}"; do
+            if [[ ! -f "$index_file" ]]; then
+                all_genome_indexes_exist=false
+                break
+            fi
+        done
+        if [[ "$all_genome_indexes_exist" == "false" ]]; then
+            echo "ℹ️  Note: Genome bowtie indexes will be built from $(basename "$genome_path")" >&2
+        fi
+
+        local vector_index_files=(
+            "${vector_path}.1.ebwt"
+            "${vector_path}.2.ebwt"
+            "${vector_path}.3.ebwt"
+            "${vector_path}.4.ebwt"
+            "${vector_path}.rev.1.ebwt"
+            "${vector_path}.rev.2.ebwt"
+        )
+
+        local all_vector_indexes_exist=true
+        for index_file in "${vector_index_files[@]}"; do
+            if [[ ! -f "$index_file" ]]; then
+                all_vector_indexes_exist=false
+                break
+            fi
+        done
+        if [[ "$all_vector_indexes_exist" == "false" ]]; then
+            echo "ℹ️  Note: Vector bowtie indexes will be built from $(basename "$vector_path").fa" >&2
+        fi
     fi
 
     # Check directories first
@@ -423,6 +487,15 @@ check_input_files() {
             echo "2. Place input FASTQ file:" >&2
             echo "   Shared/DataFiles/datasets/totalrna-seq/all.50mers.fastq" >&2
             echo "" >&2
+        elif [[ "$workflow_dir" == "piRNA-seq" ]]; then
+            echo "1. Download and prepare reference files:" >&2
+            echo "   • Download dm6.fa and generate dm6.chrom.sizes" >&2
+            echo "   • Build genome index: bowtie-build dm6.fa dm6" >&2
+            echo "   • Build vector index: bowtie-build 42AB_UBIG.fa 42AB_UBIG" >&2
+            echo "" >&2
+            echo "2. Place input FASTQ file:" >&2
+            echo "   Shared/DataFiles/datasets/pirna-seq/pirna_sample.fastq" >&2
+            echo "" >&2
         fi
 
         echo "3. For detailed setup instructions, see:" >&2
@@ -454,13 +527,18 @@ check_input_files() {
 select_workflow_and_paths() {
     echo "Available workflows:" >&2
     echo "  1) ChIP-seq analysis workflow" >&2
+    echo "  2) piRNA-seq analysis workflow" >&2
     echo "  4) Total RNA-seq analysis workflow" >&2
     echo "" >&2
     while true; do
-        read -p "Please select a workflow (1 or 4): " choice >&2
+        read -p "Please select a workflow (1, 2, or 4): " choice >&2
         case $choice in
             1)
                 WORKFLOW="chip-seq"
+                break
+                ;;
+            2)
+                WORKFLOW="pirna-seq"
                 break
                 ;;
             4)
@@ -468,7 +546,7 @@ select_workflow_and_paths() {
                 break
                 ;;
             *)
-                echo "Invalid choice. Please enter 1 or 4." >&2
+                echo "Invalid choice. Please enter 1, 2, or 4." >&2
                 ;;
         esac
     done
@@ -519,11 +597,11 @@ select_workflow_and_paths() {
     
     # Get default paths from config files
     local config_file
-    if [[ "$WORKFLOW" == "chip-seq" ]]; then
-        config_file="CHIP-seq/config.yaml"
-    else
-        config_file="totalRNA-seq/config.yaml"
-    fi
+    case "$WORKFLOW" in
+        chip-seq) config_file="CHIP-seq/config.yaml" ;;
+        pirna-seq) config_file="piRNA-seq/config.yaml" ;;
+        *) config_file="totalRNA-seq/config.yaml" ;;
+    esac
     
     # Genome path - check for existence before suggesting
     local default_genome
@@ -558,14 +636,14 @@ select_workflow_and_paths() {
     
     # Index path - check for existence before suggesting
     local default_index
-    if [[ -n "$GENOME_VERSION" && "$WORKFLOW" == "chip-seq" ]]; then
+    if [[ -n "$GENOME_VERSION" && ( "$WORKFLOW" == "chip-seq" || "$WORKFLOW" == "pirna-seq" ) ]]; then
         # Use genomes/ (plural) directory
         default_index="./Shared/DataFiles/genomes/bowtie-indexes/${GENOME_VERSION}"
         if [[ ! -d "$(expand_path "$default_index")" ]] && [[ ! -f "$(expand_path "${default_index}.1.ebwt")" ]]; then
             # Indexes can be built, so just note if they don't exist yet
             echo "ℹ️  Note: Index directory $default_index not found. Indexes will be built if needed." >&2
         fi
-    elif [[ "$WORKFLOW" == "chip-seq" ]]; then
+    elif [[ "$WORKFLOW" == "chip-seq" || "$WORKFLOW" == "pirna-seq" ]]; then
         default_index=$(grep -A 20 "references:" "$config_file" | grep -E '^\s*dm6_bowtie_index\s*:' | sed -E 's/^\s*dm6_bowtie_index\s*:\s*//; s/^"//; s/"$//' | head -1)
         # Convert ../Shared to ./Shared since we're running from project root
         if [[ -n "$default_index" ]]; then
@@ -622,6 +700,13 @@ select_workflow_and_paths() {
         fi
         [[ -z "$default_dataset" ]] && default_dataset="./Shared/DataFiles/datasets/chip-seq/chip_inputs"
         read -p "Input dataset directory path [default: $default_dataset]: " dataset_input >&2
+    elif [[ "$WORKFLOW" == "pirna-seq" ]]; then
+        default_dataset=$(grep -A 10 "sample:" "$config_file" | grep -E '^\s*fastq\s*:' | sed -E 's/^\s*fastq\s*:\s*//; s/^"//; s/"$//' | head -1)
+        if [[ -n "$default_dataset" ]]; then
+            default_dataset=$(echo "$default_dataset" | sed 's|^\.\./Shared|./Shared|')
+        fi
+        [[ -z "$default_dataset" ]] && default_dataset="./Shared/DataFiles/datasets/pirna-seq/pirna_sample.fastq"
+        read -p "Input FASTQ file path [default: $default_dataset]: " dataset_input >&2
     else
         default_dataset=$(grep -E '^\s*fastq_file\s*:' "$config_file" | sed -E 's/^\s*fastq_file\s*:\s*//; s/^"//; s/"$//' | head -1)
         # Convert ../Shared to ./Shared since we're running from project root
@@ -639,9 +724,9 @@ select_workflow_and_paths() {
     
     # Vector path
     local default_vector
-    if [[ "$WORKFLOW" == "chip-seq" ]]; then
+    if [[ "$WORKFLOW" == "chip-seq" || "$WORKFLOW" == "pirna-seq" ]]; then
         # For CHIP-seq, get vector_42ab_index under references section
-        default_vector=$(grep -A 20 "references:" "$config_file" | grep -E '^\s*vector_42ab_index\s*:' | sed -E 's/^\s*vector_42ab_index\s*:\s*//; s/^"//; s/"$//' | head -1)
+        default_vector=$(grep -A 20 "references:" "$config_file" | grep -E '^\s*(vector_42ab_index|vector_index)\s*:' | sed -E 's/^\s*(vector_42ab_index|vector_index)\s*:\s*//; s/^"//; s/"$//' | head -1)
         # Convert ../Shared to ./Shared since we're running from project root
         if [[ -n "$default_vector" ]]; then
             default_vector=$(echo "$default_vector" | sed 's|^\.\./Shared|./Shared|')
@@ -707,6 +792,7 @@ show_usage() {
     echo ""
     echo "Workflows:"
     echo "  1 | chip-seq      - ChIP-seq analysis workflow"
+    echo "  2 | pirna-seq     - piRNA-seq analysis workflow"
     echo "  4 | totalrna-seq  - Total RNA-seq analysis workflow"
     echo ""
     echo "Commands (default: run):"
@@ -749,7 +835,9 @@ show_usage() {
     echo ""
     echo "Examples:"
     echo "  $0 1 run --cores 4        # Run ChIP-seq workflow with 4 cores"
+    echo "  $0 2 run --cores 8        # Run piRNA-seq workflow with 8 cores"
     echo "  $0 chip-seq dryrun        # Dry run ChIP-seq workflow (will prompt for cores)"
+    echo "  $0 pirna-seq dryrun       # Dry run piRNA-seq workflow (will prompt for cores)"
     echo "  $0 4                      # Run totalRNA-seq (will prompt for cores)"
     echo "  $0 totalrna-seq status    # Check totalRNA-seq status"
     echo "  $0 1 fix-incomplete       # Fix incomplete ChIP-seq files and continue"
@@ -1234,13 +1322,24 @@ case "$WORKFLOW" in
     1|chip)
         WORKFLOW="chip-seq"
         ;;
+    2|pirna|pirna-seq)
+        WORKFLOW="pirna-seq"
+        ;;
     4|totalrna|totalrna-seq)
         WORKFLOW="totalrna-seq"
         ;;
 esac
 
+# Handle help aliases before interactive prompts
+if [[ "$WORKFLOW" == "help" || "$WORKFLOW" == "--help" || "$WORKFLOW" == "-h" ]]; then
+    show_usage
+    exit 0
+fi
+
 # If no workflow specified, interactively select one and configure paths
-if [[ -z "$WORKFLOW" ]]; then
+if [[ "$COMMAND" == "help" ]]; then
+    :
+elif [[ -z "$WORKFLOW" ]]; then
     select_workflow_and_paths
     COMMAND="run"  # Default to run when interactively selected
 elif [[ -z "$GENOME_VERSION" && -z "$GENOME_PATH" && -z "$INDEX_PATH" && -z "$DATASET_PATH" && -z "$VECTOR_PATH" && -z "$ADAPTER_PATH" ]]; then
@@ -1300,11 +1399,11 @@ elif [[ -z "$GENOME_VERSION" && -z "$GENOME_PATH" && -z "$INDEX_PATH" && -z "$DA
     
     # Get default paths from config files
     config_file=""
-    if [[ "$WORKFLOW_SAVED" == "chip-seq" ]]; then
-        config_file="CHIP-seq/config.yaml"
-    else
-        config_file="totalRNA-seq/config.yaml"
-    fi
+    case "$WORKFLOW_SAVED" in
+        chip-seq) config_file="CHIP-seq/config.yaml" ;;
+        pirna-seq) config_file="piRNA-seq/config.yaml" ;;
+        *) config_file="totalRNA-seq/config.yaml" ;;
+    esac
     
     # Genome path - check for existence before suggesting
     default_genome=""
@@ -1340,12 +1439,12 @@ elif [[ -z "$GENOME_VERSION" && -z "$GENOME_PATH" && -z "$INDEX_PATH" && -z "$DA
     
     # Index path
     default_index=""
-    if [[ -n "$GENOME_VERSION" && "$WORKFLOW_SAVED" == "chip-seq" ]]; then
+    if [[ -n "$GENOME_VERSION" && ( "$WORKFLOW_SAVED" == "chip-seq" || "$WORKFLOW_SAVED" == "pirna-seq" ) ]]; then
         default_index="./Shared/DataFiles/genomes/bowtie-indexes/${GENOME_VERSION}"
         if [[ ! -d "$(expand_path "$default_index")" ]] && [[ ! -f "$(expand_path "${default_index}.1.ebwt")" ]]; then
             echo "ℹ️  Note: Index directory $default_index not found. Indexes will be built if needed." >&2
         fi
-    elif [[ "$WORKFLOW_SAVED" == "chip-seq" ]]; then
+    elif [[ "$WORKFLOW_SAVED" == "chip-seq" || "$WORKFLOW_SAVED" == "pirna-seq" ]]; then
         default_index=$(grep -A 20 "references:" "$config_file" | grep -E '^\s*dm6_bowtie_index\s*:' | sed -E 's/^\s*dm6_bowtie_index\s*:\s*//; s/^"//; s/"$//' | head -1)
         if [[ -n "$default_index" ]]; then
             default_index=$(echo "$default_index" | sed 's|^\.\./Shared|./Shared|')
@@ -1394,6 +1493,13 @@ elif [[ -z "$GENOME_VERSION" && -z "$GENOME_PATH" && -z "$INDEX_PATH" && -z "$DA
         fi
         [[ -z "$default_dataset" ]] && default_dataset="./Shared/DataFiles/datasets/chip-seq/chip_inputs"
         read -p "Input dataset directory path [default: $default_dataset]: " dataset_input >&2
+    elif [[ "$WORKFLOW_SAVED" == "pirna-seq" ]]; then
+        default_dataset=$(grep -A 10 "sample:" "$config_file" | grep -E '^\s*fastq\s*:' | sed -E 's/^\s*fastq\s*:\s*//; s/^"//; s/"$//' | head -1)
+        if [[ -n "$default_dataset" ]]; then
+            default_dataset=$(echo "$default_dataset" | sed 's|^\.\./Shared|./Shared|')
+        fi
+        [[ -z "$default_dataset" ]] && default_dataset="./Shared/DataFiles/datasets/pirna-seq/pirna_sample.fastq"
+        read -p "Input FASTQ file path [default: $default_dataset]: " dataset_input >&2
     else
         default_dataset=$(grep -E '^\s*fastq_file\s*:' "$config_file" | sed -E 's/^\s*fastq_file\s*:\s*//; s/^"//; s/"$//' | head -1)
         if [[ -n "$default_dataset" ]]; then
@@ -1410,8 +1516,8 @@ elif [[ -z "$GENOME_VERSION" && -z "$GENOME_PATH" && -z "$INDEX_PATH" && -z "$DA
     
     # Vector path
     default_vector=""
-    if [[ "$WORKFLOW_SAVED" == "chip-seq" ]]; then
-        default_vector=$(grep -A 20 "references:" "$config_file" | grep -E '^\s*vector_42ab_index\s*:' | sed -E 's/^\s*vector_42ab_index\s*:\s*//; s/^"//; s/"$//' | head -1)
+    if [[ "$WORKFLOW_SAVED" == "chip-seq" || "$WORKFLOW_SAVED" == "pirna-seq" ]]; then
+        default_vector=$(grep -A 20 "references:" "$config_file" | grep -E '^\s*(vector_42ab_index|vector_index)\s*:' | sed -E 's/^\s*(vector_42ab_index|vector_index)\s*:\s*//; s/^"//; s/"$//' | head -1)
         if [[ -n "$default_vector" ]]; then
             default_vector=$(echo "$default_vector" | sed 's|^\.\./Shared|./Shared|')
         fi
@@ -1449,6 +1555,9 @@ fi
 case "$WORKFLOW" in
     chip-seq)
         WORKFLOW_DIR="CHIP-seq"
+        ;;
+    pirna-seq)
+        WORKFLOW_DIR="piRNA-seq"
         ;;
     totalrna-seq)
         WORKFLOW_DIR="totalRNA-seq"
@@ -1498,7 +1607,7 @@ fi
 
 # Build samtools 0.1.8 from source for CHIP-seq (needed when no containers;
 # x86 pre-built binary segfaults on ARM64)
-if [[ "$WORKFLOW" == "chip" && ("$COMMAND" == "run" || "$COMMAND" == "run-force" || "$COMMAND" == "fix-incomplete" || "$COMMAND" == "setup" || "$COMMAND" == "dryrun") ]]; then
+if [[ "$WORKFLOW" == "chip-seq" && ("$COMMAND" == "run" || "$COMMAND" == "run-force" || "$COMMAND" == "fix-incomplete" || "$COMMAND" == "setup" || "$COMMAND" == "dryrun") ]]; then
     ensure_samtools_018
     ensure_samtools_016
 fi
@@ -1511,7 +1620,7 @@ fi
 
 # Ensure cutadapt container for CHIP-seq (Python 2.7, original pipeline version)
 # When pipeline container exists (Apptainer), Cutadapt is built-in and this will skip
-if [[ "$WORKFLOW" == "chip" && ("$COMMAND" == "run" || "$COMMAND" == "run-force" || "$COMMAND" == "fix-incomplete" || "$COMMAND" == "setup" || "$COMMAND" == "dryrun") ]]; then
+if [[ "$WORKFLOW" == "chip-seq" && ("$COMMAND" == "run" || "$COMMAND" == "run-force" || "$COMMAND" == "fix-incomplete" || "$COMMAND" == "setup" || "$COMMAND" == "dryrun") ]]; then
     ensure_cutadapt_container
 fi
 

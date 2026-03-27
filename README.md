@@ -10,7 +10,7 @@ This repository contains a bioinformatics workflow system that is **converting a
 |----------|-------------|--------|
 | **CHIP-seq** | ChIP-seq analysis from raw FASTQ to BigWig visualization | ✅ Converted |
 | **TotalRNA-seq** | Total RNA-seq processing with rRNA removal and alignment | ✅ Converted |
-| **piRNA-seq** | Specialized piRNA analysis pipeline | 📋 Next Priority |
+| **piRNA-seq** | Specialized piRNA analysis pipeline | 🚧 MVP Scaffold (Dry-run Ready) |
 | **Fusion Reads** | Detection and analysis of fusion reads | 📋 Planned |
 | **RIP-seq** | RNA immunoprecipitation sequencing | 📋 Planned |
 
@@ -21,6 +21,7 @@ This repository contains a bioinformatics workflow system that is **converting a
 ```bash
 # Recommended (when data is in Shared/DataFiles/genomes, etc.)
 ./run_workflow.sh 1 run --use-apptainer --defaults   # ChIP-seq
+./run_workflow.sh 2 run --use-apptainer --defaults   # piRNA-seq
 ./run_workflow.sh 4 run --use-apptainer --defaults   # totalRNA-seq
 
 # Non-interactive clean restart (remove old results first; skips overwrite prompt)
@@ -34,6 +35,7 @@ This repository contains a bioinformatics workflow system that is **converting a
 
 # Or use numeric shortcuts
 ./run_workflow.sh 1    # Run ChIP-seq workflow
+./run_workflow.sh 2    # Run piRNA-seq workflow
 ./run_workflow.sh 4    # Run totalRNA-seq workflow
 ```
 
@@ -74,6 +76,12 @@ This project **builds upon and enhances** the original work by [Luo et al. 2025]
 │   ├── envs/                # Conda environment definitions + Apptainer .def files
 │   ├── results/             # Analysis outputs
 │   └── README.md            # Detailed ChIP-seq documentation
+├── piRNA-seq/                # 🚧 piRNA-seq MVP pipeline (dry-run ready)
+│   ├── Snakefile            # Main workflow definition
+│   ├── config.yaml          # Configuration file
+│   ├── envs/                # Conda environment definitions
+│   ├── results/             # Analysis outputs
+│   └── README.md            # Detailed piRNA-seq documentation
 ├── totalRNA-seq/            # ✅ Total RNA-seq processing pipeline (Production Ready)
 │   ├── Snakefile            # Main workflow definition
 │   ├── config.yaml          # Configuration file

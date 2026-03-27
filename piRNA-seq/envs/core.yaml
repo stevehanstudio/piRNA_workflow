@@ -1,0 +1,11 @@
+name: pirna_core
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  - fastqc
+  - cutadapt
+  - bowtie
+  - samtools
+  - deeptools
