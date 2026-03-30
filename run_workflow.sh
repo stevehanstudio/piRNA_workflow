@@ -360,7 +360,7 @@ check_input_files() {
         fi
     elif [[ "$workflow_dir" == "piRNA-seq" ]]; then
         # piRNA-seq - defaults and required files for MVP pipeline
-        dataset_path="${DATASET_PATH:-./Shared/DataFiles/datasets/pirna-seq/pirna_sample.fastq}"
+        dataset_path="${DATASET_PATH:-./Shared/DataFiles/datasets/pirna-seq/pirna_sample.fastq.gz}"
         dataset_path=$(expand_path "$dataset_path")
 
         local index_path="${INDEX_PATH:-./Shared/DataFiles/genomes/bowtie-indexes/dm6}"
@@ -968,6 +968,10 @@ create_temp_config() {
             sed -i "s|data_dir: .*|data_dir: \"$expanded_dataset\"|" "$temp_config"
         elif [[ "$workflow_dir" == "totalRNA-seq" ]]; then
             sed -i "s|fastq_file: .*|fastq_file: \"$expanded_dataset\"|" "$temp_config"
+        elif [[ "$workflow_dir" == "piRNA-seq" ]]; then
+            # piRNA-seq config uses: sample: {name, fastq}
+            # Keep indentation consistent with config.yaml.
+            sed -i "s|^  fastq: .*|  fastq: \"$expanded_dataset\"|" "$temp_config"
         fi
         echo "Override: Using dataset path: $expanded_dataset" >&2
     fi

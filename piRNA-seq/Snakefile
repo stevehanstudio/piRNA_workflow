@@ -1,6 +1,10 @@
 configfile: "config.yaml"
 
 import os
+import pathlib
+
+SNAKEFILE_DIR = pathlib.Path(__file__).resolve().parent
+PROJECT_ROOT = SNAKEFILE_DIR.parent
 
 GENOME_VERSION = config["genome"]["version"]
 SAMPLE_NAME = config["sample"]["name"]
@@ -28,10 +32,51 @@ COVERAGE_BG = f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.10bp.bg4"
 SUMMARY_TXT = f"{RESULTS_DIR}/reports/{SAMPLE_NAME}.summary.txt"
 BOOTSTRAP_FASTQ = f"{RESULTS_DIR}/bootstrap/{SAMPLE_NAME}.fastq"
 
-if os.path.exists(CONFIG_FASTQ):
-    RAW_FASTQ = CONFIG_FASTQ
-else:
-    RAW_FASTQ = BOOTSTRAP_FASTQ
+def resolve_existing_fastq(path_str: str):
+    """
+    Resolve fastq paths in a way that works both for:
+    - config defaults (paths relative to this Snakefile directory)
+    - run_workflow.sh overrides (paths often relative to project root)
+    """
+    def norm(p: str) -> str:
+        return os.path.normpath(p)
+
+    candidates = []
+    if os.path.isabs(path_str):
+        candidates.append(path_str)
+    else:
+        # The config often contains "./Shared/..." (relative to repo root)
+        # while Snakemake runs from /work/piRNA-seq in the container.
+        stripped = path_str
+        if stripped.startswith("./"):
+            stripped = stripped[2:]
+
+        # 1) as-is (relative to current working directory)
+        candidates.append(path_str)
+
+        # 2) relative to Snakefile dir
+        candidates.append(norm(str(SNAKEFILE_DIR / path_str)))
+        candidates.append(norm(str(SNAKEFILE_DIR / stripped)))
+
+        # 3) relative to repo root (/work)
+        candidates.append(norm(str(PROJECT_ROOT / path_str)))
+        candidates.append(norm(str(PROJECT_ROOT / stripped)))
+
+    for c in candidates:
+        if c and os.path.exists(c):
+            return c
+    return None
+
+# Normalize common override path forms:
+# - config defaults are typically "../Shared/..." (relative to piRNA-seq/)
+# - run_workflow.sh overrides are often provided as "./Shared/..." (relative to repo root),
+#   but inside the container we run from /work/piRNA-seq, so "./Shared" would be wrong.
+if isinstance(CONFIG_FASTQ, str) and CONFIG_FASTQ.startswith("./Shared/"):
+    CONFIG_FASTQ = CONFIG_FASTQ.replace("./Shared/", "../Shared/", 1)
+
+# For MVP runs, prefer the configured FASTQ path directly.
+# (Bootstrap is kept for DAG testing, but we don't auto-select it during real runs.)
+RAW_FASTQ = CONFIG_FASTQ
 
 rule bootstrap_example_fastq:
     output:
@@ -39,7 +84,9 @@ rule bootstrap_example_fastq:
     shell:
         """
         mkdir -p {RESULTS_DIR}/bootstrap
-        printf '@read1\\nTGGAATTCTCGGGTGCCAAGG\\n+\\nIIIIIIIIIIIIIIIIIIIIII\\n@read2\\nACGTACGTACGTACGTACGTAC\\n+\\nIIIIIIIIIIIIIIIIIIIIII\\n' > {output}
+        # Valid FASTQ bootstrap: sequence length must equal quality length.
+        # Use 20nt reads so they also survive the default size selection (18-32).
+        printf '@read1\\nACGTACGTACGTACGTACGT\\n+\\nIIIIIIIIIIIIIIIIIIII\\n@read2\\nTGGAATTCTCGGGTGCCAAG\\n+\\nIIIIIIIIIIIIIIIIIIII\\n' > {output}
         """
 
 rule all:
@@ -70,6 +117,15 @@ rule fastqc_raw:
         """
         mkdir -p {QC_RAW_DIR}
         fastqc -o {QC_RAW_DIR} {input}
+
+        # FastQC names output files based on the input basename. Rename to the
+        # stable, sample-name-based outputs expected by this workflow.
+        base="$(basename "{input}")"
+        base="${{base%.gz}}"
+        base="${{base%.fastq}}"
+        base="${{base%.fq}}"
+        mv -f "{QC_RAW_DIR}/${{base}}_fastqc.html" "{output.html}"
+        mv -f "{QC_RAW_DIR}/${{base}}_fastqc.zip" "{output.zip}"
         """
 
 rule trim_adapters:

@@ -9,7 +9,7 @@ genome:
 
 sample:
   name: "pirna_sample"
-  fastq: "../Shared/DataFiles/datasets/pirna-seq/pirna_sample.fastq"
+  fastq: "../Shared/DataFiles/datasets/pirna-seq/pirna_sample.fastq.gz"
 
 references:
   vector_index: "../Shared/DataFiles/genomes/YichengVectors/42AB_UBIG"
@@ -20,5 +20,5 @@ output:
 
 analysis:
   min_read_length: 18
-  max_read_length: 32
+  max_read_length: 100
   threads: 8
