@@ -183,6 +183,31 @@ check_input_files() {
     echo "=== Input File Validation ===" >&2
     echo "Checking required input files for $workflow_dir workflow..." >&2
     
+    # Guardrail: prevent accidental runs when genomes directory is missing or a broken symlink.
+    # This avoids the “EdgeXpert got replaced by a symlink” failure mode.
+    local genomes_dir="./Shared/DataFiles/genomes"
+    local genomes_dir_expanded
+    genomes_dir_expanded=$(expand_path "$genomes_dir")
+    if [[ -L "$genomes_dir_expanded" ]]; then
+        local genomes_target
+        genomes_target=$(readlink -f "$genomes_dir_expanded" 2>/dev/null || true)
+        if [[ -z "$genomes_target" || ! -d "$genomes_target" ]]; then
+            echo "❌ genomes path is a broken symlink: $genomes_dir_expanded" >&2
+            echo "Fix options (choose ONE, local only — do not commit):" >&2
+            echo "  - Recreate local symlink to your data disk, e.g.:" >&2
+            echo "      ln -s /mnt/data/Projects/HeLab/piRNA_workflow/Shared/DataFiles/genomes Shared/DataFiles/genomes" >&2
+            echo "  - Or create a real directory at: $genomes_dir_expanded" >&2
+            exit 1
+        fi
+    elif [[ ! -d "$genomes_dir_expanded" ]]; then
+        echo "❌ genomes directory not found: $genomes_dir_expanded" >&2
+        echo "Fix options (choose ONE, local only — do not commit):" >&2
+        echo "  - If genomes live on /mnt/data on this machine:" >&2
+        echo "      ln -s /mnt/data/Projects/HeLab/piRNA_workflow/Shared/DataFiles/genomes Shared/DataFiles/genomes" >&2
+        echo "  - Or create/populate a real directory at: $genomes_dir_expanded" >&2
+        exit 1
+    fi
+    
     # Use override paths if provided, otherwise use defaults.
     # If --genome-version is provided and --genome-path is not, point to that version's FASTA.
     local effective_genome_version="${GENOME_VERSION:-dm6}"
