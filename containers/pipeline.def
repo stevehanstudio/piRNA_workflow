@@ -38,6 +38,22 @@ From: ubuntu:22.04
 %post
     export DEBIAN_FRONTEND=noninteractive
     export PATH="/opt/miniconda3/bin:$PATH"
+    # Retry helper for intermittent network/channel errors during image builds.
+    retry_cmd() {
+        local attempts=0
+        local max_attempts=5
+        local delay=15
+        until "$@"; do
+            attempts=$((attempts + 1))
+            if [ "$attempts" -ge "$max_attempts" ]; then
+                echo "Command failed after ${max_attempts} attempts: $*" >&2
+                return 1
+            fi
+            echo "Retry ${attempts}/${max_attempts} after ${delay}s: $*" >&2
+            sleep "$delay"
+            delay=$((delay + 15))
+        done
+    }
 
     # Layer 1: System dependencies
     apt-get update && apt-get install -y --no-install-recommends \
@@ -51,6 +67,7 @@ From: ubuntu:22.04
         ca-certificates \
         zlib1g-dev \
         git \
+        bedops \
         python3 \
         python3-pip \
         openjdk-11-jre-headless \
@@ -108,10 +125,10 @@ From: ubuntu:22.04
     rm /tmp/fastqc.zip
 
     # Layer 7: Cutadapt 1.8.3 (matches original Luo pipeline)
-    /opt/miniconda3/bin/conda create -y -n cutadapt python=3.6
+    retry_cmd /opt/miniconda3/bin/conda create -y -n cutadapt python=3.6
     . /opt/miniconda3/etc/profile.d/conda.sh
     conda activate cutadapt
-    pip install --no-cache-dir cutadapt==1.8.3
+    retry_cmd pip install --no-cache-dir cutadapt==1.8.3
     ln -sf /opt/miniconda3/envs/cutadapt/bin/cutadapt /usr/local/bin/cutadapt
 
     # Layer 8: STAR 2.7.9a (x86_64: pre-built binary; aarch64: compile from source)
@@ -135,15 +152,22 @@ From: ubuntu:22.04
     rm -rf /tmp/STAR-2.7.9a /tmp/STAR.tar.gz
 
     # Layer 9: RSEM 1.3.3 (bioconda pre-built for linux-64 and linux-aarch64)
-    /opt/miniconda3/bin/conda create -y -n rsem rsem=1.3.3 -c bioconda -c conda-forge
+    retry_cmd /opt/miniconda3/bin/conda create -y -n rsem rsem=1.3.3 -c bioconda -c conda-forge
     mkdir -p /opt/pipeline/rsem-1.3.3/bin
     for f in /opt/miniconda3/envs/rsem/bin/*; do ln -sf "$f" /opt/pipeline/rsem-1.3.3/bin/; done
 
     # Layer 10: deepTools 2.4.2
-    /opt/miniconda3/bin/conda create -y -n deeptools python=3.6
+    # Conda alone often cannot solve deeptools 2.4.2 with current channel metadata (py27/py35
+    # stacks conflict with modern deps). Pip alone hit py2bit/pyBigWig build isolation requiring
+    # setuptools>=74 on Python 3.6. Pin setuptools and install extension deps without isolation.
+    retry_cmd /opt/miniconda3/bin/conda create -y -n deeptools python=3.6 -c conda-forge
     . /opt/miniconda3/etc/profile.d/conda.sh
     conda activate deeptools
-    pip install --no-cache-dir deeptools==2.4.2
+    # setuptools 59.8.0 is not published on PyPI; 59.6.0 is the last 59.x pip can resolve for py3.6.
+    retry_cmd pip install --no-cache-dir 'pip<22' 'setuptools==59.6.0' wheel
+    retry_cmd pip install --no-cache-dir --no-build-isolation 'py2bit==0.3.0'
+    retry_cmd pip install --no-cache-dir --no-build-isolation 'pyBigWig==0.3.17'
+    retry_cmd pip install --no-cache-dir 'deeptools==2.4.2'
     ln -sf /opt/miniconda3/envs/deeptools/bin/bamCompare /usr/local/bin/
     ln -sf /opt/miniconda3/envs/deeptools/bin/bamCoverage /usr/local/bin/
     ln -sf /opt/miniconda3/envs/deeptools/bin/plotFingerprint /usr/local/bin/
@@ -155,7 +179,7 @@ From: ubuntu:22.04
     ln -sf /opt/miniconda3/envs/deeptools/bin/computeMatrix /usr/local/bin/
 
     # Layer 11: Snakemake + mamba
-    /opt/miniconda3/bin/conda install -y -n base mamba snakemake
+    retry_cmd /opt/miniconda3/bin/conda install -y -n base mamba snakemake
 
     mkdir -p /work
 

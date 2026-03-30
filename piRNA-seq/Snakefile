@@ -34,6 +34,28 @@ COVERAGE_BG = f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.10bp.bg4"
 SUMMARY_TXT = f"{RESULTS_DIR}/reports/{SAMPLE_NAME}.summary.txt"
 BOOTSTRAP_FASTQ = f"{RESULTS_DIR}/bootstrap/{SAMPLE_NAME}.fastq"
 
+# Parity artifacts from Luo 2025 piRNA-seq.md Bowtie steps
+GENOME_AL_FASTQ = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{GENOME_VERSION}.genome.unique.fastq"
+GENOME_UN_FASTQ = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{GENOME_VERSION}.genome.unmapped.fastq"
+GENOME_MULTI_FASTQ = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{GENOME_VERSION}.genome.multi.fastq"
+VECTOR_AL_FASTQ = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.42AB_UASG.vectoronly.fastq"
+
+# Coverage parity artifacts (Luo 2025): bins 10/100/1000 and strand splits.
+VECTOR_COV_PREFIX = f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.42AB_UASG.vectoronly"
+VECTOR_BG_10 = f"{VECTOR_COV_PREFIX}.10.bg4"
+VECTOR_BG_10_MINUS = f"{VECTOR_COV_PREFIX}.10.Minus.bg4"
+VECTOR_BG_10_PLUS = f"{VECTOR_COV_PREFIX}.10.Plus.bg4"
+VECTOR_BG_100 = f"{VECTOR_COV_PREFIX}.100.bg4"
+VECTOR_BG_100_MINUS = f"{VECTOR_COV_PREFIX}.100.Minus.bg4"
+VECTOR_BG_100_PLUS = f"{VECTOR_COV_PREFIX}.100.Plus.bg4"
+VECTOR_BG_1000 = f"{VECTOR_COV_PREFIX}.1000.bg4"
+VECTOR_BG_1000_MINUS = f"{VECTOR_COV_PREFIX}.1000.Minus.bg4"
+VECTOR_BG_1000_PLUS = f"{VECTOR_COV_PREFIX}.1000.Plus.bg4"
+
+VECTOR_BG_10_CHOP = f"{VECTOR_BG_10}.chopped.bg4"
+VECTOR_BG_100_CHOP = f"{VECTOR_BG_100}.chopped.bg4"
+VECTOR_BG_1000_CHOP = f"{VECTOR_BG_1000}.chopped.bg4"
+
 VECTOR_EBWT_SUFFIXES = ("1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt")
 VECTOR_EBWT = [f"{VECTOR_INDEX}.{suf}" for suf in VECTOR_EBWT_SUFFIXES]
 
@@ -97,7 +119,23 @@ rule all:
         f"{VECTOR_BAM}.bai",
         UNIQUE_BAM,
         f"{UNIQUE_BAM}.bai",
+        GENOME_AL_FASTQ,
+        GENOME_UN_FASTQ,
+        GENOME_MULTI_FASTQ,
+        VECTOR_AL_FASTQ,
         COVERAGE_BG,
+        VECTOR_BG_10,
+        VECTOR_BG_10_MINUS,
+        VECTOR_BG_10_PLUS,
+        VECTOR_BG_100,
+        VECTOR_BG_100_MINUS,
+        VECTOR_BG_100_PLUS,
+        VECTOR_BG_1000,
+        VECTOR_BG_1000_MINUS,
+        VECTOR_BG_1000_PLUS,
+        VECTOR_BG_10_CHOP,
+        VECTOR_BG_100_CHOP,
+        VECTOR_BG_1000_CHOP,
         SUMMARY_TXT
 
 
@@ -200,6 +238,9 @@ rule map_genome_align:
         fq=SIZE_SELECTED_FASTQ,
     output:
         bam=GENOME_BAM_RAW,
+        al=GENOME_AL_FASTQ,
+        un=GENOME_UN_FASTQ,
+        multi=GENOME_MULTI_FASTQ,
     params:
         index=GENOME_INDEX,
         sortpfx=f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{GENOME_VERSION}.genome.sorttmp",
@@ -212,6 +253,7 @@ rule map_genome_align:
         ST16="${{SAMTOOLS_016:-samtools}}"
         mkdir -p {RESULTS_DIR}/mapping
         "$BT" -p {threads} --chunkmbs 1024 -v 0 -a -m 1 -t --sam-nh --best --strata -q --sam -k 1 \
+          --al {output.al} --un {output.un} --max {output.multi} \
           {params.index} {input.fq} \
           | "$ST18" view -bT {GENOME_FA} - \
           | "$ST16" sort - {params.sortpfx}
@@ -260,6 +302,7 @@ rule map_vectors:
     output:
         bam=VECTOR_BAM,
         bai=f"{VECTOR_BAM}.bai",
+        al=VECTOR_AL_FASTQ,
     params:
         index=VECTOR_INDEX,
         sortpfx=f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.vector.sorttmp",
@@ -272,6 +315,7 @@ rule map_vectors:
         ST16="${{SAMTOOLS_016:-samtools}}"
         mkdir -p {RESULTS_DIR}/mapping
         "$BT" -p {threads} --chunkmbs 1024 -v 0 -a -m 1 -t --sam-nh --best --strata -q --sam -k 1 \
+          --al {output.al} \
           {params.index} {input.fq} \
           | "$ST18" view -bT {VECTOR_FA} - \
           | "$ST16" sort - {params.sortpfx}
@@ -292,6 +336,75 @@ rule coverage:
         BCV="${{BAMCOVERAGE_BIN:-bamCoverage}}"
         mkdir -p {RESULTS_DIR}/coverage
         "$BCV" --binSize 10 --outFileFormat bedgraph --bam {input} -o {output}
+        """
+
+
+rule vector_coverage:
+    input:
+        VECTOR_BAM
+    output:
+        bg10=VECTOR_BG_10,
+        bg10m=VECTOR_BG_10_MINUS,
+        bg10p=VECTOR_BG_10_PLUS,
+        bg100=VECTOR_BG_100,
+        bg100m=VECTOR_BG_100_MINUS,
+        bg100p=VECTOR_BG_100_PLUS,
+        bg1000=VECTOR_BG_1000,
+        bg1000m=VECTOR_BG_1000_MINUS,
+        bg1000p=VECTOR_BG_1000_PLUS,
+    shell:
+        """
+        BCV="${{BAMCOVERAGE_BIN:-bamCoverage}}"
+        mkdir -p {RESULTS_DIR}/coverage
+
+        "$BCV" -b {input} -of bedgraph -bs 10 -o {output.bg10}
+        "$BCV" -b {input} -of bedgraph -bs 10 --samFlagInclude 16 -o {output.bg10m}
+        "$BCV" -b {input} -of bedgraph -bs 10 --samFlagExclude 16 -o {output.bg10p}
+
+        "$BCV" -b {input} -of bedgraph -bs 100 -o {output.bg100}
+        "$BCV" -b {input} -of bedgraph -bs 100 --samFlagInclude 16 -o {output.bg100m}
+        "$BCV" -b {input} -of bedgraph -bs 100 --samFlagExclude 16 -o {output.bg100p}
+
+        "$BCV" -b {input} -of bedgraph -bs 1000 -o {output.bg1000}
+        "$BCV" -b {input} -of bedgraph -bs 1000 --samFlagInclude 16 -o {output.bg1000m}
+        "$BCV" -b {input} -of bedgraph -bs 1000 --samFlagExclude 16 -o {output.bg1000p}
+        """
+
+
+rule chop_vector_bg4:
+    input:
+        bg4=lambda wc: [VECTOR_BG_10, VECTOR_BG_100, VECTOR_BG_1000]
+    output:
+        ch10=VECTOR_BG_10_CHOP,
+        ch100=VECTOR_BG_100_CHOP,
+        ch1000=VECTOR_BG_1000_CHOP,
+    shell:
+        r"""
+        # Luo 2025: convert bg4 -> bed5, chop to bin size, then bedmap scores back.
+        # Requires bedops/bedmap (bedops package) inside the pipeline container.
+        BOPS="${{BEDOPS_BIN:-bedops}}"
+        BMAP="${{BEDMAP_BIN:-bedmap}}"
+        if ! command -v "$BOPS" >/dev/null 2>&1; then
+          echo "Missing required tool: bedops" >&2
+          echo "Rebuild container after pulling latest containers/pipeline.def:" >&2
+          echo "  apptainer build containers/pirna_pipeline.sif containers/pipeline.def" >&2
+          exit 127
+        fi
+        if ! command -v "$BMAP" >/dev/null 2>&1; then
+          echo "Missing required tool: bedmap" >&2
+          echo "Rebuild container after pulling latest containers/pipeline.def:" >&2
+          echo "  apptainer build containers/pirna_pipeline.sif containers/pipeline.def" >&2
+          exit 127
+        fi
+        for bs in 10 100 1000; do
+          in="{VECTOR_COV_PREFIX}.${{bs}}.bg4"
+          out="$in.chopped.bg4"
+          tmp="$(mktemp -p {RESULTS_DIR}/coverage signal.XXXXXX.bed)"
+          awk -vOFS="\t" '{{ print $1, $2, $3, ".", $4 }}' "$in" > "$tmp"
+          "$BOPS" --chop "$bs" "$tmp" | "$BMAP" --echo --echo-map-score - "$tmp" | sed -e 's/|/\t/g' > "$out"
+          rm -f "$tmp"
+        done
+        test -s "{output.ch10}" && test -s "{output.ch100}" && test -s "{output.ch1000}"
         """
 
 

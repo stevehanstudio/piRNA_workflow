@@ -1113,10 +1113,11 @@ ensure_pipeline_container() {
     local script_dir
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     local ensure_script="$script_dir/Shared/Scripts/shell/ensure_pipeline_container.sh"
-    if [[ -x "$ensure_script" ]]; then
-        "$ensure_script"
+    if [[ -f "$ensure_script" ]]; then
+        bash "$ensure_script"
     else
-        echo "Warning: ensure_pipeline_container.sh not found at $ensure_script" >&2
+        echo "Error: ensure_pipeline_container.sh not found at $ensure_script" >&2
+        exit 1
     fi
 }
 
@@ -1237,6 +1238,17 @@ run_snakemake() {
                 "$PIPELINE_SIF" \
                 bash -c "cd /work/${workflow_dir} && ${command} ${config_override}"
     else
+        # With --use-apptainer, the pipeline SIF is mandatory; do not run Snakemake on host Conda.
+        if [[ "${USE_APPTAINER:-false}" == "true" ]]; then
+            local ensure_script="$script_root/Shared/Scripts/shell/ensure_pipeline_container.sh"
+            echo "Error: --use-apptainer requires a working pipeline image at ${PIPELINE_SIF}." >&2
+            if [[ -f "$ensure_script" ]]; then
+                bash "$ensure_script" || true
+            else
+                echo "Error: missing helper script: ${ensure_script}" >&2
+            fi
+            exit 1
+        fi
         echo "Activating snakemake_env..."
         echo "Running in directory: ${workflow_dir}"
         echo "Command: ${command}"
@@ -1679,17 +1691,16 @@ if [[ "$USE_APPTAINER" == "true" && ("$COMMAND" == "run" || "$COMMAND" == "run-f
     ensure_pipeline_container
 fi
 
-# Do not auto-build individual tool containers. Users should obtain a prebuilt
-# pipeline SIF or run conda-only (omit --use-apptainer).
+# Do not auto-build individual tool containers. With --use-apptainer, run_snakemake requires
+# the pipeline SIF (see ensure_pipeline_container) and does not fall back to host Conda.
 
 # Build container flags (Apptainer only)
 CONTAINER_FLAGS=""
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ "$USE_APPTAINER" == "true" ]]; then
     [[ "$USE_APPTAINER_SUDO" == "true" ]] && export APPTAINER_SUDO=1
-    # Pipeline container already ensured above (before ensure_cutadapt); no duplicate call
-    # Fallback: do NOT auto-build individual tool containers. If the pipeline SIF is missing,
-    # users should use conda-only (omit --use-apptainer) or obtain a prebuilt SIF.
+    # Pipeline container already ensured above for run/setup/dryrun/etc.; run_snakemake re-checks
+    # for unlock/status and still errors if the SIF is unusable (no Conda fallback).
     # When running inside pipeline container, do NOT pass --use-apptainer to Snakemake
     # (all tools are already in the container; rules with container: None would trigger Snakemake to spawn sub-containers incorrectly)
     PIPELINE_SIF="${SCRIPT_ROOT}/containers/pirna_pipeline.sif"
