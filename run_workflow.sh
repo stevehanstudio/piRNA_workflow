@@ -1644,17 +1644,15 @@ if [[ "$WORKFLOW" == "chip-seq" && ("$COMMAND" == "run" || "$COMMAND" == "run-fo
     ensure_samtools_016
 fi
 
-# When using Apptainer, build pipeline container first so ensure_cutadapt can skip (Cutadapt is built-in)
+# When using Apptainer, verify the pipeline container is available.
+# IMPORTANT: Never trigger a build automatically (many servers/HPC disallow builds).
 if [[ "$USE_APPTAINER" == "true" && ("$COMMAND" == "run" || "$COMMAND" == "run-force" || "$COMMAND" == "fix-incomplete" || "$COMMAND" == "setup" || "$COMMAND" == "dryrun") ]]; then
     [[ "$USE_APPTAINER_SUDO" == "true" ]] && export APPTAINER_SUDO=1
     ensure_pipeline_container
 fi
 
-# Ensure cutadapt container for CHIP-seq (Python 2.7, original pipeline version)
-# When pipeline container exists (Apptainer), Cutadapt is built-in and this will skip
-if [[ "$WORKFLOW" == "chip-seq" && ("$COMMAND" == "run" || "$COMMAND" == "run-force" || "$COMMAND" == "fix-incomplete" || "$COMMAND" == "setup" || "$COMMAND" == "dryrun") ]]; then
-    ensure_cutadapt_container
-fi
+# Do not auto-build individual tool containers. Users should obtain a prebuilt
+# pipeline SIF or run conda-only (omit --use-apptainer).
 
 # Build container flags (Apptainer only)
 CONTAINER_FLAGS=""
@@ -1662,12 +1660,8 @@ SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ "$USE_APPTAINER" == "true" ]]; then
     [[ "$USE_APPTAINER_SUDO" == "true" ]] && export APPTAINER_SUDO=1
     # Pipeline container already ensured above (before ensure_cutadapt); no duplicate call
-    # Fallback: individual containers when pipeline container unavailable
-    if [[ "$COMMAND" == "run" || "$COMMAND" == "run-force" || "$COMMAND" == "fix-incomplete" || "$COMMAND" == "setup" || "$COMMAND" == "dryrun" ]]; then
-        ensure_fastqc_container
-        ensure_cutadapt_container
-        ensure_bowtie_container
-    fi
+    # Fallback: do NOT auto-build individual tool containers. If the pipeline SIF is missing,
+    # users should use conda-only (omit --use-apptainer) or obtain a prebuilt SIF.
     # When running inside pipeline container, do NOT pass --use-apptainer to Snakemake
     # (all tools are already in the container; rules with container: None would trigger Snakemake to spawn sub-containers incorrectly)
     PIPELINE_SIF="${SCRIPT_ROOT}/containers/pirna_pipeline.sif"
