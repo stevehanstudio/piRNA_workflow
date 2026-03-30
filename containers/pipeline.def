@@ -16,6 +16,7 @@ From: ubuntu:22.04
 %labels
     Maintainer HeLab
     Description Single pipeline container for piRNA workflow with STAR, RSEM, deepTools, Bowtie, FastQC, Cutadapt, samtools
+    PiRNA_tools FastQC_0.11.3 cutadapt_1.8.3 Bowtie_1.0.1_hamrhein_nh samtools_0.1.8_0.1.16 deeptools_2.4.2
 
 %files
     CHIP-seq/envs/cpuid_arm64.h /build/cpuid_arm64.h
@@ -26,6 +27,12 @@ From: ubuntu:22.04
     export PIPELINE_CONTAINER=1
     export SAMTOOLS_018=/opt/pipeline/samtools-0.1.8/samtools
     export SAMTOOLS_016=/opt/pipeline/samtools-0.1.16/samtools
+    # Absolute paths so host PATH cannot shadow pinned tools when Apptainer inherits the shell environment.
+    export BOWTIE_BIN=/usr/local/bin/bowtie
+    export BOWTIE_BUILD_BIN=/usr/local/bin/bowtie-build
+    export FASTQC_BIN=/opt/FastQC/fastqc
+    export CUTADAPT_BIN=/usr/local/bin/cutadapt
+    export BAMCOVERAGE_BIN=/usr/local/bin/bamCoverage
     export PATH="/opt/pipeline/samtools-0.1.8:/opt/pipeline/samtools-0.1.16:/opt/pipeline/STAR-2.7.9a/bin:/opt/pipeline/rsem-1.3.3/bin:/opt/miniconda3/bin:/opt/FastQC:/usr/local/bin:$PATH"
 
 %post

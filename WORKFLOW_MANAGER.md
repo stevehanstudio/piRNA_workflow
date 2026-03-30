@@ -73,6 +73,8 @@ The workflow manager (`run_workflow.sh`) is designed for **Linux/macOS** and req
    ```
    If the build fails (e.g. "mount namespace requires privileges"), use `sudo apptainer build ...` or the remote builder (see [CONTAINER_KNOWN_ISSUES.md](containers/CONTAINER_KNOWN_ISSUES.md)). **Note:** SIF images are architecture-specific—build on x86_64 for x86 machines, on ARM64 for ARM machines. When `pirna_pipeline.sif` exists, the workflow runs Snakemake inside it automatically.
 
+   **piRNA-seq:** The manager does **not** pass `--use-conda` for this workflow. Rules use the pinned FastQC, cutadapt, Bowtie (1.0.1 hamrhein patch), samtools 0.1.8/0.1.16, and deepTools 2.4.2 from the SIF (`containers/pipeline.def`), matching the Luo 2025 shell pipeline targets.
+
 3. **Individual tool containers** (fallback): Run with `--use-apptainer`; the workflow manager builds FastQC, Cutadapt, and Bowtie containers from `CHIP-seq/envs/*.def` when the pipeline container is not available.
 
 4. **Sudo** is only needed when *building* the container if unprivileged build fails. Running the workflow (`apptainer exec`) typically does not require sudo. On rare systems, if you see permission errors when running, try `--use-sudo`; see [CONTAINER_KNOWN_ISSUES.md](containers/CONTAINER_KNOWN_ISSUES.md).
@@ -101,7 +103,7 @@ See [containers/CONTAINER_KNOWN_ISSUES.md](containers/CONTAINER_KNOWN_ISSUES.md)
 
 | Command | Description |
 |---------|-------------|
-| `setup` | Create conda environments for the workflow |
+| `setup` | Create conda environments (skipped for piRNA-seq; use pipeline SIF) |
 | `dryrun` | Show what will be executed (dry run) |
 | `run` | Run the complete workflow **[DEFAULT]** |
 | `run-force` | Force re-run all steps of the workflow |

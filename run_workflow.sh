@@ -214,7 +214,13 @@ check_input_files() {
     local genome_path="${GENOME_PATH:-./Shared/DataFiles/genomes/${effective_genome_version}.fa}"
     local dataset_path="${DATASET_PATH:-./Shared/DataFiles/datasets/chip-seq/chip_inputs}"
     local adapter_path="${ADAPTER_PATH:-./Shared/DataFiles/genomes/AllAdaptors.fa}"
-    local vector_path="${VECTOR_PATH:-./Shared/DataFiles/genomes/YichengVectors/42AB_UBIG}"
+    # piRNA-seq.md uses 42AB_UASG; ChIP/totalRNA in this repo use 42AB_UBIG.
+    local vector_path
+    if [[ "$workflow_dir" == "piRNA-seq" ]]; then
+        vector_path="${VECTOR_PATH:-./Shared/DataFiles/genomes/YichengVectors/42AB_UASG}"
+    else
+        vector_path="${VECTOR_PATH:-./Shared/DataFiles/genomes/YichengVectors/42AB_UBIG}"
+    fi
     
     # Expand ~ in paths
     genome_path=$(expand_path "$genome_path")
@@ -518,7 +524,7 @@ check_input_files() {
             echo "1. Download and prepare reference files:" >&2
             echo "   • Download ${effective_genome_version}.fa and generate ${effective_genome_version}.chrom.sizes" >&2
             echo "   • Build genome index: bowtie-build ${effective_genome_version}.fa ${effective_genome_version}" >&2
-            echo "   • Build vector index: bowtie-build 42AB_UBIG.fa 42AB_UBIG" >&2
+            echo "   • Build vector index: bowtie-build 42AB_UASG.fa 42AB_UASG" >&2
             echo "" >&2
             echo "2. Place input FASTQ file:" >&2
             echo "   ${dataset_path}" >&2
@@ -759,7 +765,13 @@ select_workflow_and_paths() {
         if [[ -n "$default_vector" ]]; then
             default_vector=$(echo "$default_vector" | sed 's|^\.\./Shared|./Shared|')
         fi
-        [[ -z "$default_vector" ]] && default_vector="./Shared/DataFiles/genomes/YichengVectors/42AB_UBIG"
+        if [[ -z "$default_vector" ]]; then
+            if [[ "$WORKFLOW" == "pirna-seq" ]]; then
+                default_vector="./Shared/DataFiles/genomes/YichengVectors/42AB_UASG"
+            else
+                default_vector="./Shared/DataFiles/genomes/YichengVectors/42AB_UBIG"
+            fi
+        fi
     else
         # For totalRNA-seq, check for vector_index
         default_vector=$(grep -E '^\s*vector_index\s*:' "$config_file" | sed -E 's/^\s*vector_index\s*:\s*//; s/^"//; s/"$//' | head -1)
@@ -805,7 +817,11 @@ auto_unlock_if_safe() {
     # Check if lock directory exists
     if [[ -d "$workflow_dir/.snakemake/locks" ]] && [[ -n "$(ls -A "$workflow_dir/.snakemake/locks" 2>/dev/null)" ]]; then
         echo "🔓 Stale lock detected - automatically unlocking workflow directory..." >&2
-        run_snakemake "$workflow_dir" "snakemake --unlock --use-conda" 2>&1 | grep -v "Unlocking working directory" || true
+        if [[ "$workflow_dir" == "piRNA-seq" ]]; then
+            run_snakemake "$workflow_dir" "snakemake --unlock" 2>&1 | grep -v "Unlocking working directory" || true
+        else
+            run_snakemake "$workflow_dir" "snakemake --unlock --use-conda --conda-frontend mamba" 2>&1 | grep -v "Unlocking working directory" || true
+        fi
         echo "✅ Directory unlocked successfully!" >&2
         echo "" >&2
         return 0
@@ -1553,7 +1569,13 @@ elif [[ -z "$GENOME_VERSION" && -z "$GENOME_PATH" && -z "$INDEX_PATH" && -z "$DA
         if [[ -n "$default_vector" ]]; then
             default_vector=$(echo "$default_vector" | sed 's|^\.\./Shared|./Shared|')
         fi
-        [[ -z "$default_vector" ]] && default_vector="./Shared/DataFiles/genomes/YichengVectors/42AB_UBIG"
+        if [[ -z "$default_vector" ]]; then
+            if [[ "$WORKFLOW_SAVED" == "pirna-seq" ]]; then
+                default_vector="./Shared/DataFiles/genomes/YichengVectors/42AB_UASG"
+            else
+                default_vector="./Shared/DataFiles/genomes/YichengVectors/42AB_UBIG"
+            fi
+        fi
     else
         default_vector=$(grep -E '^\s*vector_index\s*:' "$config_file" | sed -E 's/^\s*vector_index\s*:\s*//; s/^"//; s/"$//' | head -1)
         if [[ -n "$default_vector" ]]; then
@@ -1605,6 +1627,12 @@ case "$WORKFLOW" in
         exit 1
         ;;
 esac
+
+# piRNA-seq uses pinned tools from the pipeline Apptainer image (or host PATH); no Snakemake conda envs.
+SM_CONDA_FLAGS=""
+if [[ "$WORKFLOW_DIR" != "piRNA-seq" ]]; then
+    SM_CONDA_FLAGS="--use-conda --conda-frontend mamba "
+fi
 
 # Check if workflow directory exists
 if [[ ! -d "$WORKFLOW_DIR" ]]; then
@@ -1701,25 +1729,29 @@ fi
 case "$COMMAND" in
     setup)
         echo "Setting up conda environments for $WORKFLOW..."
-        run_snakemake "$WORKFLOW_DIR" "snakemake --use-conda --conda-frontend mamba --conda-create-envs-only all $CONTAINER_FLAGS"
+        if [[ "$WORKFLOW_DIR" == "piRNA-seq" ]]; then
+            echo "piRNA-seq: no Snakemake conda envs (use pipeline Apptainer for pinned FastQC/cutadapt/Bowtie/samtools/deepTools)."
+        else
+            run_snakemake "$WORKFLOW_DIR" "snakemake ${SM_CONDA_FLAGS}--conda-create-envs-only all $CONTAINER_FLAGS"
+        fi
         echo "Setup completed successfully!"
         ;;
     dryrun)
         echo "Performing dry run for $WORKFLOW..."
-        run_snakemake "$WORKFLOW_DIR" "snakemake all --use-conda --conda-frontend mamba --cores $CORES --dry-run $CONTAINER_FLAGS"
+        run_snakemake "$WORKFLOW_DIR" "snakemake all ${SM_CONDA_FLAGS}--cores $CORES --dry-run $CONTAINER_FLAGS"
         ;;
     run)
         if [[ "$FORCE_RERUN" == "true" ]]; then
             echo "Force running $WORKFLOW workflow (all steps)..."
             echo "Note: Cleaning up any incomplete file metadata first..."
-            run_snakemake "$WORKFLOW_DIR" "snakemake --cleanup-metadata --use-conda --conda-frontend mamba $CONTAINER_FLAGS" 2>/dev/null || true
+            run_snakemake "$WORKFLOW_DIR" "snakemake --cleanup-metadata ${SM_CONDA_FLAGS}$CONTAINER_FLAGS" 2>/dev/null || true
             START_TIME=$(date +%s)
-            run_snakemake "$WORKFLOW_DIR" "snakemake all --forceall --rerun-incomplete --use-conda --conda-frontend mamba --cores $CORES $CONTAINER_FLAGS $EXTRA_FLAGS"
+            run_snakemake "$WORKFLOW_DIR" "snakemake all --forceall --rerun-incomplete ${SM_CONDA_FLAGS}--cores $CORES $CONTAINER_FLAGS $EXTRA_FLAGS"
         else
             echo "Running $WORKFLOW workflow..."
             START_TIME=$(date +%s)
             # Try regular run first, if it fails with incomplete files, suggest fix-incomplete
-            if ! run_snakemake "$WORKFLOW_DIR" "snakemake all --use-conda --conda-frontend mamba --cores $CORES $CONTAINER_FLAGS $EXTRA_FLAGS"; then
+            if ! run_snakemake "$WORKFLOW_DIR" "snakemake all ${SM_CONDA_FLAGS}--cores $CORES $CONTAINER_FLAGS $EXTRA_FLAGS"; then
                 echo ""
                 echo "❌ Workflow failed. This might be due to incomplete files from a previous run."
                 echo "💡 Try running: $0 $WORKFLOW fix-incomplete"
@@ -1738,9 +1770,9 @@ case "$COMMAND" in
     run-force)
         echo "Force running $WORKFLOW workflow (all steps)..."
         echo "Note: Cleaning up any incomplete file metadata first..."
-        run_snakemake "$WORKFLOW_DIR" "snakemake --cleanup-metadata --use-conda --conda-frontend mamba $CONTAINER_FLAGS" 2>/dev/null || true
+        run_snakemake "$WORKFLOW_DIR" "snakemake --cleanup-metadata ${SM_CONDA_FLAGS}$CONTAINER_FLAGS" 2>/dev/null || true
         START_TIME=$(date +%s)
-        run_snakemake "$WORKFLOW_DIR" "snakemake all --forceall --rerun-incomplete --use-conda --conda-frontend mamba --cores $CORES $CONTAINER_FLAGS $EXTRA_FLAGS"
+        run_snakemake "$WORKFLOW_DIR" "snakemake all --forceall --rerun-incomplete ${SM_CONDA_FLAGS}--cores $CORES $CONTAINER_FLAGS $EXTRA_FLAGS"
         END_TIME=$(date +%s)
         DURATION=$((END_TIME - START_TIME))
         echo ""
@@ -1753,11 +1785,11 @@ case "$COMMAND" in
         echo "Fixing incomplete files for $WORKFLOW workflow..."
         echo "Step 1: Attempting to clean up metadata for incomplete files..."
         # Try to cleanup metadata - this might fail if no specific files are provided, that's OK
-        run_snakemake "$WORKFLOW_DIR" "snakemake --cleanup-metadata --use-conda --conda-frontend mamba $CONTAINER_FLAGS || true" 2>/dev/null || true
+        run_snakemake "$WORKFLOW_DIR" "snakemake --cleanup-metadata ${SM_CONDA_FLAGS}$CONTAINER_FLAGS || true" 2>/dev/null || true
         echo ""
         echo "Step 2: Re-running workflow with incomplete file recovery..."
         START_TIME=$(date +%s)
-        run_snakemake "$WORKFLOW_DIR" "snakemake all --rerun-incomplete --use-conda --conda-frontend mamba --cores $CORES $CONTAINER_FLAGS $EXTRA_FLAGS"
+        run_snakemake "$WORKFLOW_DIR" "snakemake all --rerun-incomplete ${SM_CONDA_FLAGS}--cores $CORES $CONTAINER_FLAGS $EXTRA_FLAGS"
         END_TIME=$(date +%s)
         DURATION=$((END_TIME - START_TIME))
         echo ""
@@ -1773,12 +1805,12 @@ case "$COMMAND" in
         ;;
     unlock)
         echo "Unlocking $WORKFLOW workflow directory..."
-        run_snakemake "$WORKFLOW_DIR" "snakemake --unlock --use-conda --conda-frontend mamba $CONTAINER_FLAGS"
+        run_snakemake "$WORKFLOW_DIR" "snakemake --unlock ${SM_CONDA_FLAGS}$CONTAINER_FLAGS"
         echo "Workflow directory unlocked successfully!"
         ;;
     status)
         echo "Checking $WORKFLOW workflow status..."
-        run_snakemake "$WORKFLOW_DIR" "snakemake all --use-conda --conda-frontend mamba --dry-run --quiet $CONTAINER_FLAGS"
+        run_snakemake "$WORKFLOW_DIR" "snakemake all ${SM_CONDA_FLAGS}--dry-run --quiet $CONTAINER_FLAGS"
         if [[ -d "$WORKFLOW_DIR/results" ]]; then
             echo ""
             echo "Results directory contents:"

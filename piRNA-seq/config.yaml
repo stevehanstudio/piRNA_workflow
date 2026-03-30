@@ -12,13 +12,16 @@ sample:
   fastq: "../Shared/DataFiles/datasets/pirna-seq/pirna_sample.fastq.gz"
 
 references:
-  vector_index: "../Shared/DataFiles/genomes/YichengVectors/42AB_UBIG"
-  adapter_sequence: "TGGAATTCTCGGGTGCCAAGG"
+  # Luo 2025 piRNA-seq.md maps to 42AB_UASG (not 42AB_UBIG used by ChIP/totalRNA in this repo).
+  vector_index: "../Shared/DataFiles/genomes/YichengVectors/42AB_UASG"
+  # Illumina TruSeq small RNA / documented in piRNA-seq.md
+  adapter_sequence: "AGATCGGAAGAGCACACGTCT"
 
 output:
   results_dir: "results"
 
 analysis:
-  min_read_length: 18
-  max_read_length: 100
+  # Luo 2025: extract 23–29 nt after adapter trim (piRNA-seq.md).
+  min_read_length: 23
+  max_read_length: 29
   threads: 8

@@ -1,3 +1,5 @@
+# Legacy: piRNA-seq rules no longer use this conda env.
+# Pinned tools live in containers/pipeline.def (Apptainer). run_workflow.sh omits --use-conda for piRNA-seq.
 name: pirna_core
 channels:
   - conda-forge

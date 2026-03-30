@@ -2,27 +2,30 @@
 
 ## Purpose
 
-Provide a minimal, repeatable validation that the piRNA-seq MVP workflow can build a complete DAG with no external sample data pre-staged.
+Minimal validation that the piRNA-seq workflow defines a complete DAG.
 
 ## Command
 
 ```bash
 cd piRNA-seq
-conda run -n snakemake_env snakemake --dry-run --cores 1
+snakemake -n all --cores 1
 ```
+
+(Use `conda run -n snakemake_env snakemake ...` if Snakemake is only installed in that environment.)
 
 ## Expected Result
 
 - Exit code `0`
-- DAG includes all MVP rules:
-  - `bootstrap_example_fastq`
+- DAG includes at least these rules:
+
+  - `bowtie_index_vector` (runs when `42AB_UASG.*.ebwt` are absent)
   - `fastqc_raw`
   - `trim_adapters`
   - `size_select_pirna`
   - `fastqc_filtered`
-  - `map_genome`
+  - `map_genome_align`
+  - `remove_chrM`
   - `filter_unique_genome_reads`
-  - `extract_non_genome_reads`
   - `map_vectors`
   - `coverage`
   - `summary_report`
@@ -30,5 +33,5 @@ conda run -n snakemake_env snakemake --dry-run --cores 1
 
 ## Latest Local Check
 
-- Date: 2026-02-26
-- Result: Pass (`12` jobs in dry-run DAG)
+- Date: 2026-03-30
+- Note: Rule set updated for Luo 2025 parity and `42AB_UASG`; job count depends on whether vector indexes already exist.
