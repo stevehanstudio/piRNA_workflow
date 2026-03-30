@@ -45,6 +45,18 @@ This repository contains a bioinformatics workflow system that is **converting a
 - ✅ Automatic error recovery and lock management
 - ✅ Input validation and overwrite protection
 
+## 📦 Large reference data (recommended symlink)
+
+Reference genomes and indexes can be large. To keep your repo on a smaller disk while storing genomes elsewhere, create a **local symlink** at `Shared/DataFiles/genomes` that points to your actual data directory.
+
+This symlink is **intentionally not tracked in git** (it is ignored), so each machine can point it to a different location.
+
+```bash
+# Example: put large data on another disk
+mkdir -p /mnt/bigdisk/HeLab_DataFiles
+ln -s /mnt/bigdisk/HeLab_DataFiles Shared/DataFiles/genomes
+```
+
 **`--clean` vs `--rerun-incomplete`:**
 - `--clean`: deletes `results/` before run (fresh restart, non-interactive)
 - `--rerun-incomplete`: keeps existing outputs and only retries incomplete/failed jobs

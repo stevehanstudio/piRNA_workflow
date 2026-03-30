@@ -183,8 +183,10 @@ check_input_files() {
     echo "=== Input File Validation ===" >&2
     echo "Checking required input files for $workflow_dir workflow..." >&2
     
-    # Use override paths if provided, otherwise use defaults
-    local genome_path="${GENOME_PATH:-./Shared/DataFiles/genomes/dm6.fa}"
+    # Use override paths if provided, otherwise use defaults.
+    # If --genome-version is provided and --genome-path is not, point to that version's FASTA.
+    local effective_genome_version="${GENOME_VERSION:-dm6}"
+    local genome_path="${GENOME_PATH:-./Shared/DataFiles/genomes/${effective_genome_version}.fa}"
     local dataset_path="${DATASET_PATH:-./Shared/DataFiles/datasets/chip-seq/chip_inputs}"
     local adapter_path="${ADAPTER_PATH:-./Shared/DataFiles/genomes/AllAdaptors.fa}"
     local vector_path="${VECTOR_PATH:-./Shared/DataFiles/genomes/YichengVectors/42AB_UBIG}"
@@ -202,7 +204,7 @@ check_input_files() {
 
     if [[ "$workflow_dir" == "CHIP-seq" ]]; then
         # Determine paths for genome-related files based on custom paths
-        local index_path="${INDEX_PATH:-./Shared/DataFiles/genomes/bowtie-indexes/dm6}"
+        local index_path="${INDEX_PATH:-./Shared/DataFiles/genomes/bowtie-indexes/${effective_genome_version}}"
         index_path=$(expand_path "$index_path")
         local index_dir=$(dirname "$index_path")
         local index_basename=$(basename "$index_path")
@@ -245,10 +247,10 @@ check_input_files() {
             fi
         done
 
-        # If indexes don't exist, dm6.fa must exist (so Snakemake can build them)
+        # If indexes don't exist, the genome FASTA must exist (so Snakemake can build them)
         if [[ "$all_dm6_indexes_exist" == "false" ]]; then
-            # dm6.fa is already in required_files, so we're good - Snakemake will build indexes
-            echo "ℹ️  Note: dm6 bowtie indexes will be built from dm6.fa" >&2
+            # genome FASTA is already in required_files, so we're good - Snakemake will build indexes
+            echo "ℹ️  Note: Genome bowtie indexes will be built from $(basename "$genome_path")" >&2
         fi
 
         # Check for vector index files: either indexes exist OR source file exists
@@ -363,7 +365,7 @@ check_input_files() {
         dataset_path="${DATASET_PATH:-./Shared/DataFiles/datasets/pirna-seq/pirna_sample.fastq.gz}"
         dataset_path=$(expand_path "$dataset_path")
 
-        local index_path="${INDEX_PATH:-./Shared/DataFiles/genomes/bowtie-indexes/dm6}"
+        local index_path="${INDEX_PATH:-./Shared/DataFiles/genomes/bowtie-indexes/${effective_genome_version}}"
         index_path=$(expand_path "$index_path")
         local index_dir=$(dirname "$index_path")
         local index_basename=$(basename "$index_path")
@@ -377,10 +379,10 @@ check_input_files() {
             "${vector_path}.fa"
         )
 
+        # Only the dataset directory must exist up front. Index/vector directories can be
+        # created by Snakemake rules (e.g., bowtie-build rules typically mkdir -p).
         local required_dirs=(
             "$(dirname "$dataset_path")"
-            "$index_dir"
-            "$(dirname "$vector_path")"
         )
 
         local genome_index_files=(
@@ -489,18 +491,19 @@ check_input_files() {
             echo "" >&2
         elif [[ "$workflow_dir" == "piRNA-seq" ]]; then
             echo "1. Download and prepare reference files:" >&2
-            echo "   • Download dm6.fa and generate dm6.chrom.sizes" >&2
-            echo "   • Build genome index: bowtie-build dm6.fa dm6" >&2
+            echo "   • Download ${effective_genome_version}.fa and generate ${effective_genome_version}.chrom.sizes" >&2
+            echo "   • Build genome index: bowtie-build ${effective_genome_version}.fa ${effective_genome_version}" >&2
             echo "   • Build vector index: bowtie-build 42AB_UBIG.fa 42AB_UBIG" >&2
             echo "" >&2
             echo "2. Place input FASTQ file:" >&2
-            echo "   Shared/DataFiles/datasets/pirna-seq/pirna_sample.fastq" >&2
+            echo "   ${dataset_path}" >&2
             echo "" >&2
         fi
 
         echo "3. For detailed setup instructions, see:" >&2
         echo "   • $workflow_dir/README.md" >&2
-        echo "   • INDEX_BUILDING_STRATEGY.md" >&2
+        # Keep this optional; file may not exist in all checkouts.
+        echo "   • (optional) INDEX_BUILDING_STRATEGY.md" >&2
         echo "" >&2
 
         while true; do
