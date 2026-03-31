@@ -47,10 +47,11 @@ For DAG checks without the Apptainer image, install `snakemake` on the host and 
 5. `bowtie_index_vector` (if `.ebwt` missing)
 6. Genome alignment + `samtools view` / `sort` (0.1.8 / 0.1.16)
 7. Remove chrM (`egrep -v`, as in the published shell pipeline)
-8. MAPQ &gt; 0 filter → unique BAM
+8. Optional MAPQ &gt; 0 filter → `*.genome.unique.bam` (Luo shell uses Bowtie `-m 1` only; set `analysis.mapq_filter_unique: false` in `config.yaml` for parity)
 9. Vector alignment of the **full** 23–29 nt library (not genome-unmapped only)
-10. `bamCoverage` 10 bp bedgraph
-11. Summary report
+10. Genome `bamCoverage` 10 bp bedgraph (from unique BAM)
+11. Vector + (optional) transposon-cluster bedgraphs from `genome.te_regions` — 10/100/1000 bp, ± strand, then bedops/bedmap chop; set `te_regions: {}` to skip
+12. Summary report
 
 See `SMOKE_TEST.md` for dry-run expectations.
 

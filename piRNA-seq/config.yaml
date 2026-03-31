@@ -6,6 +6,12 @@ genome:
   fasta: "../Shared/DataFiles/genomes/{version}.fa"
   bowtie_index: "../Shared/DataFiles/genomes/bowtie-indexes/{version}"
   chrom_sizes: "../Shared/DataFiles/genomes/bowtie-indexes/{version}.chrom.sizes"
+  # Luo 2025 piRNA-seq.md transposon windows (dm3). Override for other references or set to {}
+  # to skip te_cluster_coverage / chop_te_bg4 rules.
+  te_regions:
+    # Note: deepTools 2.4.2 expects CHR:START:END (not CHR:START-END).
+    "20A": "chrX:21392175:21431907"
+    "42A": "chr2R:2144349:2386719"
 
 sample:
   name: "pirna_sample"
@@ -25,3 +31,6 @@ analysis:
   min_read_length: 23
   max_read_length: 29
   threads: 8
+  # Luo shell pipeline names *unique.dup* BAMs after Bowtie -m 1 only; it does not add
+  # samtools MAPQ filtering. Set true to drop MAPQ==0 for *.genome.unique.bam and genome coverage.
+  mapq_filter_unique: false

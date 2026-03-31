@@ -2,6 +2,7 @@ configfile: "config.yaml"
 
 import os
 import pathlib
+import re
 
 SNAKEFILE_DIR = pathlib.Path(__file__).resolve().parent
 PROJECT_ROOT = SNAKEFILE_DIR.parent
@@ -10,6 +11,7 @@ GENOME_VERSION = config["genome"]["version"]
 SAMPLE_NAME = config["sample"]["name"]
 THREADS = int(config["analysis"]["threads"])
 RESULTS_DIR = config["output"]["results_dir"]
+MAPQ_FILTER_UNIQUE = bool(config["analysis"].get("mapq_filter_unique", True))
 
 CONFIG_FASTQ = config["sample"]["fastq"]
 ADAPTER = config["references"]["adapter_sequence"]
@@ -58,6 +60,69 @@ VECTOR_BG_1000_CHOP = f"{VECTOR_BG_1000}.chopped.bg4"
 
 VECTOR_EBWT_SUFFIXES = ("1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt")
 VECTOR_EBWT = [f"{VECTOR_INDEX}.{suf}" for suf in VECTOR_EBWT_SUFFIXES]
+
+_te_cfg = config.get("genome", {}).get("te_regions")
+TE_REGIONS = _te_cfg if isinstance(_te_cfg, dict) else {}
+
+def normalize_te_region(region: str) -> str:
+    """
+    deepTools 2.4.2 expects --region in the form CHR[:START[:END]].
+    The Luo 2025 markdown uses CHR:START-END, so accept that and normalize.
+    """
+    if not region:
+        return region
+    # Convert "chr:start-end" -> "chr:start:end"
+    m = re.match(r"^([^:]+):(\d+)-(\d+)$", region)
+    if m:
+        return f"{m.group(1)}:{m.group(2)}:{m.group(3)}"
+    return region
+
+
+def te_cov_prefix(tag: str) -> str:
+    return f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{tag}"
+
+
+TE_TARGET_FILES = []
+for _te_tag in TE_REGIONS:
+    _tp = te_cov_prefix(_te_tag)
+    for _te_bs in (10, 100, 1000):
+        TE_TARGET_FILES.append(f"{_tp}.{_te_bs}.bg4")
+        TE_TARGET_FILES.append(f"{_tp}.{_te_bs}.Minus.bg4")
+        TE_TARGET_FILES.append(f"{_tp}.{_te_bs}.Plus.bg4")
+        TE_TARGET_FILES.append(f"{_tp}.{_te_bs}.bg4.chopped.bg4")
+
+
+_PI_RNA_ALL_INPUTS = [
+    f"{QC_RAW_DIR}/{SAMPLE_NAME}_fastqc.html",
+    f"{QC_FILTERED_DIR}/{SAMPLE_NAME}.pirna_sized_fastqc.html",
+    TRIMMED_FASTQ,
+    SIZE_SELECTED_FASTQ,
+    GENOME_BAM,
+    f"{GENOME_BAM}.bai",
+    VECTOR_BAM,
+    f"{VECTOR_BAM}.bai",
+    UNIQUE_BAM,
+    f"{UNIQUE_BAM}.bai",
+    GENOME_AL_FASTQ,
+    GENOME_UN_FASTQ,
+    GENOME_MULTI_FASTQ,
+    VECTOR_AL_FASTQ,
+    COVERAGE_BG,
+    VECTOR_BG_10,
+    VECTOR_BG_10_MINUS,
+    VECTOR_BG_10_PLUS,
+    VECTOR_BG_100,
+    VECTOR_BG_100_MINUS,
+    VECTOR_BG_100_PLUS,
+    VECTOR_BG_1000,
+    VECTOR_BG_1000_MINUS,
+    VECTOR_BG_1000_PLUS,
+    VECTOR_BG_10_CHOP,
+    VECTOR_BG_100_CHOP,
+    VECTOR_BG_1000_CHOP,
+    SUMMARY_TXT,
+]
+_PI_RNA_ALL_INPUTS.extend(TE_TARGET_FILES)
 
 
 def resolve_existing_fastq(path_str: str):
@@ -109,34 +174,7 @@ rule bootstrap_example_fastq:
 rule all:
     default_target: True
     input:
-        f"{QC_RAW_DIR}/{SAMPLE_NAME}_fastqc.html",
-        f"{QC_FILTERED_DIR}/{SAMPLE_NAME}.pirna_sized_fastqc.html",
-        TRIMMED_FASTQ,
-        SIZE_SELECTED_FASTQ,
-        GENOME_BAM,
-        f"{GENOME_BAM}.bai",
-        VECTOR_BAM,
-        f"{VECTOR_BAM}.bai",
-        UNIQUE_BAM,
-        f"{UNIQUE_BAM}.bai",
-        GENOME_AL_FASTQ,
-        GENOME_UN_FASTQ,
-        GENOME_MULTI_FASTQ,
-        VECTOR_AL_FASTQ,
-        COVERAGE_BG,
-        VECTOR_BG_10,
-        VECTOR_BG_10_MINUS,
-        VECTOR_BG_10_PLUS,
-        VECTOR_BG_100,
-        VECTOR_BG_100_MINUS,
-        VECTOR_BG_100_PLUS,
-        VECTOR_BG_1000,
-        VECTOR_BG_1000_MINUS,
-        VECTOR_BG_1000_PLUS,
-        VECTOR_BG_10_CHOP,
-        VECTOR_BG_100_CHOP,
-        VECTOR_BG_1000_CHOP,
-        SUMMARY_TXT
+        _PI_RNA_ALL_INPUTS
 
 
 rule bowtie_index_vector:
@@ -285,11 +323,17 @@ rule filter_unique_genome_reads:
     output:
         bam=UNIQUE_BAM,
         bai=f"{UNIQUE_BAM}.bai",
+    params:
+        mapq_flag=1 if MAPQ_FILTER_UNIQUE else 0,
     shell:
         """
         ST18="${{SAMTOOLS_018:-samtools}}"
         ST16="${{SAMTOOLS_016:-samtools}}"
-        "$ST18" view -b -q 1 {input} > {output.bam}
+        if [ {params.mapq_flag} -eq 1 ]; then
+          "$ST18" view -b -q 1 {input} > {output.bam}
+        else
+          "$ST18" view -b {input} > {output.bam}
+        fi
         "$ST16" index {output.bam}
         """
 
@@ -408,6 +452,79 @@ rule chop_vector_bg4:
         """
 
 
+if TE_REGIONS:
+    _TE_TAG_PATTERN = "|".join(re.escape(k) for k in TE_REGIONS.keys())
+
+    rule te_cluster_coverage:
+        input:
+            UNIQUE_BAM,
+        output:
+            bg10=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.10.bg4",
+            bg10m=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.10.Minus.bg4",
+            bg10p=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.10.Plus.bg4",
+            bg100=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.100.bg4",
+            bg100m=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.100.Minus.bg4",
+            bg100p=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.100.Plus.bg4",
+            bg1000=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.1000.bg4",
+            bg1000m=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.1000.Minus.bg4",
+            bg1000p=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.1000.Plus.bg4",
+        wildcard_constraints:
+            tag=_TE_TAG_PATTERN,
+        params:
+            region=lambda w: normalize_te_region(TE_REGIONS[w.tag]),
+        shell:
+            """
+            BCV="${{BAMCOVERAGE_BIN:-bamCoverage}}"
+            mkdir -p {RESULTS_DIR}/coverage
+            REG='{params.region}'
+            "$BCV" -b {input} -of bedgraph -bs 10 --region "$REG" -o {output.bg10}
+            "$BCV" -b {input} -of bedgraph -bs 10 --region "$REG" --samFlagInclude 16 -o {output.bg10m}
+            "$BCV" -b {input} -of bedgraph -bs 10 --region "$REG" --samFlagExclude 16 -o {output.bg10p}
+            "$BCV" -b {input} -of bedgraph -bs 100 --region "$REG" -o {output.bg100}
+            "$BCV" -b {input} -of bedgraph -bs 100 --region "$REG" --samFlagInclude 16 -o {output.bg100m}
+            "$BCV" -b {input} -of bedgraph -bs 100 --region "$REG" --samFlagExclude 16 -o {output.bg100p}
+            "$BCV" -b {input} -of bedgraph -bs 1000 --region "$REG" -o {output.bg1000}
+            "$BCV" -b {input} -of bedgraph -bs 1000 --region "$REG" --samFlagInclude 16 -o {output.bg1000m}
+            "$BCV" -b {input} -of bedgraph -bs 1000 --region "$REG" --samFlagExclude 16 -o {output.bg1000p}
+            """
+
+    rule chop_te_bg4:
+        input:
+            bg10=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.10.bg4",
+            bg100=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.100.bg4",
+            bg1000=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.1000.bg4",
+        output:
+            ch10=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.10.bg4.chopped.bg4",
+            ch100=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.100.bg4.chopped.bg4",
+            ch1000=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.1000.bg4.chopped.bg4",
+        wildcard_constraints:
+            tag=_TE_TAG_PATTERN,
+        params:
+            prefix=lambda w: te_cov_prefix(w.tag),
+        shell:
+            r"""
+            BOPS="${{BEDOPS_BIN:-bedops}}"
+            BMAP="${{BEDMAP_BIN:-bedmap}}"
+            if ! command -v "$BOPS" >/dev/null 2>&1; then
+              echo "Missing required tool: bedops" >&2
+              exit 127
+            fi
+            if ! command -v "$BMAP" >/dev/null 2>&1; then
+              echo "Missing required tool: bedmap" >&2
+              exit 127
+            fi
+            for bs in 10 100 1000; do
+              in="{params.prefix}.$bs.bg4"
+              out="$in.chopped.bg4"
+              tmp="$(mktemp -p {RESULTS_DIR}/coverage te_signal.XXXXXX.bed)"
+              awk -vOFS="\t" '{{ print $1, $2, $3, ".", $4 }}' "$in" > "$tmp"
+              "$BOPS" --chop "$bs" "$tmp" | "$BMAP" --echo --echo-map-score - "$tmp" | sed -e 's/|/\t/g' > "$out"
+              rm -f "$tmp"
+            done
+            test -s "{output.ch10}" && test -s "{output.ch100}" && test -s "{output.ch1000}"
+            """
+
+
 rule summary_report:
     input:
         genome_bam=GENOME_BAM,
@@ -416,6 +533,9 @@ rule summary_report:
         coverage=COVERAGE_BG,
     output:
         SUMMARY_TXT,
+    params:
+        mapq_filter=MAPQ_FILTER_UNIQUE,
+        te_note=",".join(sorted(TE_REGIONS.keys())) if TE_REGIONS else "none",
     shell:
         """
         mkdir -p {RESULTS_DIR}/reports
@@ -423,6 +543,8 @@ rule summary_report:
           echo "piRNA-seq summary (Luo 2025 piRNA-seq.md parity targets)"
           echo "sample: {SAMPLE_NAME}"
           echo "genome: {GENOME_VERSION}"
+          echo "mapq_filter_unique: {params.mapq_filter}"
+          echo "te_regions: {params.te_note}"
           echo "raw_fastq: {RAW_FASTQ}"
           echo "sized_fastq: {SIZE_SELECTED_FASTQ}"
           echo "genome_bam: {input.genome_bam}"
