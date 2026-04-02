@@ -30,7 +30,13 @@ analysis:
   # Luo 2025: extract 23–29 nt after adapter trim (piRNA-seq.md).
   min_read_length: 23
   max_read_length: 29
+  # Filename token for genome/vector mapping outputs (default: "{min_read_length}_{max_read_length}").
+  # Override for a different size branch, e.g. size_class: "21"
+  # size_class: "23_29"
   threads: 8
+  # Coverage/bedGraph outputs (bamCoverage + bedops/bedmap chop) are optional.
+  # YiCheng comparison only requires BAMs, so default is off.
+  emit_coverage: false
   # Luo shell pipeline names *unique.dup* BAMs after Bowtie -m 1 only; it does not add
-  # samtools MAPQ filtering. Set true to drop MAPQ==0 for *.genome.unique.bam and genome coverage.
+  # samtools MAPQ filtering. Set true to drop MAPQ==0 for *.{size_class}.{genome}.genome.unique.bam and genome coverage.
   mapq_filter_unique: false

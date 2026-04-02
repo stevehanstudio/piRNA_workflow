@@ -47,7 +47,7 @@ For DAG checks without the Apptainer image, install `snakemake` on the host and 
 5. `bowtie_index_vector` (if `.ebwt` missing)
 6. Genome alignment + `samtools view` / `sort` (0.1.8 / 0.1.16)
 7. Remove chrM (`egrep -v`, as in the published shell pipeline)
-8. Optional MAPQ &gt; 0 filter → `*.genome.unique.bam` (Luo shell uses Bowtie `-m 1` only; set `analysis.mapq_filter_unique: false` in `config.yaml` for parity)
+8. Optional MAPQ &gt; 0 filter → `{sample}.{size_class}.{genome}.genome.unique.bam` (default `size_class` is `{min_read_length}_{max_read_length}`, e.g. `23_29`; override with `analysis.size_class`. Luo shell uses Bowtie `-m 1` only; set `analysis.mapq_filter_unique: false` in `config.yaml` for parity)
 9. Vector alignment of the **full** 23–29 nt library (not genome-unmapped only)
 10. Genome `bamCoverage` 10 bp bedgraph (from unique BAM)
 11. Vector + (optional) transposon-cluster bedgraphs from `genome.te_regions` — 10/100/1000 bp, ± strand, then bedops/bedmap chop; set `te_regions: {}` to skip
@@ -64,4 +64,4 @@ See `SMOKE_TEST.md` for dry-run expectations.
 
 ## Outputs
 
-Under `results/`: `fastqc_raw/`, `fastqc_filtered/`, `trimmed/`, `mapping/` (including `*.genome.aln.bam` before chrM filter), `coverage/`, `reports/`.
+Under `results/`: `fastqc_raw/`, `fastqc_filtered/`, `trimmed/`, `mapping/` (genome BAMs and Bowtie split FASTQs use `{sample}.{size_class}.{genome}.…`; vector BAM uses `{sample}.{size_class}.vector.bam`), `coverage/`, `reports/`.

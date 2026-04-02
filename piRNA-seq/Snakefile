@@ -11,6 +11,7 @@ GENOME_VERSION = config["genome"]["version"]
 SAMPLE_NAME = config["sample"]["name"]
 THREADS = int(config["analysis"]["threads"])
 RESULTS_DIR = config["output"]["results_dir"]
+EMIT_COVERAGE = bool(config["analysis"].get("emit_coverage", False))
 MAPQ_FILTER_UNIQUE = bool(config["analysis"].get("mapq_filter_unique", True))
 
 CONFIG_FASTQ = config["sample"]["fastq"]
@@ -23,27 +24,35 @@ VECTOR_FA = f"{VECTOR_INDEX}.fa"
 
 MIN_LEN = int(config["analysis"]["min_read_length"])
 MAX_LEN = int(config["analysis"]["max_read_length"])
+_scfg = config["analysis"].get("size_class")
+SIZE_CLASS = (
+    str(_scfg).strip()
+    if _scfg is not None and str(_scfg).strip()
+    else f"{MIN_LEN}_{MAX_LEN}"
+)
+# Luo coverage filenames used "*23_29mer*"; keep the same pattern for arbitrary size_class.
+SIZE_CLASS_MER = f"{SIZE_CLASS}mer"
 
 QC_RAW_DIR = f"{RESULTS_DIR}/fastqc_raw"
 QC_FILTERED_DIR = f"{RESULTS_DIR}/fastqc_filtered"
 TRIMMED_FASTQ = f"{RESULTS_DIR}/trimmed/{SAMPLE_NAME}.adapter_trimmed.fastq"
 SIZE_SELECTED_FASTQ = f"{RESULTS_DIR}/trimmed/{SAMPLE_NAME}.pirna_sized.fastq"
-GENOME_BAM_RAW = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{GENOME_VERSION}.genome.aln.bam"
-GENOME_BAM = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{GENOME_VERSION}.genome.bam"
-VECTOR_BAM = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.vector.bam"
-UNIQUE_BAM = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{GENOME_VERSION}.genome.unique.bam"
-COVERAGE_BG = f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.10bp.bg4"
+GENOME_BAM_RAW = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.{GENOME_VERSION}.genome.aln.bam"
+GENOME_BAM = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.{GENOME_VERSION}.genome.bam"
+VECTOR_BAM = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.vector.bam"
+UNIQUE_BAM = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.{GENOME_VERSION}.genome.unique.bam"
+COVERAGE_BG = f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{SIZE_CLASS}.{GENOME_VERSION}.10bp.bg4"
 SUMMARY_TXT = f"{RESULTS_DIR}/reports/{SAMPLE_NAME}.summary.txt"
 BOOTSTRAP_FASTQ = f"{RESULTS_DIR}/bootstrap/{SAMPLE_NAME}.fastq"
 
 # Parity artifacts from Luo 2025 piRNA-seq.md Bowtie steps
-GENOME_AL_FASTQ = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{GENOME_VERSION}.genome.unique.fastq"
-GENOME_UN_FASTQ = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{GENOME_VERSION}.genome.unmapped.fastq"
-GENOME_MULTI_FASTQ = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{GENOME_VERSION}.genome.multi.fastq"
-VECTOR_AL_FASTQ = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.42AB_UASG.vectoronly.fastq"
+GENOME_AL_FASTQ = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.{GENOME_VERSION}.genome.unique.fastq"
+GENOME_UN_FASTQ = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.{GENOME_VERSION}.genome.unmapped.fastq"
+GENOME_MULTI_FASTQ = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.{GENOME_VERSION}.genome.multi.fastq"
+VECTOR_AL_FASTQ = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.42AB_UASG.vectoronly.fastq"
 
 # Coverage parity artifacts (Luo 2025): bins 10/100/1000 and strand splits.
-VECTOR_COV_PREFIX = f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.42AB_UASG.vectoronly"
+VECTOR_COV_PREFIX = f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.42AB_UASG.vectoronly"
 VECTOR_BG_10 = f"{VECTOR_COV_PREFIX}.10.bg4"
 VECTOR_BG_10_MINUS = f"{VECTOR_COV_PREFIX}.10.Minus.bg4"
 VECTOR_BG_10_PLUS = f"{VECTOR_COV_PREFIX}.10.Plus.bg4"
@@ -79,17 +88,18 @@ def normalize_te_region(region: str) -> str:
 
 
 def te_cov_prefix(tag: str) -> str:
-    return f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{tag}"
+    return f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.te.{tag}"
 
 
 TE_TARGET_FILES = []
-for _te_tag in TE_REGIONS:
-    _tp = te_cov_prefix(_te_tag)
-    for _te_bs in (10, 100, 1000):
-        TE_TARGET_FILES.append(f"{_tp}.{_te_bs}.bg4")
-        TE_TARGET_FILES.append(f"{_tp}.{_te_bs}.Minus.bg4")
-        TE_TARGET_FILES.append(f"{_tp}.{_te_bs}.Plus.bg4")
-        TE_TARGET_FILES.append(f"{_tp}.{_te_bs}.bg4.chopped.bg4")
+if EMIT_COVERAGE:
+    for _te_tag in TE_REGIONS:
+        _tp = te_cov_prefix(_te_tag)
+        for _te_bs in (10, 100, 1000):
+            TE_TARGET_FILES.append(f"{_tp}.{_te_bs}.bg4")
+            TE_TARGET_FILES.append(f"{_tp}.{_te_bs}.Minus.bg4")
+            TE_TARGET_FILES.append(f"{_tp}.{_te_bs}.Plus.bg4")
+            TE_TARGET_FILES.append(f"{_tp}.{_te_bs}.bg4.chopped.bg4")
 
 
 _PI_RNA_ALL_INPUTS = [
@@ -107,22 +117,28 @@ _PI_RNA_ALL_INPUTS = [
     GENOME_UN_FASTQ,
     GENOME_MULTI_FASTQ,
     VECTOR_AL_FASTQ,
-    COVERAGE_BG,
-    VECTOR_BG_10,
-    VECTOR_BG_10_MINUS,
-    VECTOR_BG_10_PLUS,
-    VECTOR_BG_100,
-    VECTOR_BG_100_MINUS,
-    VECTOR_BG_100_PLUS,
-    VECTOR_BG_1000,
-    VECTOR_BG_1000_MINUS,
-    VECTOR_BG_1000_PLUS,
-    VECTOR_BG_10_CHOP,
-    VECTOR_BG_100_CHOP,
-    VECTOR_BG_1000_CHOP,
     SUMMARY_TXT,
 ]
 _PI_RNA_ALL_INPUTS.extend(TE_TARGET_FILES)
+
+if EMIT_COVERAGE:
+    _PI_RNA_ALL_INPUTS.extend(
+        [
+            COVERAGE_BG,
+            VECTOR_BG_10,
+            VECTOR_BG_10_MINUS,
+            VECTOR_BG_10_PLUS,
+            VECTOR_BG_100,
+            VECTOR_BG_100_MINUS,
+            VECTOR_BG_100_PLUS,
+            VECTOR_BG_1000,
+            VECTOR_BG_1000_MINUS,
+            VECTOR_BG_1000_PLUS,
+            VECTOR_BG_10_CHOP,
+            VECTOR_BG_100_CHOP,
+            VECTOR_BG_1000_CHOP,
+        ]
+    )
 
 
 def resolve_existing_fastq(path_str: str):
@@ -281,7 +297,7 @@ rule map_genome_align:
         multi=GENOME_MULTI_FASTQ,
     params:
         index=GENOME_INDEX,
-        sortpfx=f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{GENOME_VERSION}.genome.sorttmp",
+        sortpfx=f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.{GENOME_VERSION}.genome.sorttmp",
     threads:
         THREADS
     shell:
@@ -349,7 +365,7 @@ rule map_vectors:
         al=VECTOR_AL_FASTQ,
     params:
         index=VECTOR_INDEX,
-        sortpfx=f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.vector.sorttmp",
+        sortpfx=f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.vector.sorttmp",
     threads:
         THREADS
     shell:
@@ -452,22 +468,22 @@ rule chop_vector_bg4:
         """
 
 
-if TE_REGIONS:
+if EMIT_COVERAGE and TE_REGIONS:
     _TE_TAG_PATTERN = "|".join(re.escape(k) for k in TE_REGIONS.keys())
 
     rule te_cluster_coverage:
         input:
             UNIQUE_BAM,
         output:
-            bg10=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.10.bg4",
-            bg10m=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.10.Minus.bg4",
-            bg10p=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.10.Plus.bg4",
-            bg100=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.100.bg4",
-            bg100m=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.100.Minus.bg4",
-            bg100p=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.100.Plus.bg4",
-            bg1000=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.1000.bg4",
-            bg1000m=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.1000.Minus.bg4",
-            bg1000p=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.1000.Plus.bg4",
+            bg10=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.te.{{tag}}.10.bg4",
+            bg10m=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.te.{{tag}}.10.Minus.bg4",
+            bg10p=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.te.{{tag}}.10.Plus.bg4",
+            bg100=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.te.{{tag}}.100.bg4",
+            bg100m=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.te.{{tag}}.100.Minus.bg4",
+            bg100p=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.te.{{tag}}.100.Plus.bg4",
+            bg1000=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.te.{{tag}}.1000.bg4",
+            bg1000m=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.te.{{tag}}.1000.Minus.bg4",
+            bg1000p=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.te.{{tag}}.1000.Plus.bg4",
         wildcard_constraints:
             tag=_TE_TAG_PATTERN,
         params:
@@ -490,13 +506,13 @@ if TE_REGIONS:
 
     rule chop_te_bg4:
         input:
-            bg10=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.10.bg4",
-            bg100=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.100.bg4",
-            bg1000=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.1000.bg4",
+            bg10=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.te.{{tag}}.10.bg4",
+            bg100=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.te.{{tag}}.100.bg4",
+            bg1000=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.te.{{tag}}.1000.bg4",
         output:
-            ch10=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.10.bg4.chopped.bg4",
-            ch100=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.100.bg4.chopped.bg4",
-            ch1000=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.23_29mer.te.{{tag}}.1000.bg4.chopped.bg4",
+            ch10=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.te.{{tag}}.10.bg4.chopped.bg4",
+            ch100=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.te.{{tag}}.100.bg4.chopped.bg4",
+            ch1000=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.te.{{tag}}.1000.bg4.chopped.bg4",
         wildcard_constraints:
             tag=_TE_TAG_PATTERN,
         params:
@@ -530,19 +546,22 @@ rule summary_report:
         genome_bam=GENOME_BAM,
         unique_bam=UNIQUE_BAM,
         vector_bam=VECTOR_BAM,
-        coverage=COVERAGE_BG,
+        coverage=lambda wc: COVERAGE_BG if EMIT_COVERAGE else [],
     output:
         SUMMARY_TXT,
     params:
         mapq_filter=MAPQ_FILTER_UNIQUE,
         te_note=",".join(sorted(TE_REGIONS.keys())) if TE_REGIONS else "none",
+        emit_coverage=EMIT_COVERAGE,
     shell:
         """
         mkdir -p {RESULTS_DIR}/reports
         {{
           echo "piRNA-seq summary (Luo 2025 piRNA-seq.md parity targets)"
           echo "sample: {SAMPLE_NAME}"
+          echo "size_class: {SIZE_CLASS}"
           echo "genome: {GENOME_VERSION}"
+          echo "emit_coverage: {params.emit_coverage}"
           echo "mapq_filter_unique: {params.mapq_filter}"
           echo "te_regions: {params.te_note}"
           echo "raw_fastq: {RAW_FASTQ}"
@@ -550,6 +569,10 @@ rule summary_report:
           echo "genome_bam: {input.genome_bam}"
           echo "unique_bam: {input.unique_bam}"
           echo "vector_bam: {input.vector_bam}"
-          echo "coverage_bedgraph: {input.coverage}"
+          if [ "{params.emit_coverage}" = "True" ]; then
+            echo "coverage_bedgraph: {input.coverage}"
+          else
+            echo "coverage_bedgraph: none"
+          fi
         }} > {output}
         """
