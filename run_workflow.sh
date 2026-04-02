@@ -681,6 +681,54 @@ check_input_files() {
     fi
 }
 
+# Interactive: Apptainer pipeline image (respects --use-apptainer / --pipeline-sif from CLI).
+prompt_apptainer_options() {
+    local wf_root
+    wf_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local default_sif="$wf_root/containers/pirna_pipeline.sif"
+
+    if [[ "$USE_APPTAINER" == "true" ]]; then
+        if [[ -n "${PIRNA_PIPELINE_SIF:-}" ]]; then
+            echo "Apptainer enabled (--use-apptainer); pipeline image: $PIRNA_PIPELINE_SIF" >&2
+            echo "" >&2
+            return 0
+        fi
+        echo "=== Apptainer ===" >&2
+        read -p "Path to Apptainer image [default: $default_sif]: " sif_input >&2
+        if [[ -n "$sif_input" ]]; then
+            PIRNA_PIPELINE_SIF="$(expand_path "$sif_input")"
+        else
+            PIRNA_PIPELINE_SIF="$default_sif"
+        fi
+        export PIRNA_PIPELINE_SIF
+        echo "Using pipeline image: $PIRNA_PIPELINE_SIF" >&2
+        echo "" >&2
+        return 0
+    fi
+
+    echo "=== Apptainer ===" >&2
+    echo "Run with the pipeline .sif for pinned FastQC, cutadapt, Bowtie, samtools, etc." >&2
+    echo "Press Enter or Y for Apptainer (default); type n to use conda snakemake_env on the host instead." >&2
+    read -p "Use Apptainer pipeline image? [Y/n]: " ap_in >&2
+    case "$ap_in" in
+        [nN]|[nN][oO])
+            echo "Using host conda (snakemake_env), no Apptainer image." >&2
+            ;;
+        *)
+            USE_APPTAINER=true
+            read -p "Path to Apptainer image [default: $default_sif]: " sif_input >&2
+            if [[ -n "$sif_input" ]]; then
+                PIRNA_PIPELINE_SIF="$(expand_path "$sif_input")"
+            else
+                PIRNA_PIPELINE_SIF="$default_sif"
+            fi
+            export PIRNA_PIPELINE_SIF
+            echo "Using pipeline image: $PIRNA_PIPELINE_SIF" >&2
+            ;;
+    esac
+    echo "" >&2
+}
+
 # Function to interactively select workflow and configure paths
 select_workflow_and_paths() {
     echo "Available workflows:" >&2
@@ -933,6 +981,7 @@ select_workflow_and_paths() {
         echo "Using custom adapter path: $ADAPTER_PATH" >&2
     fi
     echo "" >&2
+    prompt_apptainer_options
 }
 
 # Function to check if snakemake is running and auto-unlock if safe
@@ -1795,6 +1844,7 @@ elif [[ -z "$GENOME_VERSION" && -z "$GENOME_PATH" && -z "$INDEX_PATH" && -z "$DA
     fi
     echo "" >&2
     fi  # end else (non-defaults path prompt)
+    prompt_apptainer_options
 fi
 
 # Validate workflow
