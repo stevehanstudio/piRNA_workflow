@@ -158,6 +158,15 @@ expand_path() {
     echo "$path"
 }
 
+# Bowtie index prefix (no .fa). Config stores the prefix; workflow appends .fa for references.
+pirna_normalize_vector_index_prefix() {
+    local p="$1"
+    case "$p" in
+        *.fa) echo "${p%.fa}" ;;
+        *) echo "$p" ;;
+    esac
+}
+
 # Merge piRNA multi-vector TSV (id<TAB>path per line) into temp config references.vectors (needs PyYAML).
 pirna_merge_vectors_into_config() {
     local tc="$1"
@@ -186,6 +195,8 @@ for line in tsv.read_text().splitlines():
     if not vid or not idx:
         sys.stderr.write("error: empty id or index path in vector list\n")
         sys.exit(1)
+    if idx.endswith(".fa"):
+        idx = idx[: -len(".fa")]
     vectors.append({"id": vid, "index": idx})
 cfg = yaml.safe_load(tc.read_text())
 refs = cfg.setdefault("references", {})
@@ -207,7 +218,7 @@ PY
 prompt_pirna_vector_paths() {
     local default_vector="$1"
     PIRNA_MULTI_VECTOR_TSV=""
-    echo "Vectors: map the size-selected library to one or more Bowtie vector indexes (Luo 2025)." >&2
+    echo "Vectors: map the size-selected library to one or more Bowtie vector indexes." >&2
     read -p "Number of vectors to map [default: 1]: " _nvec_in >&2
     local _n="${_nvec_in:-1}"
     if ! [[ "$_n" =~ ^[0-9]+$ ]]; then
@@ -217,32 +228,34 @@ prompt_pirna_vector_paths() {
         _n=1
     fi
     if [[ "$_n" -eq 1 ]]; then
-        read -p "Vector index directory path [default: $default_vector]: " vector_input >&2
+        echo "Bowtie index prefix: path shared by NAME.fa and NAME.1.ebwt (do not end with .fa; a trailing .fa is stripped)." >&2
+        read -p "Vector index prefix [default: $default_vector]: " vector_input >&2
         if [[ -n "$vector_input" ]]; then
-            VECTOR_PATH="$vector_input"
-            echo "Using custom vector path: $VECTOR_PATH" >&2
+            VECTOR_PATH=$(pirna_normalize_vector_index_prefix "$(expand_path "$vector_input")")
+            echo "Using custom vector index prefix: $VECTOR_PATH" >&2
         fi
         return 0
     fi
     if ! python3 -c "import yaml" 2>/dev/null; then
         echo "Multi-vector mode needs Python 3 with PyYAML (pip install pyyaml)." >&2
         echo "Falling back to a single vector; re-run after installing PyYAML to use multiple vectors." >&2
-        read -p "Vector index directory path [default: $default_vector]: " vector_input >&2
+        echo "Bowtie index prefix: path shared by NAME.fa and NAME.1.ebwt (do not end with .fa; a trailing .fa is stripped)." >&2
+        read -p "Vector index prefix [default: $default_vector]: " vector_input >&2
         if [[ -n "$vector_input" ]]; then
-            VECTOR_PATH="$vector_input"
-            echo "Using custom vector path: $VECTOR_PATH" >&2
+            VECTOR_PATH=$(pirna_normalize_vector_index_prefix "$(expand_path "$vector_input")")
+            echo "Using custom vector index prefix: $VECTOR_PATH" >&2
         fi
         return 0
     fi
     VECTOR_PATH=""
     local _tsv
     _tsv="$(mktemp /tmp/pirna_vectors.XXXXXX.tsv)"
-    echo "Enter each vector's Bowtie index prefix (directory path, same as single-vector mode)." >&2
+    echo "Bowtie index prefix per vector: same as single-vector mode (path without .fa; trailing .fa is stripped)." >&2
     local _i
     for ((_i = 1; _i <= _n; _i++)); do
-        read -p "  Vector $_i index path [default: $default_vector]: " _vpath >&2
+        read -p "  Vector $_i index prefix [default: $default_vector]: " _vpath >&2
         _vpath="${_vpath:-$default_vector}"
-        _vpath=$(expand_path "$_vpath")
+        _vpath=$(pirna_normalize_vector_index_prefix "$(expand_path "$_vpath")")
         local _vid
         _vid=$(basename "$_vpath")
         read -p "  Vector $_i id for output filenames [default: $_vid]: " _vid_in >&2
@@ -876,16 +889,18 @@ select_workflow_and_paths() {
     if [[ "$WORKFLOW" == "pirna-seq" ]]; then
         prompt_pirna_vector_paths "$default_vector"
     elif [[ "$WORKFLOW" == "chip-seq" ]]; then
-        read -p "Vector index directory path [default: $default_vector]: " vector_input >&2
+        echo "Bowtie index prefix (path without .fa; trailing .fa is stripped)." >&2
+        read -p "Vector index prefix [default: $default_vector]: " vector_input >&2
         if [[ -n "$vector_input" ]]; then
-            VECTOR_PATH="$vector_input"
-            echo "Using custom vector path: $VECTOR_PATH" >&2
+            VECTOR_PATH=$(pirna_normalize_vector_index_prefix "$(expand_path "$vector_input")")
+            echo "Using custom vector index prefix: $VECTOR_PATH" >&2
         fi
     else
-        read -p "Vector index directory path [default: $default_vector]: " vector_input >&2
+        echo "Bowtie index prefix (path without .fa; trailing .fa is stripped)." >&2
+        read -p "Vector index prefix [default: $default_vector]: " vector_input >&2
         if [[ -n "$vector_input" ]]; then
-            VECTOR_PATH="$vector_input"
-            echo "Using custom vector path: $VECTOR_PATH" >&2
+            VECTOR_PATH=$(pirna_normalize_vector_index_prefix "$(expand_path "$vector_input")")
+            echo "Using custom vector index prefix: $VECTOR_PATH" >&2
         fi
     fi
     echo "" >&2
@@ -1136,7 +1151,7 @@ create_temp_config() {
 
     if [[ -n "$VECTOR_PATH" && "$workflow_dir" == "piRNA-seq" && "$_pirna_multi_merged" != "true" ]]; then
         local expanded_vector
-        expanded_vector=$(expand_path "$VECTOR_PATH")
+        expanded_vector=$(pirna_normalize_vector_index_prefix "$(expand_path "$VECTOR_PATH")")
         if grep -q "vector_index:" "$temp_config"; then
             sed -i "s|vector_index: .*|vector_index: \"$expanded_vector\"|" "$temp_config"
             echo "Override: piRNA-seq vector_index (single-vector / legacy): $expanded_vector" >&2
@@ -1183,7 +1198,8 @@ create_temp_config() {
         fi
         if [[ -n "$VECTOR_PATH" ]]; then
             # For totalRNA-seq, VECTOR_PATH overrides the vector index and ref
-            local expanded_vector=$(expand_path "$VECTOR_PATH")
+            local expanded_vector
+            expanded_vector=$(pirna_normalize_vector_index_prefix "$(expand_path "$VECTOR_PATH")")
             sed -i "s|vector_index: .*|vector_index: \"$expanded_vector\"|" "$temp_config"
             if ! grep -q "^vector_ref:" "$temp_config"; then
                 echo "vector_ref: \"${expanded_vector}.fa\"" >> "$temp_config"
@@ -1194,7 +1210,8 @@ create_temp_config() {
     fi
     
     if [[ -n "$VECTOR_PATH" ]]; then
-        local expanded_vector=$(expand_path "$VECTOR_PATH")
+        local expanded_vector
+        expanded_vector=$(pirna_normalize_vector_index_prefix "$(expand_path "$VECTOR_PATH")")
         sed -i "s|vector_42ab_index: .*|vector_42ab_index: \"$expanded_vector\"|" "$temp_config"
         sed -i "s|vector_42ab_fasta: .*|vector_42ab_fasta: \"${expanded_vector}.fa\"|" "$temp_config"
         echo "Override: Using vector path: $expanded_vector" >&2
@@ -1734,16 +1751,18 @@ elif [[ -z "$GENOME_VERSION" && -z "$GENOME_PATH" && -z "$INDEX_PATH" && -z "$DA
     if [[ "$WORKFLOW_SAVED" == "pirna-seq" ]]; then
         prompt_pirna_vector_paths "$default_vector"
     elif [[ "$WORKFLOW_SAVED" == "chip-seq" ]]; then
-        read -p "Vector index directory path [default: $default_vector]: " vector_input >&2
+        echo "Bowtie index prefix (path without .fa; trailing .fa is stripped)." >&2
+        read -p "Vector index prefix [default: $default_vector]: " vector_input >&2
         if [[ -n "$vector_input" ]]; then
-            VECTOR_PATH="$vector_input"
-            echo "Using custom vector path: $VECTOR_PATH" >&2
+            VECTOR_PATH=$(pirna_normalize_vector_index_prefix "$(expand_path "$vector_input")")
+            echo "Using custom vector index prefix: $VECTOR_PATH" >&2
         fi
     else
-        read -p "Vector index directory path [default: $default_vector]: " vector_input >&2
+        echo "Bowtie index prefix (path without .fa; trailing .fa is stripped)." >&2
+        read -p "Vector index prefix [default: $default_vector]: " vector_input >&2
         if [[ -n "$vector_input" ]]; then
-            VECTOR_PATH="$vector_input"
-            echo "Using custom vector path: $VECTOR_PATH" >&2
+            VECTOR_PATH=$(pirna_normalize_vector_index_prefix "$(expand_path "$vector_input")")
+            echo "Using custom vector index prefix: $VECTOR_PATH" >&2
         fi
     fi
     echo "" >&2
