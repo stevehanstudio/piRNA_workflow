@@ -1195,6 +1195,7 @@ run_snakemake() {
 
     if [[ "$USE_PIPELINE_CONTAINER" == "true" ]]; then
         echo "Running in pipeline container..."
+        echo "Pipeline image: $(readlink -f "$PIPELINE_SIF" 2>/dev/null || echo "$PIPELINE_SIF")"
         [[ "${APPTAINER_SUDO:-0}" == "1" ]] && echo "(using sudo for Apptainer)"
         echo "Directory: ${workflow_dir}"
         echo "Command: ${command}"
