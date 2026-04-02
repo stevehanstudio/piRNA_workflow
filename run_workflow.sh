@@ -167,11 +167,26 @@ pirna_normalize_vector_index_prefix() {
     esac
 }
 
+# Prefer snakemake_env's Python for PyYAML (system python3 often lacks it on servers).
+pirna_can_import_yaml() {
+    if command -v conda &>/dev/null && conda info --envs 2>/dev/null | grep -q snakemake_env; then
+        conda run --no-capture-output -n snakemake_env python3 -c "import yaml" 2>/dev/null && return 0
+    fi
+    command -v python3 &>/dev/null && python3 -c "import yaml" 2>/dev/null && return 0
+    return 1
+}
+
 # Merge piRNA multi-vector TSV (id<TAB>path per line) into temp config references.vectors (needs PyYAML).
 pirna_merge_vectors_into_config() {
     local tc="$1"
     local tsv="$2"
-    python3 - "$tc" "$tsv" <<'PY'
+    local -a py_cmd=(python3)
+    if command -v conda &>/dev/null && conda info --envs 2>/dev/null | grep -q snakemake_env; then
+        if conda run --no-capture-output -n snakemake_env python3 -c "import yaml" 2>/dev/null; then
+            py_cmd=(conda run --no-capture-output -n snakemake_env python3)
+        fi
+    fi
+    "${py_cmd[@]}" - "$tc" "$tsv" <<'PY'
 import pathlib, sys
 try:
     import yaml  # type: ignore
@@ -236,8 +251,8 @@ prompt_pirna_vector_paths() {
         fi
         return 0
     fi
-    if ! python3 -c "import yaml" 2>/dev/null; then
-        echo "Multi-vector mode needs Python 3 with PyYAML (pip install pyyaml)." >&2
+    if ! pirna_can_import_yaml; then
+        echo "Multi-vector mode needs PyYAML (try: conda install -n snakemake_env pyyaml, or pip install pyyaml for python3)." >&2
         echo "Falling back to a single vector; re-run after installing PyYAML to use multiple vectors." >&2
         echo "Bowtie index prefix: path shared by NAME.fa and NAME.1.ebwt (do not end with .fa; a trailing .fa is stripped)." >&2
         read -p "Vector index prefix [default: $default_vector]: " vector_input >&2
