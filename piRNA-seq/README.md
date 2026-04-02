@@ -8,7 +8,7 @@ Snakemake workflow aligned to [Luo 2025 piRNA-seq.md](https://github.com/Peng-He
 
 ## Tool versions (Apptainer)
 
-With `./run_workflow.sh 2 run --use-apptainer`, Snakemake runs inside `containers/pirna_pipeline.sif`, which already includes:
+With `./run_workflow.sh 2 run --use-apptainer`, Snakemake runs inside the pipeline SIF (default `containers/pirna_pipeline.sif` in the repo). Use **`PIRNA_PIPELINE_SIF`** or **`--pipeline-sif /path/to/pirna_pipeline.sif`** if the image lives elsewhere (e.g. lab share after cloning the repo). The image includes:
 
 | Tool | Version / source |
 |------|------------------|
@@ -55,13 +55,16 @@ For DAG checks without the Apptainer image, install `snakemake` on the host and 
 
 See `SMOKE_TEST.md` for dry-run expectations.
 
+Interactive `./run_workflow.sh` (piRNA-seq): you are prompted for **number of vectors** (default 1). For 2 or more, enter each vector’s Bowtie index prefix path and an **id** for filenames; the script merges `references.vectors` into a temporary config (requires Python **PyYAML**). Single-vector behavior is unchanged (`vector_index` override).
+
 ## Required inputs
 
 - Sample FASTQ (`config.yaml` → `sample.fastq`)
 - Genome FASTA + Bowtie index prefix (`genome.fasta`, `genome.bowtie_index`)
 - `genome.chrom_sizes`
-- `references.vector_index` → `42AB_UASG` prefix and `42AB_UASG.fa`
+- `references.vector_index` (single vector; basename = id in filenames) **or** `references.vectors` (list of `{id, index}` for multiple vectors; each needs `index.fa` beside the Bowtie prefix)
+- Vector Bowtie indexes are built under `results/references/vector/{id}/` (from each `*.fa`)
 
 ## Outputs
 
-Under `results/`: `fastqc_raw/`, `fastqc_filtered/`, `trimmed/`, `mapping/` (genome BAMs and Bowtie split FASTQs use `{sample}.{size_class}.{genome}.…`; vector BAM uses `{sample}.{size_class}.vector.bam`), `coverage/`, `reports/`.
+Under `results/`: `fastqc_raw/`, `fastqc_filtered/`, `trimmed/`, `mapping/` (genome BAMs and Bowtie split FASTQs use `{sample}.{size_class}.{genome}.…`; per-vector BAMs use `{sample}.{size_class}.{vector_id}.vector.bam`), `coverage/`, `reports/`.

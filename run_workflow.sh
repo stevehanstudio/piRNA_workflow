@@ -158,6 +158,102 @@ expand_path() {
     echo "$path"
 }
 
+# Merge piRNA multi-vector TSV (id<TAB>path per line) into temp config references.vectors (needs PyYAML).
+pirna_merge_vectors_into_config() {
+    local tc="$1"
+    local tsv="$2"
+    python3 - "$tc" "$tsv" <<'PY'
+import pathlib, sys
+try:
+    import yaml  # type: ignore
+except ImportError:
+    sys.stderr.write(
+        "error: Python PyYAML is required for multi-vector config (pip install pyyaml).\n"
+    )
+    sys.exit(1)
+tc = pathlib.Path(sys.argv[1])
+tsv = pathlib.Path(sys.argv[2])
+vectors = []
+for line in tsv.read_text().splitlines():
+    line = line.strip()
+    if not line or line.startswith("#"):
+        continue
+    parts = line.split("\t", 1)
+    if len(parts) != 2:
+        sys.stderr.write("error: each vector line must be: id<TAB>index_path\n")
+        sys.exit(1)
+    vid, idx = parts[0].strip(), parts[1].strip()
+    if not vid or not idx:
+        sys.stderr.write("error: empty id or index path in vector list\n")
+        sys.exit(1)
+    vectors.append({"id": vid, "index": idx})
+cfg = yaml.safe_load(tc.read_text())
+refs = cfg.setdefault("references", {})
+refs.pop("vector_index", None)
+refs["vectors"] = vectors
+tc.write_text(
+    yaml.dump(
+        cfg,
+        default_flow_style=False,
+        allow_unicode=True,
+        sort_keys=False,
+    )
+)
+PY
+}
+
+# Interactive piRNA-seq only: ask how many vectors, then paths (or single vector like legacy).
+# Sets VECTOR_PATH (n=1) or PIRNA_MULTI_VECTOR_TSV path to a tab-separated file (n>=2).
+prompt_pirna_vector_paths() {
+    local default_vector="$1"
+    PIRNA_MULTI_VECTOR_TSV=""
+    echo "Vectors: map the size-selected library to one or more Bowtie vector indexes (Luo 2025)." >&2
+    read -p "Number of vectors to map [default: 1]: " _nvec_in >&2
+    local _n="${_nvec_in:-1}"
+    if ! [[ "$_n" =~ ^[0-9]+$ ]]; then
+        _n=1
+    fi
+    if [[ "$_n" -lt 1 ]]; then
+        _n=1
+    fi
+    if [[ "$_n" -eq 1 ]]; then
+        read -p "Vector index directory path [default: $default_vector]: " vector_input >&2
+        if [[ -n "$vector_input" ]]; then
+            VECTOR_PATH="$vector_input"
+            echo "Using custom vector path: $VECTOR_PATH" >&2
+        fi
+        return 0
+    fi
+    if ! python3 -c "import yaml" 2>/dev/null; then
+        echo "Multi-vector mode needs Python 3 with PyYAML (pip install pyyaml)." >&2
+        echo "Falling back to a single vector; re-run after installing PyYAML to use multiple vectors." >&2
+        read -p "Vector index directory path [default: $default_vector]: " vector_input >&2
+        if [[ -n "$vector_input" ]]; then
+            VECTOR_PATH="$vector_input"
+            echo "Using custom vector path: $VECTOR_PATH" >&2
+        fi
+        return 0
+    fi
+    VECTOR_PATH=""
+    local _tsv
+    _tsv="$(mktemp /tmp/pirna_vectors.XXXXXX.tsv)"
+    echo "Enter each vector's Bowtie index prefix (directory path, same as single-vector mode)." >&2
+    local _i
+    for ((_i = 1; _i <= _n; _i++)); do
+        read -p "  Vector $_i index path [default: $default_vector]: " _vpath >&2
+        _vpath="${_vpath:-$default_vector}"
+        _vpath=$(expand_path "$_vpath")
+        local _vid
+        _vid=$(basename "$_vpath")
+        read -p "  Vector $_i id for output filenames [default: $_vid]: " _vid_in >&2
+        _vid="${_vid_in:-$_vid}"
+        printf '%s\t%s\n' "$_vid" "$_vpath" >> "$_tsv"
+    done
+    PIRNA_MULTI_VECTOR_TSV="$_tsv"
+    export PIRNA_MULTI_VECTOR_TSV
+    echo "Using $_n vectors; will write references.vectors to the temporary run config." >&2
+}
+
 # Helper function to find existing file path
 find_existing_path() {
     local candidate_paths=("$@")
@@ -756,12 +852,10 @@ select_workflow_and_paths() {
     fi
     echo "" >&2
     
-    # Vector path
+    # Vector path(s)
     local default_vector
     if [[ "$WORKFLOW" == "chip-seq" || "$WORKFLOW" == "pirna-seq" ]]; then
-        # For CHIP-seq, get vector_42ab_index under references section
         default_vector=$(grep -A 20 "references:" "$config_file" | grep -E '^\s*(vector_42ab_index|vector_index)\s*:' | sed -E 's/^\s*(vector_42ab_index|vector_index)\s*:\s*//; s/^"//; s/"$//' | head -1)
-        # Convert ../Shared to ./Shared since we're running from project root
         if [[ -n "$default_vector" ]]; then
             default_vector=$(echo "$default_vector" | sed 's|^\.\./Shared|./Shared|')
         fi
@@ -773,18 +867,26 @@ select_workflow_and_paths() {
             fi
         fi
     else
-        # For totalRNA-seq, check for vector_index
         default_vector=$(grep -E '^\s*vector_index\s*:' "$config_file" | sed -E 's/^\s*vector_index\s*:\s*//; s/^"//; s/"$//' | head -1)
-        # Convert ../Shared to ./Shared since we're running from project root
         if [[ -n "$default_vector" ]]; then
             default_vector=$(echo "$default_vector" | sed 's|^\.\./Shared|./Shared|')
         fi
         [[ -z "$default_vector" ]] && default_vector="./Shared/DataFiles/genomes/YichengVectors/42AB_UBIG"
     fi
-    read -p "Vector index directory path [default: $default_vector]: " vector_input >&2
-    if [[ -n "$vector_input" ]]; then
-        VECTOR_PATH="$vector_input"
-        echo "Using custom vector path: $VECTOR_PATH" >&2
+    if [[ "$WORKFLOW" == "pirna-seq" ]]; then
+        prompt_pirna_vector_paths "$default_vector"
+    elif [[ "$WORKFLOW" == "chip-seq" ]]; then
+        read -p "Vector index directory path [default: $default_vector]: " vector_input >&2
+        if [[ -n "$vector_input" ]]; then
+            VECTOR_PATH="$vector_input"
+            echo "Using custom vector path: $VECTOR_PATH" >&2
+        fi
+    else
+        read -p "Vector index directory path [default: $default_vector]: " vector_input >&2
+        if [[ -n "$vector_input" ]]; then
+            VECTOR_PATH="$vector_input"
+            echo "Using custom vector path: $VECTOR_PATH" >&2
+        fi
     fi
     echo "" >&2
     
@@ -857,6 +959,7 @@ show_usage() {
     echo "  --rerun-incomplete  - Re-run incomplete jobs"
     echo "  --clean            - Remove workflow results before run/run-force (non-interactive)"
     echo "  --use-apptainer    - Use Apptainer containers for FastQC and Bowtie (ensures 0.11.3 and 1.0.1-nh)"
+    echo "  --pipeline-sif PATH - Path to pirna_pipeline.sif (default: ./containers/pirna_pipeline.sif). Same as env PIRNA_PIPELINE_SIF."
     echo "  --use-sudo         - Use sudo for Apptainer exec (when unprivileged execution fails)"
     echo ""
     echo "Genome Configuration Options:"
@@ -866,7 +969,7 @@ show_usage() {
     echo "  --genome-path PATH    - Override genome FASTA file path"
     echo "  --index-path PATH     - Override bowtie index directory path"
     echo "  --dataset-path PATH   - Override input dataset directory/file path"
-    echo "  --vector-path PATH    - Override vector index directory path"
+    echo "  --vector-path PATH    - Override vector index directory path (piRNA-seq: single vector; multi-vector: config.yaml references.vectors or interactive prompts)"
     echo "  --adapter-path PATH   - Override adapter sequences file path"
     echo ""
     echo "Interactive Features:"
@@ -897,6 +1000,8 @@ show_usage() {
     echo "  $0 1 run --use-apptainer --cores 8         # Run CHIP-seq with FastQC in Apptainer"
     echo "  $0 4 run --use-apptainer                   # Run totalRNA-seq with Apptainer"
     echo "  $0 1 run --use-apptainer --use-sudo        # Run with sudo (when unprivileged exec fails)"
+    echo "  PIRNA_PIPELINE_SIF=/lab/sifs/pirna_pipeline.sif $0 2 run --use-apptainer  # Shared image path"
+    echo "  $0 2 run --use-apptainer --pipeline-sif /lab/sifs/pirna_pipeline.sif       # Same via flag"
     echo ""
     echo "  $0 4 run --defaults                        # Run totalRNA-seq with defaults, no prompts"
     echo ""
@@ -1018,6 +1123,26 @@ create_temp_config() {
             sed -i "s|^  fastq: .*|  fastq: \"$expanded_dataset\"|" "$temp_config"
         fi
         echo "Override: Using dataset path: $expanded_dataset" >&2
+    fi
+
+    local _pirna_multi_merged=false
+    if [[ "$workflow_dir" == "piRNA-seq" && -n "${PIRNA_MULTI_VECTOR_TSV:-}" && -f "$PIRNA_MULTI_VECTOR_TSV" ]]; then
+        pirna_merge_vectors_into_config "$temp_config" "$PIRNA_MULTI_VECTOR_TSV"
+        rm -f "$PIRNA_MULTI_VECTOR_TSV"
+        PIRNA_MULTI_VECTOR_TSV=""
+        _pirna_multi_merged=true
+        echo "Override: piRNA-seq references.vectors merged from interactive multi-vector list" >&2
+    fi
+
+    if [[ -n "$VECTOR_PATH" && "$workflow_dir" == "piRNA-seq" && "$_pirna_multi_merged" != "true" ]]; then
+        local expanded_vector
+        expanded_vector=$(expand_path "$VECTOR_PATH")
+        if grep -q "vector_index:" "$temp_config"; then
+            sed -i "s|vector_index: .*|vector_index: \"$expanded_vector\"|" "$temp_config"
+            echo "Override: piRNA-seq vector_index (single-vector / legacy): $expanded_vector" >&2
+        else
+            echo "Note: piRNA-seq config has no vector_index: line; use references.vectors in config or interactive multi-vector." >&2
+        fi
     fi
     
     # Additional totalRNA-seq specific overrides
@@ -1173,7 +1298,7 @@ run_snakemake() {
 
     # Create temporary config if path overrides or genome version are provided
     local temp_config=""
-    if [[ -n "$GENOME_PATH" || -n "$INDEX_PATH" || -n "$DATASET_PATH" || -n "$VECTOR_PATH" || -n "$ADAPTER_PATH" || -n "$GENOME_VERSION" ]]; then
+    if [[ -n "$GENOME_PATH" || -n "$INDEX_PATH" || -n "$DATASET_PATH" || -n "$VECTOR_PATH" || -n "${PIRNA_MULTI_VECTOR_TSV:-}" || -n "$ADAPTER_PATH" || -n "$GENOME_VERSION" ]]; then
         temp_config=$(create_temp_config "$workflow_dir")
         echo "Using temporary config with overrides: $temp_config" >&2
     fi
@@ -1183,9 +1308,9 @@ run_snakemake() {
         config_override="--configfile $(basename "$temp_config")"
     fi
 
-    # Use pipeline container when available (Apptainer only)
+    # Use pipeline container when available (Apptainer only). Override: PIRNA_PIPELINE_SIF or --pipeline-sif.
     SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    PIPELINE_SIF="${SCRIPT_ROOT}/containers/pirna_pipeline.sif"
+    PIPELINE_SIF="${PIRNA_PIPELINE_SIF:-$SCRIPT_ROOT/containers/pirna_pipeline.sif}"
     APPTAINER_CMD="apptainer"
     [[ "${APPTAINER_SUDO:-0}" == "1" ]] && APPTAINER_CMD="sudo apptainer"
     USE_PIPELINE_CONTAINER=false
@@ -1282,6 +1407,7 @@ GENOME_PATH=""
 INDEX_PATH=""
 DATASET_PATH=""
 VECTOR_PATH=""
+PIRNA_MULTI_VECTOR_TSV=""
 ADAPTER_PATH=""
 GENOME_VERSION=""
 GENOME_SPECIES=""
@@ -1358,6 +1484,15 @@ while [[ $# -gt 0 ]]; do
         --use-apptainer)
             USE_APPTAINER=true
             shift
+            ;;
+        --pipeline-sif)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --pipeline-sif requires a path to pirna_pipeline.sif" >&2
+                exit 1
+            fi
+            PIRNA_PIPELINE_SIF="$2"
+            export PIRNA_PIPELINE_SIF
+            shift 2
             ;;
         --use-sudo)
             USE_APPTAINER_SUDO=true
@@ -1575,7 +1710,7 @@ elif [[ -z "$GENOME_VERSION" && -z "$GENOME_PATH" && -z "$INDEX_PATH" && -z "$DA
     fi
     echo "" >&2
     
-    # Vector path
+    # Vector path(s)
     default_vector=""
     if [[ "$WORKFLOW_SAVED" == "chip-seq" || "$WORKFLOW_SAVED" == "pirna-seq" ]]; then
         default_vector=$(grep -A 20 "references:" "$config_file" | grep -E '^\s*(vector_42ab_index|vector_index)\s*:' | sed -E 's/^\s*(vector_42ab_index|vector_index)\s*:\s*//; s/^"//; s/"$//' | head -1)
@@ -1596,10 +1731,20 @@ elif [[ -z "$GENOME_VERSION" && -z "$GENOME_PATH" && -z "$INDEX_PATH" && -z "$DA
         fi
         [[ -z "$default_vector" ]] && default_vector="./Shared/DataFiles/genomes/YichengVectors/42AB_UBIG"
     fi
-    read -p "Vector index directory path [default: $default_vector]: " vector_input >&2
-    if [[ -n "$vector_input" ]]; then
-        VECTOR_PATH="$vector_input"
-        echo "Using custom vector path: $VECTOR_PATH" >&2
+    if [[ "$WORKFLOW_SAVED" == "pirna-seq" ]]; then
+        prompt_pirna_vector_paths "$default_vector"
+    elif [[ "$WORKFLOW_SAVED" == "chip-seq" ]]; then
+        read -p "Vector index directory path [default: $default_vector]: " vector_input >&2
+        if [[ -n "$vector_input" ]]; then
+            VECTOR_PATH="$vector_input"
+            echo "Using custom vector path: $VECTOR_PATH" >&2
+        fi
+    else
+        read -p "Vector index directory path [default: $default_vector]: " vector_input >&2
+        if [[ -n "$vector_input" ]]; then
+            VECTOR_PATH="$vector_input"
+            echo "Using custom vector path: $VECTOR_PATH" >&2
+        fi
     fi
     echo "" >&2
     
@@ -1704,7 +1849,7 @@ if [[ "$USE_APPTAINER" == "true" ]]; then
     # for unlock/status and still errors if the SIF is unusable (no Conda fallback).
     # When running inside pipeline container, do NOT pass --use-apptainer to Snakemake
     # (all tools are already in the container; rules with container: None would trigger Snakemake to spawn sub-containers incorrectly)
-    PIPELINE_SIF="${SCRIPT_ROOT}/containers/pirna_pipeline.sif"
+    PIPELINE_SIF="${PIRNA_PIPELINE_SIF:-$SCRIPT_ROOT/containers/pirna_pipeline.sif}"
     APPTAINER_CMD="apptainer"
     [[ "${APPTAINER_SUDO:-0}" == "1" ]] && APPTAINER_CMD="sudo apptainer"
     if [[ -f "$PIPELINE_SIF" ]] && $APPTAINER_CMD exec "$PIPELINE_SIF" snakemake --version &>/dev/null; then

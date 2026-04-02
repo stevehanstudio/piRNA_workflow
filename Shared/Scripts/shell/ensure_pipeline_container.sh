@@ -10,7 +10,8 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-PIPELINE_SIF="${PROJECT_ROOT}/containers/pirna_pipeline.sif"
+# Default: repo-relative image. Override for shared/cached SIFs: export PIRNA_PIPELINE_SIF=/path/to/pirna_pipeline.sif
+PIPELINE_SIF="${PIRNA_PIPELINE_SIF:-$PROJECT_ROOT/containers/pirna_pipeline.sif}"
 PIPELINE_DEF="${PROJECT_ROOT}/containers/pipeline.def"
 
 # Use sudo for Apptainer exec when unprivileged execution fails (APPTAINER_SUDO=1)
@@ -31,10 +32,14 @@ if [[ ! -f "$PIPELINE_SIF" ]]; then
     echo "This workflow expects a prebuilt pipeline container (Option A)." >&2
     echo "Ask your lab/admin to build it once on a machine with build permissions, then copy it here." >&2
     echo "" >&2
+    echo "Use a different path (e.g. lab share) without copying into the repo:" >&2
+    echo "  export PIRNA_PIPELINE_SIF=/path/to/pirna_pipeline.sif" >&2
+    echo "  # or: ./run_workflow.sh ... --use-apptainer --pipeline-sif /path/to/pirna_pipeline.sif" >&2
+    echo "" >&2
     echo "Build command (admin/dev machine):" >&2
     echo "  cd $PROJECT_ROOT && sudo apptainer build containers/pirna_pipeline.sif containers/pipeline.def" >&2
     echo "" >&2
-    echo "Then copy the resulting SIF to this path:" >&2
+    echo "Then copy the resulting SIF to this path (or set PIRNA_PIPELINE_SIF):" >&2
     echo "  $PIPELINE_SIF" >&2
     exit 1
 fi

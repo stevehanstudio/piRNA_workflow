@@ -19,7 +19,15 @@ sample:
 
 references:
   # Luo 2025 piRNA-seq.md maps to 42AB_UASG (not 42AB_UBIG used by ChIP/totalRNA in this repo).
+  # Single vector (default): basename of the path is used as the output id (e.g. 42AB_UASG.*.vector.bam).
   vector_index: "../Shared/DataFiles/genomes/YichengVectors/42AB_UASG"
+  # Multi-vector: set `vectors` (list of {id, index}) and omit or remove `vector_index`.
+  # Example:
+  # vectors:
+  #   - id: "42AB_UASG"
+  #     index: "../Shared/DataFiles/genomes/YichengVectors/42AB_UASG"
+  #   - id: "42AB_UBIG"
+  #     index: "../Shared/DataFiles/genomes/YichengVectors/42AB_UBIG"
   # Illumina TruSeq small RNA / documented in piRNA-seq.md
   adapter_sequence: "AGATCGGAAGAGCACACGTCT"
 

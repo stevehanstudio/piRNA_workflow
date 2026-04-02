@@ -7,7 +7,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 FASTQC_SIF="${PROJECT_ROOT}/CHIP-seq/envs/fastqc_0.11.3.sif"
-PIPELINE_SIF="${PROJECT_ROOT}/containers/pirna_pipeline.sif"
+PIPELINE_SIF="${PIRNA_PIPELINE_SIF:-$PROJECT_ROOT/containers/pirna_pipeline.sif}"
 
 # When pipeline container exists (SIF), FastQC is built-in - skip individual build
 if [[ -f "$PIPELINE_SIF" ]]; then

@@ -19,8 +19,6 @@ ADAPTER = config["references"]["adapter_sequence"]
 GENOME_INDEX = config["genome"]["bowtie_index"].format(version=GENOME_VERSION)
 GENOME_FA = config["genome"]["fasta"].format(version=GENOME_VERSION)
 CHROM_SIZES = config["genome"]["chrom_sizes"].format(version=GENOME_VERSION)
-VECTOR_INDEX = config["references"]["vector_index"]
-VECTOR_FA = f"{VECTOR_INDEX}.fa"
 
 MIN_LEN = int(config["analysis"]["min_read_length"])
 MAX_LEN = int(config["analysis"]["max_read_length"])
@@ -33,13 +31,74 @@ SIZE_CLASS = (
 # Luo coverage filenames used "*23_29mer*"; keep the same pattern for arbitrary size_class.
 SIZE_CLASS_MER = f"{SIZE_CLASS}mer"
 
+VECTOR_EBWT_SUFFIXES = ("1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt")
+
+
+def _parse_vector_entries(ref: dict) -> list:
+    """Build [{id, index}, ...] from references.vectors or legacy references.vector_index."""
+    entries = []
+    if ref.get("vectors"):
+        for i, item in enumerate(ref["vectors"]):
+            if not isinstance(item, dict):
+                raise ValueError(f"references.vectors[{i}] must be a mapping with id and index")
+            vid = str(item.get("id", "")).strip()
+            idx = str(item.get("index", "")).strip()
+            if not vid or not idx:
+                raise ValueError(f"references.vectors[{i}] requires non-empty id and index")
+            if not re.match(r"^[\w.-]+$", vid):
+                raise ValueError(
+                    f"Vector id {vid!r} must use only letters, digits, underscore, dot, hyphen"
+                )
+            entries.append({"id": vid, "index": idx})
+    elif ref.get("vector_index"):
+        idx = str(ref["vector_index"]).strip()
+        vid = os.path.basename(os.path.normpath(idx))
+        entries.append({"id": vid, "index": idx})
+    else:
+        raise ValueError("references must define vector_index (single) or vectors (non-empty list)")
+    ids = [e["id"] for e in entries]
+    if len(ids) != len(set(ids)):
+        raise ValueError(f"Duplicate vector ids: {ids}")
+    return entries
+
+
+VECTOR_ENTRIES = _parse_vector_entries(config["references"])
+VECTOR_IDS = [e["id"] for e in VECTOR_ENTRIES]
+VECTOR_BY_ID = {e["id"]: e for e in VECTOR_ENTRIES}
+_VECTOR_ID_PATTERN = "|".join(re.escape(v) for v in VECTOR_IDS)
+
+
+def vector_index_prefix(vid: str) -> str:
+    return VECTOR_BY_ID[vid]["index"]
+
+
+def vector_fa_path(vid: str) -> str:
+    return f"{vector_index_prefix(vid)}.fa"
+
+
+def vector_built_prefix(vid: str) -> str:
+    """Bowtie index prefix under results (Snakemake wildcards require stable paths)."""
+    return f"{RESULTS_DIR}/references/vector/{vid}/bowtie"
+
+
+def vector_bam_path(vid: str) -> str:
+    return f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.{vid}.vector.bam"
+
+
+def vector_al_fastq_path(vid: str) -> str:
+    return f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.{vid}.vectoronly.fastq"
+
+
+def vector_cov_prefix_for(vid: str) -> str:
+    return f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.{vid}.vectoronly"
+
+
 QC_RAW_DIR = f"{RESULTS_DIR}/fastqc_raw"
 QC_FILTERED_DIR = f"{RESULTS_DIR}/fastqc_filtered"
 TRIMMED_FASTQ = f"{RESULTS_DIR}/trimmed/{SAMPLE_NAME}.adapter_trimmed.fastq"
 SIZE_SELECTED_FASTQ = f"{RESULTS_DIR}/trimmed/{SAMPLE_NAME}.pirna_sized.fastq"
 GENOME_BAM_RAW = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.{GENOME_VERSION}.genome.aln.bam"
 GENOME_BAM = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.{GENOME_VERSION}.genome.bam"
-VECTOR_BAM = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.vector.bam"
 UNIQUE_BAM = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.{GENOME_VERSION}.genome.unique.bam"
 COVERAGE_BG = f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{SIZE_CLASS}.{GENOME_VERSION}.10bp.bg4"
 SUMMARY_TXT = f"{RESULTS_DIR}/reports/{SAMPLE_NAME}.summary.txt"
@@ -49,26 +108,17 @@ BOOTSTRAP_FASTQ = f"{RESULTS_DIR}/bootstrap/{SAMPLE_NAME}.fastq"
 GENOME_AL_FASTQ = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.{GENOME_VERSION}.genome.unique.fastq"
 GENOME_UN_FASTQ = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.{GENOME_VERSION}.genome.unmapped.fastq"
 GENOME_MULTI_FASTQ = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.{GENOME_VERSION}.genome.multi.fastq"
-VECTOR_AL_FASTQ = f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.42AB_UASG.vectoronly.fastq"
 
-# Coverage parity artifacts (Luo 2025): bins 10/100/1000 and strand splits.
-VECTOR_COV_PREFIX = f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.42AB_UASG.vectoronly"
-VECTOR_BG_10 = f"{VECTOR_COV_PREFIX}.10.bg4"
-VECTOR_BG_10_MINUS = f"{VECTOR_COV_PREFIX}.10.Minus.bg4"
-VECTOR_BG_10_PLUS = f"{VECTOR_COV_PREFIX}.10.Plus.bg4"
-VECTOR_BG_100 = f"{VECTOR_COV_PREFIX}.100.bg4"
-VECTOR_BG_100_MINUS = f"{VECTOR_COV_PREFIX}.100.Minus.bg4"
-VECTOR_BG_100_PLUS = f"{VECTOR_COV_PREFIX}.100.Plus.bg4"
-VECTOR_BG_1000 = f"{VECTOR_COV_PREFIX}.1000.bg4"
-VECTOR_BG_1000_MINUS = f"{VECTOR_COV_PREFIX}.1000.Minus.bg4"
-VECTOR_BG_1000_PLUS = f"{VECTOR_COV_PREFIX}.1000.Plus.bg4"
-
-VECTOR_BG_10_CHOP = f"{VECTOR_BG_10}.chopped.bg4"
-VECTOR_BG_100_CHOP = f"{VECTOR_BG_100}.chopped.bg4"
-VECTOR_BG_1000_CHOP = f"{VECTOR_BG_1000}.chopped.bg4"
-
-VECTOR_EBWT_SUFFIXES = ("1.ebwt", "2.ebwt", "3.ebwt", "4.ebwt", "rev.1.ebwt", "rev.2.ebwt")
-VECTOR_EBWT = [f"{VECTOR_INDEX}.{suf}" for suf in VECTOR_EBWT_SUFFIXES]
+# Coverage parity artifacts (Luo 2025): bins 10/100/1000 and strand splits, per vector id.
+VECTOR_COVERAGE_ALL = []
+if EMIT_COVERAGE:
+    for _vid in VECTOR_IDS:
+        _vp = vector_cov_prefix_for(_vid)
+        for _bs in (10, 100, 1000):
+            VECTOR_COVERAGE_ALL.append(f"{_vp}.{_bs}.bg4")
+            VECTOR_COVERAGE_ALL.append(f"{_vp}.{_bs}.Minus.bg4")
+            VECTOR_COVERAGE_ALL.append(f"{_vp}.{_bs}.Plus.bg4")
+            VECTOR_COVERAGE_ALL.append(f"{_vp}.{_bs}.bg4.chopped.bg4")
 
 _te_cfg = config.get("genome", {}).get("te_regions")
 TE_REGIONS = _te_cfg if isinstance(_te_cfg, dict) else {}
@@ -109,36 +159,25 @@ _PI_RNA_ALL_INPUTS = [
     SIZE_SELECTED_FASTQ,
     GENOME_BAM,
     f"{GENOME_BAM}.bai",
-    VECTOR_BAM,
-    f"{VECTOR_BAM}.bai",
     UNIQUE_BAM,
     f"{UNIQUE_BAM}.bai",
     GENOME_AL_FASTQ,
     GENOME_UN_FASTQ,
     GENOME_MULTI_FASTQ,
-    VECTOR_AL_FASTQ,
     SUMMARY_TXT,
 ]
+for _vid in VECTOR_IDS:
+    _PI_RNA_ALL_INPUTS.extend(
+        [
+            vector_bam_path(_vid),
+            f"{vector_bam_path(_vid)}.bai",
+            vector_al_fastq_path(_vid),
+        ]
+    )
 _PI_RNA_ALL_INPUTS.extend(TE_TARGET_FILES)
 
 if EMIT_COVERAGE:
-    _PI_RNA_ALL_INPUTS.extend(
-        [
-            COVERAGE_BG,
-            VECTOR_BG_10,
-            VECTOR_BG_10_MINUS,
-            VECTOR_BG_10_PLUS,
-            VECTOR_BG_100,
-            VECTOR_BG_100_MINUS,
-            VECTOR_BG_100_PLUS,
-            VECTOR_BG_1000,
-            VECTOR_BG_1000_MINUS,
-            VECTOR_BG_1000_PLUS,
-            VECTOR_BG_10_CHOP,
-            VECTOR_BG_100_CHOP,
-            VECTOR_BG_1000_CHOP,
-        ]
-    )
+    _PI_RNA_ALL_INPUTS.extend([COVERAGE_BG] + VECTOR_COVERAGE_ALL)
 
 
 def resolve_existing_fastq(path_str: str):
@@ -195,16 +234,21 @@ rule all:
 
 rule bowtie_index_vector:
     input:
-        VECTOR_FA,
+        fa=lambda wc: vector_fa_path(wc.vector_id),
     output:
-        VECTOR_EBWT,
+        ebwt=expand(
+            RESULTS_DIR + "/references/vector/{{vector_id}}/bowtie.{suf}",
+            suf=VECTOR_EBWT_SUFFIXES,
+        ),
     params:
-        prefix=VECTOR_INDEX,
+        prefix=lambda wc: vector_built_prefix(wc.vector_id),
+    wildcard_constraints:
+        vector_id=_VECTOR_ID_PATTERN,
     shell:
         """
         BBL="${{BOWTIE_BUILD_BIN:-bowtie-build}}"
         mkdir -p "$(dirname "{params.prefix}")"
-        "$BBL" {input} {params.prefix}
+        "$BBL" {input.fa} {params.prefix}
         """
 
 
@@ -354,20 +398,26 @@ rule filter_unique_genome_reads:
         """
 
 
-# Luo 2025 piRNA-seq.md: map the full 23–29 nt library to the vector index (not genome-unmapped only).
+# Luo 2025 piRNA-seq.md: map the full size-selected library to each vector index (not genome-unmapped only).
 rule map_vectors:
     input:
         fq=SIZE_SELECTED_FASTQ,
-        ebwt=VECTOR_EBWT,
+        ebwt=expand(
+            RESULTS_DIR + "/references/vector/{{vector_id}}/bowtie.{suf}",
+            suf=VECTOR_EBWT_SUFFIXES,
+        ),
     output:
-        bam=VECTOR_BAM,
-        bai=f"{VECTOR_BAM}.bai",
-        al=VECTOR_AL_FASTQ,
+        bam=f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.{{vector_id}}.vector.bam",
+        bai=f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.{{vector_id}}.vector.bam.bai",
+        al=f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.{{vector_id}}.vectoronly.fastq",
     params:
-        index=VECTOR_INDEX,
-        sortpfx=f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.vector.sorttmp",
+        index=lambda wc: vector_built_prefix(wc.vector_id),
+        fa=lambda wc: vector_fa_path(wc.vector_id),
+        sortpfx=f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.{{vector_id}}.vector.sorttmp",
     threads:
         THREADS
+    wildcard_constraints:
+        vector_id=_VECTOR_ID_PATTERN,
     shell:
         """
         BT="${{BOWTIE_BIN:-bowtie}}"
@@ -377,7 +427,7 @@ rule map_vectors:
         "$BT" -p {threads} --chunkmbs 1024 -v 0 -a -m 1 -t --sam-nh --best --strata -q --sam -k 1 \
           --al {output.al} \
           {params.index} {input.fq} \
-          | "$ST18" view -bT {VECTOR_FA} - \
+          | "$ST18" view -bT {params.fa} - \
           | "$ST16" sort - {params.sortpfx}
         mv -f "{params.sortpfx}.bam" "{output.bam}"
         "$ST16" index {output.bam}
@@ -401,43 +451,53 @@ rule coverage:
 
 rule vector_coverage:
     input:
-        VECTOR_BAM
+        bam=f"{RESULTS_DIR}/mapping/{SAMPLE_NAME}.{SIZE_CLASS}.{{vector_id}}.vector.bam",
     output:
-        bg10=VECTOR_BG_10,
-        bg10m=VECTOR_BG_10_MINUS,
-        bg10p=VECTOR_BG_10_PLUS,
-        bg100=VECTOR_BG_100,
-        bg100m=VECTOR_BG_100_MINUS,
-        bg100p=VECTOR_BG_100_PLUS,
-        bg1000=VECTOR_BG_1000,
-        bg1000m=VECTOR_BG_1000_MINUS,
-        bg1000p=VECTOR_BG_1000_PLUS,
+        bg10=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.{{vector_id}}.vectoronly.10.bg4",
+        bg10m=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.{{vector_id}}.vectoronly.10.Minus.bg4",
+        bg10p=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.{{vector_id}}.vectoronly.10.Plus.bg4",
+        bg100=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.{{vector_id}}.vectoronly.100.bg4",
+        bg100m=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.{{vector_id}}.vectoronly.100.Minus.bg4",
+        bg100p=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.{{vector_id}}.vectoronly.100.Plus.bg4",
+        bg1000=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.{{vector_id}}.vectoronly.1000.bg4",
+        bg1000m=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.{{vector_id}}.vectoronly.1000.Minus.bg4",
+        bg1000p=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.{{vector_id}}.vectoronly.1000.Plus.bg4",
+    wildcard_constraints:
+        vector_id=_VECTOR_ID_PATTERN,
     shell:
         """
         BCV="${{BAMCOVERAGE_BIN:-bamCoverage}}"
         mkdir -p {RESULTS_DIR}/coverage
 
-        "$BCV" -b {input} -of bedgraph -bs 10 -o {output.bg10}
-        "$BCV" -b {input} -of bedgraph -bs 10 --samFlagInclude 16 -o {output.bg10m}
-        "$BCV" -b {input} -of bedgraph -bs 10 --samFlagExclude 16 -o {output.bg10p}
+        "$BCV" -b {input.bam} -of bedgraph -bs 10 -o {output.bg10}
+        "$BCV" -b {input.bam} -of bedgraph -bs 10 --samFlagInclude 16 -o {output.bg10m}
+        "$BCV" -b {input.bam} -of bedgraph -bs 10 --samFlagExclude 16 -o {output.bg10p}
 
-        "$BCV" -b {input} -of bedgraph -bs 100 -o {output.bg100}
-        "$BCV" -b {input} -of bedgraph -bs 100 --samFlagInclude 16 -o {output.bg100m}
-        "$BCV" -b {input} -of bedgraph -bs 100 --samFlagExclude 16 -o {output.bg100p}
+        "$BCV" -b {input.bam} -of bedgraph -bs 100 -o {output.bg100}
+        "$BCV" -b {input.bam} -of bedgraph -bs 100 --samFlagInclude 16 -o {output.bg100m}
+        "$BCV" -b {input.bam} -of bedgraph -bs 100 --samFlagExclude 16 -o {output.bg100p}
 
-        "$BCV" -b {input} -of bedgraph -bs 1000 -o {output.bg1000}
-        "$BCV" -b {input} -of bedgraph -bs 1000 --samFlagInclude 16 -o {output.bg1000m}
-        "$BCV" -b {input} -of bedgraph -bs 1000 --samFlagExclude 16 -o {output.bg1000p}
+        "$BCV" -b {input.bam} -of bedgraph -bs 1000 -o {output.bg1000}
+        "$BCV" -b {input.bam} -of bedgraph -bs 1000 --samFlagInclude 16 -o {output.bg1000m}
+        "$BCV" -b {input.bam} -of bedgraph -bs 1000 --samFlagExclude 16 -o {output.bg1000p}
         """
 
 
 rule chop_vector_bg4:
     input:
-        bg4=lambda wc: [VECTOR_BG_10, VECTOR_BG_100, VECTOR_BG_1000]
+        bg4=[
+            f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.{{vector_id}}.vectoronly.10.bg4",
+            f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.{{vector_id}}.vectoronly.100.bg4",
+            f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.{{vector_id}}.vectoronly.1000.bg4",
+        ],
     output:
-        ch10=VECTOR_BG_10_CHOP,
-        ch100=VECTOR_BG_100_CHOP,
-        ch1000=VECTOR_BG_1000_CHOP,
+        ch10=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.{{vector_id}}.vectoronly.10.bg4.chopped.bg4",
+        ch100=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.{{vector_id}}.vectoronly.100.bg4.chopped.bg4",
+        ch1000=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.{{vector_id}}.vectoronly.1000.bg4.chopped.bg4",
+    params:
+        cov_prefix=f"{RESULTS_DIR}/coverage/{SAMPLE_NAME}.{GENOME_VERSION}.{SIZE_CLASS_MER}.{{vector_id}}.vectoronly",
+    wildcard_constraints:
+        vector_id=_VECTOR_ID_PATTERN,
     shell:
         r"""
         # Luo 2025: convert bg4 -> bed5, chop to bin size, then bedmap scores back.
@@ -457,7 +517,7 @@ rule chop_vector_bg4:
           exit 127
         fi
         for bs in 10 100 1000; do
-          in="{VECTOR_COV_PREFIX}.${{bs}}.bg4"
+          in="{params.cov_prefix}.${{bs}}.bg4"
           out="$in.chopped.bg4"
           tmp="$(mktemp -p {RESULTS_DIR}/coverage signal.XXXXXX.bed)"
           awk -vOFS="\t" '{{ print $1, $2, $3, ".", $4 }}' "$in" > "$tmp"
@@ -545,7 +605,11 @@ rule summary_report:
     input:
         genome_bam=GENOME_BAM,
         unique_bam=UNIQUE_BAM,
-        vector_bam=VECTOR_BAM,
+        vector_bam=expand(
+            RESULTS_DIR + "/mapping/" + SAMPLE_NAME + ".{size_class}.{vector_id}.vector.bam",
+            size_class=SIZE_CLASS,
+            vector_id=VECTOR_IDS,
+        ),
         coverage=lambda wc: COVERAGE_BG if EMIT_COVERAGE else [],
     output:
         SUMMARY_TXT,
@@ -553,6 +617,8 @@ rule summary_report:
         mapq_filter=MAPQ_FILTER_UNIQUE,
         te_note=",".join(sorted(TE_REGIONS.keys())) if TE_REGIONS else "none",
         emit_coverage=EMIT_COVERAGE,
+        vector_bam_list=" ".join(vector_bam_path(v) for v in VECTOR_IDS),
+        vector_ids=",".join(VECTOR_IDS),
     shell:
         """
         mkdir -p {RESULTS_DIR}/reports
@@ -561,6 +627,7 @@ rule summary_report:
           echo "sample: {SAMPLE_NAME}"
           echo "size_class: {SIZE_CLASS}"
           echo "genome: {GENOME_VERSION}"
+          echo "vector_ids: {params.vector_ids}"
           echo "emit_coverage: {params.emit_coverage}"
           echo "mapq_filter_unique: {params.mapq_filter}"
           echo "te_regions: {params.te_note}"
@@ -568,7 +635,7 @@ rule summary_report:
           echo "sized_fastq: {SIZE_SELECTED_FASTQ}"
           echo "genome_bam: {input.genome_bam}"
           echo "unique_bam: {input.unique_bam}"
-          echo "vector_bam: {input.vector_bam}"
+          echo "vector_bams: {params.vector_bam_list}"
           if [ "{params.emit_coverage}" = "True" ]; then
             echo "coverage_bedgraph: {input.coverage}"
           else
